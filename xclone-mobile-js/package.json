@@ -1,0 +1,30 @@
+{
+  "name": "xclone-mobile-js",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview",
+    "lint": "eslint . --ext .vue,.js"
+  },
+  "dependencies": {
+    "@capacitor/android": "^5.7.0",
+    "@capacitor/cli": "^5.7.0",
+    "@capacitor/core": "^5.7.0",
+    "@ionic/vue": "^7.0.0",
+    "@ionic/vue-router": "^7.0.0",
+    "android": "^0.0.8",
+    "axios": "^1.6.0",
+    "socket.io-client": "^4.7.5",
+    "vue": "^3.2.13",
+    "vue-router": "^4.0.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.1.4",
+    "eslint": "^8.0.0",
+    "eslint-plugin-vue": "^9.0.0",
+    "vite": "^5.4.8"
+  }
+
+}

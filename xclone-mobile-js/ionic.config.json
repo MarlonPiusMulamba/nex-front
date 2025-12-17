@@ -1,0 +1,7 @@
+{
+  "name": "xclone-mobile-js",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "vue-vite"
+}
