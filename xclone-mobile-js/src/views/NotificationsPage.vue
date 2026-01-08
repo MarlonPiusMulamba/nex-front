@@ -62,6 +62,7 @@ import {
   IonAvatar
 } from '@ionic/vue';
 import axios from 'axios';
+import config from '@/config/index.js';
 
 export default {
   name: 'NotificationsPage',
@@ -82,7 +83,7 @@ export default {
   data() {
     return {
       userId: localStorage.getItem('userId'),
-      API_URL: 'http://localhost:5000',
+      API_URL: config.api.baseURL,
       notifications: [],
       loading: false,
       defaultAvatar:
@@ -92,8 +93,10 @@ export default {
   methods: {
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
+      if (typeof imageData !== 'string') return this.defaultAvatar;
       if (imageData.startsWith('http')) return imageData;
       if (imageData.startsWith('data:image')) return imageData;
+      if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
       return `data:image/png;base64,${imageData}`;
     },
 

@@ -155,6 +155,13 @@
             class="message-textarea"
             @keyup.enter.exact="sendMessage">
           </ion-textarea>
+
+          <div class="emoji-wrapper">
+            <ion-button fill="clear" size="small" @click="toggleEmojiPicker" class="emoji-trigger">
+              <ion-icon :icon="happy" color="medium"></ion-icon>
+            </ion-button>
+            <EmojiPicker v-if="showEmojiPicker" @select="addEmoji" class="dm-emoji-picker" />
+          </div>
           
           <ion-button 
             v-if="messageText.trim() || imagePreview"
@@ -223,29 +230,6 @@
     @change="onImageSelect"
   />
 
-  <ion-modal :is-open="callStatus !== 'idle'">
-    <ion-header>
-      <ion-toolbar>
-        <ion-title>
-          {{ isCaller ? (callStatus === 'calling' ? 'Calling' : 'In Call') : (callStatus === 'ringing' ? 'Incoming Call' : 'In Call') }}
-        </ion-title>
-      </ion-toolbar>
-    </ion-header>
-    <ion-content>
-      <div class="call-container">
-        <div v-if="callMedia === 'video'" class="video-call">
-          <video ref="remoteVideo" autoplay playsinline class="remote-video"></video>
-          <video ref="localVideo" autoplay muted playsinline class="local-video"></video>
-        </div>
-        <audio v-else ref="remoteAudio" autoplay></audio>
-        <div class="call-controls">
-          <ion-button v-if="!isCaller && callStatus === 'ringing'" color="success" @click="acceptCall()">Accept</ion-button>
-          <ion-button v-if="!isCaller && callStatus === 'ringing'" color="medium" @click="declineCall()">Decline</ion-button>
-          <ion-button v-if="callStatus === 'calling' || callStatus === 'in_call'" color="danger" @click="hangupCall()">Hang Up</ion-button>
-        </div>
-      </div>
-    </ion-content>
-  </ion-modal>
   </ion-page>
 </template>
 
@@ -258,16 +242,19 @@ import {
 } from '@ionic/vue';
 import { 
   search, arrowBack, send, mic, add, call, videocam, chatbubbles,
-  checkmark, checkmarkDone
+  checkmark, checkmarkDone, happy
 } from 'ionicons/icons';
 import axios from 'axios';
+import config from '@/config/index.js';
+import EmojiPicker from '@/components/EmojiPicker.vue';
 
 export default {
   name: 'DMPage',
   components: {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
     IonButtons, IonIcon, IonSearchbar, IonModal, IonTextarea, IonSpinner,
-    IonRefresher, IonRefresherContent
+    IonRefresher, IonRefresherContent,
+    EmojiPicker
   },
   data() {
     return {
@@ -284,32 +271,23 @@ export default {
       showSearchModal: false,
       isLoading: false,
       loadingMessages: false,
-      API_URL: 'http://localhost:5000',
+      API_URL: config.api.baseURL,
       searchingUsers: false,
       isSending: false,
+      showEmojiPicker: false,
       search, arrowBack, send, mic, add, call, videocam, chatbubbles,
       checkmark, checkmarkDone,
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
-      pc: null,
-      localStream: null,
-      remoteStream: null,
-      callStatus: 'idle',      // 'idle' | 'calling' | 'ringing' | 'in_call'
-      callMedia: 'voice',      // 'voice' | 'video'
-      currentCallId: null,
-      isCaller: false,
-      callPollInterval: null,
-      incomingPollInterval: null,
-      incomingCall: null,
-      knownCallerCandidates: [],
-      knownCalleeCandidates: [],
       _socketNewMessageHandler: null
     };
   },
   methods: {
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
+      if (typeof imageData !== 'string') return this.defaultAvatar;
       if (imageData.startsWith('http')) return imageData;
       if (imageData.startsWith('data:image')) return imageData;
+      if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
       return `data:image/png;base64,${imageData}`;
     },
 
@@ -440,10 +418,19 @@ export default {
       this.messages = [];
       this.messageText = '';
       this.imagePreview = null;
+      this.showEmojiPicker = false;
       
       // Reload conversations to get updated list
       this.loadConversations();
       window.dispatchEvent(new Event('dm-refresh'));
+    },
+
+    toggleEmojiPicker() {
+      this.showEmojiPicker = !this.showEmojiPicker;
+    },
+
+    addEmoji(emoji) {
+      this.messageText += emoji;
     },
 
     async loadMessages(otherUserId) {
@@ -598,254 +585,20 @@ export default {
     },
 
     async startCall(media) {
-      if (!this.selectedChat || this.callStatus !== 'idle') return;
-      try {
-        if (!this.userId) throw new Error('Missing userId');
-        if (!this.selectedChat.user_id) throw new Error('Missing callee user_id');
-
-        this.callMedia = media;
-        this.isCaller = true;
-        this.callStatus = 'calling';
-
-        await this.attachLocalMedia(media);
-        await this.setupPeerConnection('caller');
-
-        const res = await axios.post(`${this.API_URL}/api/call/start`, {
-          caller_id: String(this.userId),
-          callee_id: String(this.selectedChat.user_id),
-          media
-        });
-        if (!res.data.success) throw new Error(res.data.message || 'Failed to start call');
-
-        this.currentCallId = res.data.call_id;
-
-        const offer = await this.pc.createOffer();
-        await this.pc.setLocalDescription(offer);
-        await axios.post(`${this.API_URL}/api/call/offer`, {
-          call_id: this.currentCallId,
-          sdp: offer
-        });
-
-        this.callPollInterval = setInterval(() => this.pollCallState(), 1500);
-      } catch (e) {
-        console.error('startCall failed:', e);
-        const msg =
-          e?.response?.data?.message ||
-          e?.response?.data?.error ||
-          e?.message ||
-          'Failed to start call';
-        alert(msg);
-        this.hangupCall();
-      }
-    },
-
-    async acceptCall() {
-      if (!this.incomingCall || this.callStatus !== 'ringing') return;
-      try {
-        this.isCaller = false;
-        await this.attachLocalMedia(this.callMedia);
-        await this.setupPeerConnection('callee');
-
-        const stateRes = await axios.get(`${this.API_URL}/api/call/state`, {
-          params: { call_id: this.currentCallId }
-        });
-        const call = stateRes.data && stateRes.data.call;
-        if (!call || !call.offer) throw new Error('Missing offer');
-
-        await this.pc.setRemoteDescription(new RTCSessionDescription(call.offer));
-
-        const answer = await this.pc.createAnswer();
-        await this.pc.setLocalDescription(answer);
-        await axios.post(`${this.API_URL}/api/call/answer`, {
-          call_id: this.currentCallId,
-          sdp: answer
-        });
-
-        this.callStatus = 'in_call';
-        this.callPollInterval = setInterval(() => this.pollCallState(), 1500);
-      } catch (e) {
-        console.error('acceptCall failed:', e);
-        const msg =
-          e?.response?.data?.message ||
-          e?.response?.data?.error ||
-          e?.message ||
-          'Failed to accept call';
-        alert(msg);
-        this.hangupCall();
-      }
-    },
-
-    async declineCall() {
-      if (!this.currentCallId) {
-        this.callStatus = 'idle';
-        this.incomingCall = null;
-        return;
-      }
-      try {
-        await axios.post(`${this.API_URL}/api/call/hangup`, { call_id: this.currentCallId });
-      } catch (_) {}
-      this.hangupCall();
-    },
-
-    async hangupCall() {
-      try {
-        if (this.currentCallId) {
-          try { await axios.post(`${this.API_URL}/api/call/hangup`, { call_id: this.currentCallId }); } catch (_) {}
-        }
-        if (this.callPollInterval) {
-          clearInterval(this.callPollInterval);
-          this.callPollInterval = null;
-        }
-        if (this.pc) {
-          try { this.pc.onicecandidate = null; this.pc.ontrack = null; this.pc.close(); } catch (_) {}
-          this.pc = null;
-        }
-        if (this.localStream) {
-          this.localStream.getTracks().forEach(t => t.stop());
-          this.localStream = null;
-        }
-        if (this.remoteStream) {
-          this.remoteStream.getTracks().forEach(t => t.stop());
-          this.remoteStream = null;
-        }
-      } finally {
-        this.currentCallId = null;
-        this.isCaller = false;
-        this.incomingCall = null;
-        this.knownCallerCandidates = [];
-        this.knownCalleeCandidates = [];
-        this.callStatus = 'idle';
-      }
-    },
-
-    async setupPeerConnection(role) {
-      const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-      this.pc = new RTCPeerConnection(config);
-      this.remoteStream = new MediaStream();
-      this.pc.ontrack = (ev) => {
-        this.remoteStream.addTrack(ev.track);
-        if (this.callMedia === 'video') {
-          const rv = this.$refs.remoteVideo;
-          if (rv) rv.srcObject = this.remoteStream;
-        } else {
-          const ra = this.$refs.remoteAudio;
-          if (ra) ra.srcObject = this.remoteStream;
-        }
-      };
-      this.pc.onicecandidate = async (ev) => {
-        if (ev.candidate && this.currentCallId) {
-          try {
-            await axios.post(`${this.API_URL}/api/call/candidate`, {
-              call_id: this.currentCallId,
-              role,
-              candidate: ev.candidate
-            });
-          } catch (_) {}
-        }
-      };
-      if (this.localStream) {
-        this.localStream.getTracks().forEach(t => this.pc.addTrack(t, this.localStream));
-        if (this.callMedia === 'video') {
-          const lv = this.$refs.localVideo;
-          if (lv) lv.srcObject = this.localStream;
-        }
-      }
-    },
-
-    async attachLocalMedia(media) {
-      if (this.localStream) {
-        this.localStream.getTracks().forEach(t => t.stop());
-        this.localStream = null;
-      }
-      const constraints = media === 'video' ? { video: true, audio: true } : { audio: true };
-      try {
-        this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch (e) {
-        const name = e && e.name;
-        if (name === 'NotFoundError' || name === 'OverconstrainedError') {
-          let devices = [];
-          try {
-            devices = await navigator.mediaDevices.enumerateDevices();
-          } catch (_) {}
-          const hasMic = devices.some(d => d.kind === 'audioinput');
-          const hasCam = devices.some(d => d.kind === 'videoinput');
-
-          if (!hasMic) {
-            throw new Error('No microphone detected. Please connect/enable a microphone and try again.');
-          }
-
-          if (media === 'video' && !hasCam) {
-            // Auto-fallback to audio-only when there is no camera.
-            this.callMedia = 'voice';
-            this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            return;
-          }
-
-          throw new Error('Requested device not found. Check your mic/camera settings and ensure no other app is using them.');
-        }
-
-        if (name === 'NotAllowedError' || name === 'SecurityError') {
-          throw new Error('Microphone/camera permission denied. Please allow access in the browser and try again.');
-        }
-
-        throw e;
-      }
-    },
-
-    async pollCallState() {
-      if (!this.currentCallId || !this.pc) return;
-      try {
-        const res = await axios.get(`${this.API_URL}/api/call/state`, { params: { call_id: this.currentCallId } });
-        const call = res.data && res.data.call;
-        if (!call) return;
-        if (call.status === 'ended') {
-          this.hangupCall();
-          return;
-        }
-        if (this.isCaller && call.answer && this.pc.signalingState !== 'stable') {
-          await this.pc.setRemoteDescription(new RTCSessionDescription(call.answer));
-          this.callStatus = 'in_call';
-        }
-        const addIfNew = async (cand, seenArr) => {
-          const key = JSON.stringify(cand);
-          if (!seenArr.includes(key)) {
-            seenArr.push(key);
-            try { await this.pc.addIceCandidate(cand); } catch (_) {}
-          }
-        };
-        if (this.isCaller && Array.isArray(call.callee_candidates)) {
-          for (const c of call.callee_candidates) {
-            await addIfNew(c, this.knownCalleeCandidates);
+      if (!this.selectedChat) return;
+      window.dispatchEvent(new CustomEvent('start-call', {
+        detail: {
+          media,
+          user: {
+            user_id: this.selectedChat.user_id,
+            username: this.selectedChat.username,
+            profile_pic: this.selectedChat.profile_pic
           }
         }
-        if (!this.isCaller && Array.isArray(call.caller_candidates)) {
-          for (const c of call.caller_candidates) {
-            await addIfNew(c, this.knownCallerCandidates);
-          }
-        }
-      } catch (_) {}
+      }));
     },
 
-    async pollIncomingCalls() {
-      if (this.callStatus !== 'idle') return;
-      try {
-        const res = await axios.get(`${this.API_URL}/api/call/incoming`, { params: { user_id: this.userId } });
-        const calls = (res.data && res.data.calls) || [];
-        let match = null;
-        if (this.selectedChat) {
-          match = calls.find(c => String(c.caller_id) === String(this.selectedChat.user_id));
-        } else if (calls.length > 0) {
-          match = calls[0];
-        }
-        if (match) {
-          this.incomingCall = match;
-          this.currentCallId = match.call_id;
-          this.callMedia = match.media || 'voice';
-          this.isCaller = false;
-          this.callStatus = 'ringing';
-        }
-      } catch (_) {}
-    },
+    // AV Calling moved to global CallOverlay.vue
 
     autoOpenFromQuery() {
       const q = this.$route && this.$route.query ? this.$route.query : {};
@@ -924,9 +677,6 @@ export default {
     this.loadConversations().then(() => {
       this.autoOpenFromQuery();
     });
-    this.incomingPollInterval = setInterval(() => {
-      this.pollIncomingCalls();
-    }, 2000);
   },
   beforeUnmount() {
     try {
@@ -937,16 +687,7 @@ export default {
       }
     } catch (_) {}
 
-    if (this.incomingPollInterval) {
-      clearInterval(this.incomingPollInterval);
-      this.incomingPollInterval = null;
-    }
-
-    if (this.callPollInterval) {
-      clearInterval(this.callPollInterval);
-      this.callPollInterval = null;
-    }
-    this.hangupCall();
+    // Nothing call-related to clean up locally anymore
   }
 };
 </script>
@@ -1286,5 +1027,18 @@ export default {
   display: flex;
   justify-content: center;
   padding: 40px;
+}
+
+.emoji-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.dm-emoji-picker {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 8px;
+  z-index: 2000;
 }
 </style>

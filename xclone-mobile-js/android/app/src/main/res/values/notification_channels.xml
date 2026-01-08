@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- High Priority Channel for DMs and Mentions -->
+    <string name="high_priority_channel_id">nexfi_high_priority</string>
+    <string name="high_priority_channel_name">Important Notifications</string>
+    <string name="high_priority_channel_description">Direct messages, mentions, and important alerts</string>
+    
+    <!-- Default Channel for General Notifications -->
+    <string name="default_notification_channel_id">nexfi_notifications</string>
+    <string name="default_notification_channel_name">NexFi Notifications</string>
+    <string name="default_notification_channel_description">General app notifications</string>
+</resources>

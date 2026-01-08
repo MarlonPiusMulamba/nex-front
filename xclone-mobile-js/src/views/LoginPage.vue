@@ -137,7 +137,7 @@ export default {
   async mounted() {
     console.log('Testing API connection...');
     try {
-      const response = await api.get('/api/health');
+      const response = await api.get('/');
       console.log('✅ API connected:', response);
     } catch (error) {
       console.error('❌ API error:', error);
@@ -188,7 +188,18 @@ export default {
         }
       } catch (error) {
         console.error('Login error:', error);
-        this.showAlert(error.response?.data?.message || 'An error occurred. Please try again later.');
+        const status = error.response?.status;
+        const serverMsg = error.response?.data?.message;
+        const networkMsg = error.message;
+        const baseUrl = api?.defaults?.baseURL;
+        const pageOrigin = window.location.origin;
+        const isNetworkError = !status && (networkMsg === 'Network Error' || String(networkMsg || '').toLowerCase().includes('network'));
+        const msg =
+          (serverMsg || (status ? `Request failed (${status})` : networkMsg) || 'An error occurred. Please try again later.') +
+          `\n\nPage: ${pageOrigin}` +
+          (baseUrl ? `\nAPI: ${baseUrl}` : '') +
+          (isNetworkError ? '\n\nHint: this often means the browser blocked the request (CORS/preflight) or the backend is unreachable from this device.' : '');
+        this.showAlert(msg);
       } finally {
         this.isLoading = false;
       }

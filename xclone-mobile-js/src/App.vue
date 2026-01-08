@@ -1,17 +1,21 @@
 <template>
   <ion-app :class="theme">
     <ion-router-outlet />
+    <CallOverlay />
   </ion-app>
 </template>
 
 <script>
 import { IonApp, IonRouterOutlet } from '@ionic/vue';
+import CallOverlay from './components/CallOverlay.vue';
+import notificationService from './utils/notificationService';
 
 export default {
   name: 'App',
   components: {
     IonApp,
-    IonRouterOutlet
+    IonRouterOutlet,
+    CallOverlay
   },
   data() {
     return {
@@ -19,6 +23,9 @@ export default {
     };
   },
   methods: {
+    playNotificationSound() {
+      notificationService.playSound();
+    },
     applyTheme(nextTheme) {
       const t = nextTheme === 'dark' ? 'dark' : 'light';
       this.theme = t;
@@ -37,9 +44,42 @@ export default {
       this.applyTheme(this.theme === 'dark' ? 'light' : 'dark');
     }
   },
-  mounted() {
+  async mounted() {
     console.log('✅ App mounted successfully');
-    console.log('Current route:', this.$router.currentRoute.value.path);
+    
+    // Initialize notification service if user is logged in
+    const userId = localStorage.getItem('userId');
+    if (userId) {
+      try {
+        await notificationService.initialize(userId);
+        console.log('✓ Notification service initialized');
+      } catch (error) {
+        console.error('Error initializing notifications:', error);
+      }
+    }
+
+    // Global Socket Listeners for notifications
+    const socket = this.$socket;
+    if (socket) {
+      socket.on('dm:new_message', (payload) => {
+        const currentUserId = localStorage.getItem('userId');
+        if (payload && payload.to_user_id == currentUserId) {
+          notificationService.handleIncomingNotification({
+            title: 'New Message',
+            message: `${payload.from_username || 'Someone'} sent you a message`,
+            type: 'message'
+          });
+        }
+      });
+
+      socket.on('notification:new', (payload) => {
+        notificationService.handleIncomingNotification({
+          title: 'New Notification',
+          message: payload.message || 'You have a new notification',
+          type: payload.type || 'general'
+        });
+      });
+    }
 
     // Default to light theme unless user explicitly chose dark before
     let saved = null;

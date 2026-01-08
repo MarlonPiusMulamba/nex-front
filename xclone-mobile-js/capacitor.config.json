@@ -3,18 +3,7 @@
   "appName": "NexFi",
   "webDir": "dist",
   "server": {
-    "androidScheme": "https",
-    "cleartext": true,
-    "allowNavigation": [
-      "nexfi-backend.onrender.com/",
-      "https://nexfi2.pythonanywhere.com/",
-      "*.onrender.com",
-      ".mongodb.net",
-      "*",
-      "http://localhost:5000",
-      "http://10.5.1.152:5000"
-
-    ]
+    "androidScheme": "https"
   },
   "plugins": {
     "SplashScreen": {
@@ -22,7 +11,6 @@
       "backgroundColor": "#ffffff",
       "showSpinner": false
     }
-
   },
   "android": {
     "allowMixedContent": true

@@ -267,6 +267,7 @@ import {
   checkmark, mail, shareOutline, calendar, heart, chatbubble, documentText
 } from 'ionicons/icons';
 import axios from 'axios';
+import config from '@/config/index.js';
 
 export default {
   name: 'FollowPage',
@@ -291,7 +292,7 @@ export default {
       followLoading: false,
       isFollowing: false,
       userId: localStorage.getItem('userId'),
-      API_URL: 'http://localhost:5000',
+      API_URL: config.api.baseURL,
       search, searchOutline, arrowBack, chevronForward, personAdd,
       checkmark, mail, shareOutline, calendar, heart, chatbubble, documentText,
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E'
@@ -300,8 +301,10 @@ export default {
   methods: {
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
+      if (typeof imageData !== 'string') return this.defaultAvatar;
       if (imageData.startsWith('http')) return imageData;
       if (imageData.startsWith('data:image')) return imageData;
+      if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
       return `data:image/png;base64,${imageData}`;
     },
 

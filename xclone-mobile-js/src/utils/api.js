@@ -9,10 +9,20 @@ try {
   config = configModule.default || configModule;
 } catch (error) {
   console.warn('Could not load config from @/config, using fallback');
+  const pageHost = window.location.hostname;
+  const isPageLocal =
+    pageHost === 'localhost' ||
+    pageHost === '127.0.0.1' ||
+    pageHost.startsWith('10.') ||
+    pageHost.startsWith('192.168.') ||
+    pageHost.startsWith('172.');
+
   // Fallback configuration
   config = {
     api: {
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
+      baseURL:
+        import.meta.env.VITE_API_URL ||
+        (isPageLocal ? `http://${pageHost}:5000` : 'https://nexback.pythonanywhere.com'),
       timeout: 30000,
     },
   };
@@ -26,6 +36,8 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+console.log('📡 API baseURL:', api.defaults.baseURL, '(VITE_API_URL:', import.meta.env.VITE_API_URL || 'not set', ')');
 
 // Request interceptor
 api.interceptors.request.use(

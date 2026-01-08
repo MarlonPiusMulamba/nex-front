@@ -42,6 +42,7 @@ import {
 } from '@ionic/vue';
 import { home, search, mail, person, notificationsOutline } from 'ionicons/icons';
 import axios from 'axios';
+import config from '@/config/index.js';
 
 export default {
   name: 'TabsPage',
@@ -61,7 +62,7 @@ export default {
       unreadNotifCount: 0,
       prevUnreadNotifCount: 0,
       userId: localStorage.getItem('userId'),
-      API_URL: 'http://localhost:5000',
+      API_URL: config.api.baseURL,
       pollInterval: null,
       notifPollInterval: null,
       audioCtx: null,

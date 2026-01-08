@@ -9,14 +9,9 @@
         </ion-buttons>
         <ion-title class="feed-title">NexFi</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="refreshFeed(null, true)" :disabled="isLoading">
-            <ion-icon :icon="refresh" :class="{ 'spin': isLoading }"></ion-icon>
-          </ion-button>
-          <ion-button @click="toggleTheme">
-            <ion-icon :icon="theme === 'light' ? moon : sunny"></ion-icon>
-          </ion-button>
-          <ion-button v-if="userId" @click="logout">
-            <ion-icon :icon="logOut"></ion-icon>
+          <ion-button @click="showHeaderActionSheet = true">
+            <ion-icon :icon="ellipsisVertical"></ion-icon>
+            <span v-if="notificationPermission !== 'granted'" class="perm-badge">!</span>
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -379,6 +374,12 @@
                 <ion-button fill="clear" size="small" @click="$refs.fileInput.click()">
                   <ion-icon :icon="image"></ion-icon>
                 </ion-button>
+                <div class="emoji-wrapper">
+                  <ion-button fill="clear" size="small" @click="toggleEmojiPicker">
+                    <ion-icon :icon="happy"></ion-icon>
+                  </ion-button>
+                  <EmojiPicker v-if="showEmojiPicker" @select="addEmoji" class="composer-emoji-picker" />
+                </div>
                 <span class="char-count" :class="{ 'over-limit': postContent.length > 280 }">
                   {{ postContent.length }}/280
                 </span>
@@ -541,13 +542,31 @@
       </ion-modal>
 
       <!-- Media Lightbox Modal -->
-      <ion-modal :is-open="showMediaModal" @did-dismiss="closeMediaModal">
-        <ion-content class="media-modal">
-          <ion-buttons slot="start">
-            <ion-button @click="closeMediaModal" color="light">Close</ion-button>
-          </ion-buttons>
+      <ion-modal :is-open="showMediaModal" @did-dismiss="closeMediaModal" class="full-screen-modal">
+        <ion-header class="ion-no-border">
+          <ion-toolbar color="dark">
+            <ion-buttons slot="start">
+              <ion-button @click="closeMediaModal" color="light">
+                <ion-icon :icon="arrowBack" slot="start"></ion-icon>
+                <span>Back</span>
+              </ion-button>
+            </ion-buttons>
+            <ion-title color="light">View Media</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="mediaZoom = Math.max(1, mediaZoom - 0.5)" color="light">
+                <ion-icon :icon="remove" slot="icon-only"></ion-icon>
+              </ion-button>
+              <ion-button @click="mediaZoom += 0.5" color="light">
+                <ion-icon :icon="add" slot="icon-only"></ion-icon>
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="media-modal" color="dark">
           <div class="media-lightbox">
-            <img v-if="mediaSrc" :src="mediaSrc" alt="Media" />
+            <div class="zoom-container" :style="{ transform: `scale(${mediaZoom})` }">
+              <img v-if="mediaSrc" :src="mediaSrc" alt="Media" @click="closeMediaModal" />
+            </div>
           </div>
         </ion-content>
       </ion-modal>
@@ -734,6 +753,14 @@
         </ion-footer>
       </ion-modal>
     </ion-content>
+
+    <ion-action-sheet
+      :is-open="showHeaderActionSheet"
+      @didDismiss="showHeaderActionSheet = false"
+      header="Feed Actions"
+      :buttons="headerActionButtons"
+    ></ion-action-sheet>
+
   </ion-page>
 </template>
 
@@ -746,10 +773,12 @@ import {
 } from '@ionic/vue';
 import { 
   add, heart, heartOutline, chatbubbleOutline, shareOutline, sunny, moon, 
-  ellipsisHorizontal, repeat, refresh, image, close, chatbubbles, logOut,
-  alertCircle
+  ellipsisHorizontal, ellipsisVertical, repeat, refresh, image, close, chatbubbles, logOut,
+  alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline
 } from 'ionicons/icons';
 import axios from 'axios';
+import config from '@/config/index.js';
+import notificationService from '@/utils/notificationService.js';
 
 export default {
   name: 'FeedPage',
@@ -760,7 +789,7 @@ export default {
     IonActionSheet
   },
   data() {
-    const API_URL = 'http://localhost:5000';
+    const API_URL = config.api.baseURL;
     
     return {
       userId: localStorage.getItem('userId'),
@@ -775,8 +804,8 @@ export default {
       activeTab: 'foryou',
       API_URL: API_URL,
       add, heart, heartOutline, chatbubbleOutline, shareOutline, sunny, moon, 
-      ellipsisHorizontal, repeat, refresh, image, close, chatbubbles, logOut,
-      alertCircle,
+      ellipsisHorizontal, ellipsisVertical, repeat, refresh, image, close, chatbubbles, logOut,
+      alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline,
       theme: window.theme || 'light',
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
       lastFetchTime: 0,
@@ -827,10 +856,55 @@ export default {
 
       // Post detail comments
       detailComments: [],
-      loadingDetailComments: false
+      loadingDetailComments: false,
+      mediaZoom: 1,
+      showEmojiPicker: false,
+      notificationPermission: 'default',
+      showHeaderActionSheet: false,
+      deferredPrompt: null
     };
   },
   computed: {
+    headerActionButtons() {
+      const buttons = [
+        {
+          text: 'Refresh Feed',
+          icon: refresh,
+          handler: () => {
+             this.refreshFeed(null, true);
+          }
+        },
+        {
+          text: 'Trigger Test Notification',
+          icon: notificationsCircleOutline,
+          handler: () => {
+             this.triggerTestNotification();
+          }
+        }
+      ];
+
+      // Add Install button if browser supports it or if we are on iOS
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+      if (!isStandalone) {
+        buttons.push({
+          text: 'Install NexFi App',
+          icon: isIOS ? phonePortraitOutline : downloadOutline,
+          handler: () => {
+            this.installPWA();
+          }
+        });
+      }
+
+      buttons.push({
+        text: 'Cancel',
+        role: 'cancel',
+        icon: close
+      });
+
+      return buttons;
+    },
     repostSheetButtons() {
       return [
         {
@@ -879,6 +953,24 @@ export default {
     },
     formatPostContent(text) {
       if (!text) return '';
+
+      // Safety check: Detect if content looks like binary/garbage (often from decompression errors)
+      // If more than 30% of characters are non-printable/control chars, it's likely garbage.
+      const garbageCheck = (str) => {
+        if (!str || str.length < 20) return false;
+        let nonPrintable = 0;
+        for (let i = 0; i < Math.min(str.length, 500); i++) {
+          const code = str.charCodeAt(i);
+          if ((code < 32 && code !== 10 && code !== 13) || code > 126) {
+            nonPrintable++;
+          }
+        }
+        return (nonPrintable / Math.min(str.length, 500)) > 0.3;
+      };
+
+      if (garbageCheck(text)) {
+        return '<i style="color:var(--ion-color-medium);">[Content unavailable due to formatting error]</i>';
+      }
 
       const escapeHtml = (str) =>
         str
@@ -1022,11 +1114,13 @@ export default {
       if (!src) return;
       this.mediaSrc = src;
       this.showMediaModal = true;
+      this.mediaZoom = 1;
     },
 
     closeMediaModal() {
       this.showMediaModal = false;
       this.mediaSrc = '';
+      this.mediaZoom = 1;
     },
 
     async onPostInput(e) {
@@ -1085,14 +1179,17 @@ export default {
     },
 
     async checkForNewPosts() {
-      if (this._isNearTop) return;
       if (!this.latestPostId) return;
 
       try {
         const result = await this.fetchFeedUltraFast(0, 1);
         const newestId = result?.posts?.[0]?.post_id;
         if (newestId && newestId !== this.latestPostId) {
-          this.showNewPostsBanner = true;
+          if (this._isNearTop) {
+            await this.refreshFeed(null, true);
+          } else {
+            this.showNewPostsBanner = true;
+          }
         }
       } catch (_) {}
     },
@@ -1156,7 +1253,9 @@ export default {
     closeMediaModal() {
       this.showMediaModal = false;
       this.mediaSrc = '';
+      this.mediaZoom = 1;
     },
+
     ensureAuthenticated() {
       if (!this.userId) {
         this.$router.push('/login');
@@ -1171,8 +1270,10 @@ export default {
     },
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
+      if (typeof imageData !== 'string') return this.defaultAvatar;
       if (imageData.startsWith('http')) return imageData;
       if (imageData.startsWith('data:image')) return imageData;
+      if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
       return `data:image/png;base64,${imageData}`;
     },
     
@@ -1277,7 +1378,8 @@ export default {
           this.lastFetchTime = now;
           console.log(`⚡ LOADED ${this.posts.length} posts in ULTRA-FAST mode`);
         } else {
-          throw new Error(result.error || 'Failed to load feed');
+          this.errorMessage = result.error || 'Failed to load feed';
+          throw new Error(this.errorMessage);
         }
       } catch (err) {
         console.error('❌ Feed error:', err);
@@ -1290,7 +1392,7 @@ export default {
     
     async fetchFeedUltraFast(offset = 0, limit = 20) {
       // ULTRA-FAST: Single attempt with aggressive timeout
-      const timeout = 15000;  // 15 seconds only
+      const timeout = 30000;  // Increased to 30s for production stability
       
       console.log(`⚡ ULTRA-FAST fetch (timeout: ${timeout}ms)`);
       
@@ -1370,7 +1472,7 @@ export default {
         this.isPosting = true;
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);  // 15 seconds
+        const timeoutId = setTimeout(() => controller.abort(), 30000);  // 30 seconds
         
         const res = await axios.post(
           `${this.API_URL}/api/post`, 
@@ -1383,7 +1485,7 @@ export default {
           },
           { 
             signal: controller.signal,
-            timeout: 15000
+            timeout: 30000
           }
         );
         
@@ -1454,9 +1556,18 @@ export default {
       this.postContent = '';
       this.postMedia = [];
       this.mediaPreviews = [];
+      this.showEmojiPicker = false;
       if (this.$refs.fileInput) {
         this.$refs.fileInput.value = '';
       }
+    },
+
+    toggleEmojiPicker() {
+      this.showEmojiPicker = !this.showEmojiPicker;
+    },
+
+    addEmoji(emoji) {
+      this.postContent += emoji;
     },
     
     async toggleLike(postId, liked) {
@@ -1807,20 +1918,82 @@ export default {
     reshareComment(c) {
       console.log('Reshare comment', c?.id);
     },
-    shareComment(c) {
+    async shareComment(c) {
       if (!c) return;
-      const text = c.content || '';
+      
+      const shareUrl = `${window.location.origin}/tabs/feed?comment=${c.id}`;
+      const shareData = {
+        title: `NexFi - Comment by @${c.username}`,
+        text: c.content || 'Check out this comment on NexFi!',
+        url: shareUrl
+      };
+
       if (navigator.share) {
-        navigator.share({ title: `Comment by @${c.username}`, text }).catch(() => {});
+        try {
+          if (c.image) {
+            const mediaUrl = this.getImageUrl(c.image);
+            const response = await fetch(mediaUrl);
+            const blob = await response.blob();
+            const file = new File([blob], 'comment-image.jpg', { type: blob.type });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              shareData.files = [file];
+            }
+          }
+          await navigator.share(shareData);
+        } catch (err) {
+          console.log('❌ Comment share failed/cancelled:', err);
+        }
+      } else {
+        // Fallback for browsers without navigator.share
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          alert('🔗 Link copied to clipboard!');
+        } catch (err) {
+          console.error('❌ Failed to copy link:', err);
+          alert('Unable to share. Please copy the URL manually.');
+        }
       }
     },
     
-    share(post) {
+    async share(post) {
+      const shareUrl = `${window.location.origin}/tabs/feed?post=${post.post_id}`;
+      const shareData = {
+        title: `NexFi - Post by @${post.username}`,
+        text: post.content || 'Check out this post on NexFi!',
+        url: shareUrl
+      };
+
       if (navigator.share) {
-        navigator.share({
-          title: `Post by @${post.username}`,
-          text: post.content
-        }).catch(err => console.log('Share cancelled:', err));
+        try {
+          // Handle images/videos for thumbnails
+          const shareMedia = post.image || (post.media && post.media.find(m => m.type === 'image')?.data);
+          
+          if (shareMedia) {
+            const mediaUrl = this.getImageUrl(shareMedia);
+            const response = await fetch(mediaUrl);
+            const blob = await response.blob();
+            const file = new File([blob], 'post-image.jpg', { type: blob.type });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              shareData.files = [file];
+            }
+          }
+
+          await navigator.share(shareData);
+          console.log('✅ Post shared successfully');
+        } catch (err) {
+          console.log('❌ Post share failed/cancelled:', err);
+        }
+      } else {
+        // Fallback for browsers without navigator.share
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          alert('🔗 Link copied to clipboard!');
+        } catch (err) {
+          console.error('❌ Failed to copy link:', err);
+          alert('Unable to share. Please copy the URL manually.');
+        }
       }
     },
     
@@ -1835,6 +2008,91 @@ export default {
         localStorage.removeItem('userAvatar');
         this.$router.push('/login');
       }
+    },
+
+    async triggerTestNotification() {
+      if (!this.userId) return;
+      
+      // Mobile & Security Check
+      const isSecure = window.isSecureContext;
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      
+      // If permission is denied/default, try to request it first
+      if (this.notificationPermission !== 'granted') {
+          console.log('🔔 Requesting permission before test...');
+          await notificationService.requestWebPermission();
+          this.updateNotificationPermission();
+          
+          if (this.notificationPermission !== 'granted') {
+              if (!isSecure && window.location.hostname !== 'localhost') {
+                  alert('❌ Security Error: Browser notifications require HTTPS. Please use a secure connection or localhost.');
+              } else if (isIOS && !window.navigator.standalone) {
+                  alert('📱 iOS Requirement: To see notifications in the tray, you must "Add to Home Screen" (Share button > Add to Home Screen) and open the app from your home screen.');
+              } else {
+                  alert('Please enable notifications in your browser settings (usually in the site info/lock icon next to the URL) to see alerts in the tray.');
+              }
+              return;
+          }
+      }
+
+      console.log('🧪 Triggering test notification for user:', this.userId);
+      try {
+        const res = await axios.post(`${this.API_URL}/api/test/notification`, {
+          user_id: this.userId
+        }, { timeout: 10000 });
+        
+        if (res.data.success) {
+          console.log('✅ Test notification triggered successfully');
+        } else {
+          console.error('❌ Backend returned success:false:', res.data.error);
+          alert(`Server Error: ${res.data.error || 'Unknown error'}`);
+        }
+      } catch (err) {
+        console.error('❌ Test notification Axios error:', err);
+        if (err.response) {
+          console.error('   Status:', err.response.status);
+          console.error('   Data:', err.response.data);
+          alert(`Error: ${err.response.status} - ${err.response.data?.error || 'Server error'}`);
+        } else if (err.request) {
+          console.error('   No response received. Network issue or CORS?');
+          alert('Network Error: No response from server. Check CORS or if server is running.');
+        } else {
+          console.error('   Message:', err.message);
+          alert(`Request Error: ${err.message}`);
+        }
+      }
+    },
+
+    updateNotificationPermission() {
+      this.notificationPermission = notificationService.getPermissionStatus();
+      console.log('🔔 Current notification permission:', this.notificationPermission);
+    },
+
+    installPWA() {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      
+      if (this.deferredPrompt) {
+        console.log('✨ Triggering native PWA install prompt...');
+        this.deferredPrompt.prompt();
+        this.deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('✅ User accepted PWA install');
+          } else {
+            console.log('❌ User dismissed PWA install');
+          }
+          this.deferredPrompt = null;
+        });
+      } else if (isIOS) {
+        alert('📱 To install NexFi on your iPhone/iPad:\n\n1. Tap the Share button (square with arrow)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap Add at the top right.');
+      } else {
+        // Broad fallback for Android/Chrome/Desktop when beforeinstallprompt hasn't fired
+        const isSecure = window.isSecureContext;
+        if (!isSecure && window.location.hostname !== 'localhost') {
+            alert('🔐 Security Requirement: PWA installation requires a secure HTTPS connection. Please ensure you are using https:// and not an IP address.');
+        } else {
+            alert('ℹ️ Installation Tip:\n\nIf the "Install" button didn\'t trigger automatically:\n1. Open your browser menu (three dots at the top right).\n2. Look for "Install app" or "Add to Home screen".');
+        }
+      }
     }
   },
   
@@ -1846,6 +2104,28 @@ export default {
     // Always load feed, even for guests (userId may be null)
     console.log('⚡ Loading public feed...');
     this.refreshFeed(null, true);
+
+    this.updateNotificationPermission();
+
+    // PWA Install Prompt Listener
+    if (window._deferredPrompt) {
+      this.deferredPrompt = window._deferredPrompt;
+      console.log('✨ PWA install prompt already captured globally!');
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      console.log('✨ PWA install prompt captured!');
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      this.deferredPrompt = e;
+      window._deferredPrompt = e; // Keep a global reference just in case
+    });
+
+    window.addEventListener('appinstalled', () => {
+      console.log('🚀 NexFi app was installed!');
+      this.deferredPrompt = null;
+    });
 
     // Realtime feed updates via Socket.IO
     try {
@@ -1876,7 +2156,7 @@ export default {
 
     this._newPostsInterval = setInterval(() => {
       this.checkForNewPosts();
-    }, 15000);
+    }, 5000);
     
     window.addEventListener('themeChanged', (e) => {
       this.theme = e.detail;
@@ -1916,8 +2196,19 @@ ion-toolbar {
 }
 
 .feed-title {
+  font-family: "Times New Roman", Times, serif !important;
   font-weight: 700;
-  font-size: 20px;
+  font-size: 24px;
+  text-align: center;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: -1; /* Place behind buttons */
 }
 
 .new-posts-banner {
@@ -1934,6 +2225,22 @@ ion-toolbar {
   font-size: 14px;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(29, 155, 240, 0.35);
+}
+
+.perm-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: #ff4961;
+  color: white;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
 }
 
 .header-avatar {
@@ -2255,10 +2562,7 @@ ion-toolbar {
 }
 
 .media-modal {
-  --background: rgba(0,0,0,0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  --background: #000;
 }
 
 .media-lightbox {
@@ -2267,12 +2571,29 @@ ion-toolbar {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: #000;
+  overflow: auto;
+}
+
+.zoom-container {
+  transition: transform 0.2s ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100%;
+  min-height: 100%;
 }
 
 .media-lightbox img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+/* Full screen modal for media */
+.full-screen-modal {
+  --width: 100%;
+  --height: 100%;
 }
 
 /* Post Actions */

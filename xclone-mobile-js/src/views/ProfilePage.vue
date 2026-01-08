@@ -9,8 +9,14 @@
         </ion-buttons>
         <ion-title>Profile</ion-title>
         <ion-buttons slot="end">
+          <ion-button v-if="loadingPosts" class="mini-spinner">
+            <ion-spinner name="dots"></ion-spinner>
+          </ion-button>
           <ion-button @click="toggleTheme">
             <ion-icon :icon="theme === 'light' ? moon : sunny"></ion-icon>
+          </ion-button>
+          <ion-button v-if="profile?.user_id === userId" @click="logout">
+            <ion-icon :icon="logOut"></ion-icon>
           </ion-button>
           <ion-button @click="showOptionsMenu = true">
             <ion-icon :icon="ellipsisVertical"></ion-icon>
@@ -32,7 +38,7 @@
       <!-- Profile Content -->
       <div v-else-if="profile" class="profile-container">
         <!-- Cover Image -->
-        <div class="cover-image" @click="editProfile">
+        <div class="cover-image" @click="profile?.user_id === userId ? editProfile() : null">
           <img 
             v-if="profile.cover_photo"
             :src="getImageUrl(profile.cover_photo)"
@@ -53,13 +59,34 @@
                 @error="handleImageError"
               />
             </div>
-            <ion-button 
-              fill="outline" 
-              size="small" 
-              class="edit-profile-btn"
-              @click="editProfile">
-              Edit Profile
-            </ion-button>
+            <div class="action-buttons">
+              <ion-button 
+                v-if="profile.user_id === userId"
+                fill="outline" 
+                size="small" 
+                class="edit-profile-btn"
+                @click="editProfile">
+                Edit Profile
+              </ion-button>
+              <template v-else>
+                <ion-button 
+                  v-if="!profile.is_following"
+                  fill="solid" 
+                  size="small" 
+                  class="follow-btn"
+                  @click="toggleFollow">
+                  Follow
+                </ion-button>
+                <ion-button 
+                  v-else
+                  fill="outline" 
+                  size="small" 
+                  class="unfollow-btn"
+                  @click="toggleFollow">
+                  Unfollow
+                </ion-button>
+              </template>
+            </div>
           </div>
 
           <div class="user-details">
@@ -127,27 +154,56 @@
 
         <!-- Posts List -->
         <div class="posts-section" v-if="activeTab === 'posts'">
-          <div v-if="userPosts.length === 0" class="empty-state">
+          <div v-if="loadingPosts && userPosts.length === 0" class="loading-posts">
+            <ion-spinner name="crescent"></ion-spinner>
+            <p>Loading posts...</p>
+          </div>
+          <div v-else-if="postsError" class="empty-state error-state">
+            <ion-icon :icon="alertCircle" class="empty-icon text-danger"></ion-icon>
+            <p>{{ postsError }}</p>
+            <ion-button fill="outline" size="small" @click="loadUserPosts">Retry</ion-button>
+          </div>
+          <div v-else-if="userPosts.length === 0" class="empty-state">
             <ion-icon :icon="documentText" class="empty-icon"></ion-icon>
             <p>No posts yet</p>
+            <ion-button fill="clear" size="small" @click="loadUserPosts">Refresh Posts</ion-button>
           </div>
           
-          <div v-for="post in userPosts" :key="post.post_id" class="post-item">
+          <div v-else v-for="post in userPosts" :key="post.post_id" class="post-item">
+            <div class="repost-badge" v-if="post.item_type === 'repost'">
+              <ion-icon :icon="grid" class="repost-icon"></ion-icon>
+              <span>Reposted by {{ post.reposted_by_username || profile.username }}</span>
+            </div>
             <div class="post-header">
               <span class="post-time">{{ formatPostTime(post.timestamp) }}</span>
             </div>
             <div 
               class="post-content" 
-              v-if="post.content"
+              v-if="post.content || post.quote_text"
               @click="onPostTextClick($event, post)"
-              v-html="formatPostContent(post.content)">
+              v-html="formatPostContent(post.quote_text || post.content)">
+            </div>
+            
+            <!-- Handle multiple media items -->
+            <div v-if="post.media && post.media.length" class="post-media-container">
+              <div class="post-media-grid" :class="'count-' + Math.min(post.media.length, 4)">
+                <div v-for="(m, idx) in post.media.slice(0, 4)" :key="idx" class="media-wrapper" @click="viewMedia(m)">
+                  <img v-if="m.type === 'image'" :src="getImageUrl(m.data)" class="post-media-img" />
+                  <div v-else-if="m.type === 'video'" class="video-preview">
+                    <video :src="getImageUrl(m.data)" class="post-media-video"></video>
+                    <div class="video-overlay"><ion-icon :icon="images"></ion-icon></div>
+                  </div>
+                </div>
+              </div>
             </div>
             <img 
-              v-if="post.image" 
+              v-else-if="post.image" 
               :src="getImageUrl(post.image)" 
               class="post-image"
               alt="Post"
+              @click="viewMedia({type: 'image', data: post.image})"
             />
+
             <div class="post-stats">
               <span><ion-icon :icon="heart"></ion-icon> {{ post.likes || 0 }}</span>
               <span><ion-icon :icon="chatbubble"></ion-icon> {{ post.comments_count || 0 }}</span>
@@ -163,11 +219,15 @@
           </div>
           
           <div 
-            v-for="item in mediaItems" 
-            :key="item.post_id"
+            v-for="(item, idx) in mediaItems" 
+            :key="idx"
             class="media-item"
             @click="viewMedia(item)">
-            <img :src="getImageUrl(item.image)" alt="Media" />
+            <img v-if="item.type === 'image'" :src="getImageUrl(item.data)" alt="Media" />
+            <div v-else-if="item.type === 'video'" class="video-item-preview">
+              <video :src="getImageUrl(item.data)"></video>
+              <div class="video-badge"><ion-icon :icon="images"></ion-icon></div>
+            </div>
           </div>
         </div>
 
@@ -300,6 +360,36 @@
         </div>
       </ion-content>
     </ion-modal>
+
+    <!-- Media Lightbox Modal -->
+    <ion-modal :is-open="showMediaModal" @did-dismiss="closeMediaModal" class="full-screen-modal">
+      <ion-header class="ion-no-border">
+        <ion-toolbar color="dark">
+          <ion-buttons slot="start">
+            <ion-button @click="closeMediaModal" color="light">
+              <ion-icon :icon="arrowBack" slot="start"></ion-icon>
+              <span>Back</span>
+            </ion-button>
+          </ion-buttons>
+          <ion-title color="light">View Media</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click="mediaZoom = Math.max(1, mediaZoom - 0.5)" color="light">
+              <ion-icon :icon="remove" slot="icon-only"></ion-icon>
+            </ion-button>
+            <ion-button @click="mediaZoom += 0.5" color="light">
+              <ion-icon :icon="add" slot="icon-only"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="media-modal" color="dark">
+        <div class="media-lightbox">
+          <div class="zoom-container" :style="{ transform: `scale(${mediaZoom})` }">
+            <img v-if="mediaSrc" :src="mediaSrc" alt="Media" @click="closeMediaModal" />
+          </div>
+        </div>
+      </ion-content>
+    </ion-modal>
   </ion-page>
 </template>
 
@@ -308,40 +398,51 @@
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
   IonButtons, IonIcon, IonSpinner, IonRefresher, IonRefresherContent,
-  IonModal, IonList, IonItem, IonLabel
+  IonModal, IonList, IonItem, IonLabel, IonInput
 } from '@ionic/vue';
 import {
   arrowBack, logOut, sunny, moon, ellipsisVertical, calendar,
   grid, images, heart, documentText, chatbubble, alertCircle,
-  shareOutline, settingsOutline
+  shareOutline, settingsOutline, add, remove
 } from 'ionicons/icons';
 import axios from 'axios';
+import config from '@/config/index.js';
 
 export default {
   name: 'ProfilePage',
   components: {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
     IonButtons, IonIcon, IonSpinner, IonRefresher, IonRefresherContent,
-    IonModal, IonList, IonItem, IonLabel
+    IonModal, IonList, IonItem, IonLabel, IonInput
   },
   data() {
     return {
-      profile: null,
-      userPosts: [],
-      mediaItems: [],
-      loading: true,
-      activeTab: 'posts',
-      showOptionsMenu: false,
       userId: localStorage.getItem('userId'),
       // Prefer route param username when viewing other profiles; fallback to own username
       username: (typeof this.$route?.params?.username === 'string' && this.$route.params.username) || localStorage.getItem('username'),
-      API_URL: 'http://localhost:5000',
+      API_URL: config.api.baseURL,
       theme: window.theme || 'light',
-      arrowBack, logOut, sunny, moon, ellipsisVertical, calendar,
-      grid, images, heart, documentText, chatbubble, alertCircle,
-      shareOutline, settingsOutline,
-      defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
-      // Edit profile state
+      arrowBack,
+      logOut,
+      sunny,
+      moon,
+      ellipsisVertical,
+      calendar,
+      grid,
+      images,
+      heart,
+      documentText,
+      chatbubble,
+      alertCircle,
+      shareOutline,
+      settingsOutline,
+      loading: false,
+      profile: null,
+      userPosts: [],
+      mediaItems: [],
+      loadingPosts: false,
+      activeTab: 'posts',
+      showOptionsMenu: false,
       showEditModal: false,
       editFirstName: '',
       editLastName: '',
@@ -351,14 +452,21 @@ export default {
       editProfilePic: null,
       editProfilePreview: '',
       editCoverPhoto: null,
-      editCoverPreview: ''
+      editCoverPreview: '',
+      defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
+      showMediaModal: false,
+      mediaSrc: '',
+      mediaZoom: 1,
+      postsError: ''
     };
   },
   methods: {
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
+      if (typeof imageData !== 'string') return this.defaultAvatar;
       if (imageData.startsWith('http')) return imageData;
       if (imageData.startsWith('data:image')) return imageData;
+      if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
       return `data:image/png;base64,${imageData}`;
     },
 
@@ -461,10 +569,13 @@ export default {
         this.loading = true;
         
         const targetUsername = (typeof this.$route?.params?.username === 'string' && this.$route.params.username) || this.username;
-        const res = await axios.get(`${this.API_URL}/api/profile/${targetUsername}`);
+        const res = await axios.get(`${this.API_URL}/api/profile/${targetUsername}`, {
+          params: { viewer_id: this.userId }
+        });
         
         if (res.data.success) {
           this.profile = res.data.profile;
+          console.log('✅ Profile loaded:', this.profile.username, 'ID:', this.profile.user_id);
 
           // Prefill edit fields
           this.editFirstName = this.profile.first_name || '';
@@ -489,22 +600,45 @@ export default {
 
     async loadUserPosts() {
       try {
-        // Get all posts and filter for this user
+        this.loadingPosts = true;
+        this.postsError = '';
+        console.log('📡 Loading posts for user_id:', this.profile.user_id);
         const res = await axios.post(`${this.API_URL}/api/feed`, {
-          user_id: this.userId
+          user_id: this.profile.user_id,
+          mode: 'profile',
+          limit: 50
         });
+        console.log('📥 Posts response:', res.data.posts?.length, 'posts');
         
         if (res.data.posts) {
-          const uid = String(this.userId);
-          this.userPosts = res.data.posts.filter(p => {
-            const isOriginal = String(p.user_id) === uid;
-            const isRepost = (p.item_type === 'repost') && String(p.reposted_by_user_id) === uid;
-            return isOriginal || isRepost;
+          this.userPosts = res.data.posts;
+          
+          // Extract media items for the media tab
+          const items = [];
+          this.userPosts.forEach(post => {
+            if (post.media && Array.isArray(post.media)) {
+              post.media.forEach(m => {
+                items.push({
+                  type: m.type || 'image',
+                  data: m.data,
+                  post_id: post.post_id
+                });
+              });
+            } else if (post.image) {
+              items.push({
+                type: 'image',
+                data: post.image,
+                post_id: post.post_id
+              });
+            }
           });
-          this.mediaItems = this.userPosts.filter(p => p.image && p.image !== '');
+          this.mediaItems = items;
         }
       } catch (err) {
         console.error('Failed to load posts:', err);
+        this.postsError = err.response?.data?.error || 'Connection error';
+      } finally {
+        this.loadingPosts = false;
       }
     },
 
@@ -591,6 +725,28 @@ export default {
       }
     },
 
+    async toggleFollow() {
+      if (!this.profile || !this.userId) return;
+      try {
+        const isFollowing = this.profile.is_following;
+        const endpoint = isFollowing ? '/api/unfollow' : '/api/follow';
+        const res = await axios.post(`${this.API_URL}${endpoint}`, {
+          follower_id: this.userId,
+          following_username: this.profile.username
+        });
+        
+        if (res.data.success) {
+          this.profile.is_following = !isFollowing;
+          this.profile.followers_count += isFollowing ? -1 : 1;
+        } else {
+          alert(res.data.message || 'Action failed');
+        }
+      } catch (err) {
+        console.error('Follow toggle error:', err);
+        alert('Action failed');
+      }
+    },
+
     showFollowing() {
       console.log('Show following list');
       // TODO: Navigate to following list
@@ -602,17 +758,52 @@ export default {
     },
 
     viewMedia(item) {
-      console.log('View media:', item);
-      // TODO: Open media viewer
+      if (!item || !item.data) return;
+      this.mediaSrc = this.getImageUrl(item.data);
+      this.showMediaModal = true;
+      this.mediaZoom = 1;
     },
 
-    shareProfile() {
+    closeMediaModal() {
+      this.showMediaModal = false;
+      this.mediaSrc = '';
+      this.mediaZoom = 1;
+    },
+
+    async shareProfile() {
+      const shareUrl = window.location.href;
+      const shareData = {
+        title: `@${this.username}'s Profile`,
+        text: `Check out @${this.username} on NexFi!`,
+        url: shareUrl
+      };
+
       if (navigator.share) {
-        navigator.share({
-          title: `@${this.username}'s Profile`,
-          text: `Check out @${this.username} on NexFi`,
-          url: window.location.href
-        });
+        try {
+          if (this.profile && this.profile.profile_pic) {
+            const mediaUrl = this.getImageUrl(this.profile.profile_pic);
+            const response = await fetch(mediaUrl);
+            const blob = await response.blob();
+            const file = new File([blob], 'profile-pic.jpg', { type: blob.type });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              shareData.files = [file];
+            }
+          }
+
+          await navigator.share(shareData);
+        } catch (err) {
+          console.log('❌ Profile share failed/cancelled:', err);
+        }
+      } else {
+        // Fallback for browsers without navigator.share
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          alert('🔗 Profile link copied to clipboard!');
+        } catch (err) {
+          console.error('❌ Failed to copy link:', err);
+          alert('Unable to share. Please copy the URL manually.');
+        }
       }
       this.showOptionsMenu = false;
     },
@@ -623,10 +814,15 @@ export default {
       // TODO: Navigate to settings
     },
 
+    toggleTheme() {
+      this.$root.toggleTheme?.();
+    },
+
     logout() {
       if (confirm('Are you sure you want to logout?')) {
         localStorage.removeItem('userId');
         localStorage.removeItem('username');
+        localStorage.removeItem('userAvatar');
         this.$router.push('/login');
       }
     }
@@ -638,8 +834,6 @@ export default {
       return;
     }
     
-    this.loadProfile();
-    
     window.addEventListener('themeChanged', (e) => {
       this.theme = e.detail;
     });
@@ -647,10 +841,22 @@ export default {
 
   watch: {
     '$route.params.username': {
+      immediate: true,
       handler(newVal) {
-        if (typeof newVal === 'string' && newVal) {
-          this.username = newVal;
-          this.loadProfile();
+        console.log('🔄 Profile Route Watch:', newVal);
+        // Fallback to own username if none provided
+        const target = (typeof newVal === 'string' && newVal) || localStorage.getItem('username');
+        
+        // Always load if target is set, but only change this.username if it's different
+        if (target) {
+          const isSame = target === this.username;
+          this.username = target;
+          
+          // If profile is already loaded for this user, don't reload EVERYTHING
+          // but we might want to refresh. For now, always load if it's the first time
+          if (!this.profile || !isSame) {
+            this.loadProfile();
+          }
         }
       }
     }
@@ -712,11 +918,22 @@ export default {
   display: block;
 }
 
-.edit-profile-btn {
+.edit-profile-btn, .follow-btn, .unfollow-btn {
   --border-width: 2px;
   --border-radius: 20px;
   height: 36px;
   font-weight: 700;
+  text-transform: none;
+}
+
+.follow-btn {
+  --background: var(--ion-color-primary);
+  --color: #fff;
+}
+
+.unfollow-btn {
+  --border-color: var(--ion-color-medium);
+  --color: var(--ion-color-medium);
 }
 
 .edit-cover {
@@ -936,6 +1153,61 @@ export default {
   width: 100%;
   border-radius: 16px;
   margin: 12px 0;
+  cursor: pointer;
+}
+
+.post-media-container {
+  margin: 12px 0;
+}
+
+.post-media-grid {
+  display: grid;
+  gap: 2px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--ion-border-color, #eff3f4);
+}
+
+.post-media-grid.count-1 { grid-template-columns: 1fr; }
+.post-media-grid.count-2 { grid-template-columns: 1fr 1fr; aspect-ratio: 16/9; }
+.post-media-grid.count-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; aspect-ratio: 16/9; }
+.post-media-grid.count-3 .media-wrapper:first-child { grid-row: 1 / span 2; }
+.post-media-grid.count-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; aspect-ratio: 16/9; }
+
+.media-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.post-media-img, .post-media-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.video-preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.video-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.5);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
 }
 
 .post-stats {
@@ -967,16 +1239,34 @@ export default {
   aspect-ratio: 1;
   overflow: hidden;
   cursor: pointer;
+  position: relative;
 }
 
-.media-item img {
+.media-item img, .video-item-preview video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: transform 0.2s;
 }
 
-.media-item:hover img {
+.video-item-preview {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.video-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: white;
+  background: rgba(0,0,0,0.3);
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+}
+
+.media-item:hover img, .media-item:hover video {
   transform: scale(1.05);
 }
 
@@ -992,13 +1282,70 @@ export default {
   opacity: 0.5;
 }
 
-.loading-container {
+.loading-container, .loading-posts {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
   padding: 60px 20px;
+  color: var(--ion-color-medium, #536471);
+}
+
+.loading-posts ion-spinner {
+  margin-bottom: 12px;
+}
+
+.repost-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ion-color-medium, #536471);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.repost-icon {
+  font-size: 16px;
 }
 
 .logout-item {
   margin-top: 20px;
+}
+
+/* Media Lightbox */
+.media-modal {
+  --background: #000;
+}
+
+.media-lightbox {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  overflow: auto;
+}
+
+.zoom-container {
+  transition: transform 0.2s ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.media-lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Full screen modal for media */
+.full-screen-modal {
+  --width: 100%;
+  --height: 100%;
 }
 </style>

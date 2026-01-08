@@ -276,6 +276,7 @@ import {
   camera
 } from 'ionicons/icons';
 import axios from 'axios';
+import config from '@/config/index.js';
 
 export default {
   name: 'RegisterPage',
@@ -311,7 +312,7 @@ export default {
       confirmPasswordError: '',
       dobError: '',
       genderError: '',
-      API_URL: 'http://localhost:5000',
+      API_URL: config.api.baseURL,
       flash,
       personOutline,
       mailOutline,

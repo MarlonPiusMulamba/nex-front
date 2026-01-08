@@ -29,7 +29,7 @@ try {
   // Fallback config
   config = {
     api: {
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
+      baseURL: import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5000`,
       timeout: 30000,
     },
     app: {
@@ -101,9 +101,19 @@ app.config.globalProperties.$config = config;
 
 // Global Socket.IO client (DM + feed realtime)
 try {
-  const socketBaseUrl = config?.api?.baseURL || import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const socketBaseUrl = config?.api?.baseURL || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5000`;
+  const isPythonAnywhere = /pythonanywhere\.com/i.test(socketBaseUrl);
+  const enableSocketIo = String(import.meta.env.VITE_ENABLE_SOCKETIO || '').toLowerCase() === 'true';
+  if (isPythonAnywhere && !enableSocketIo) {
+    console.log('ℹ️ Socket.IO disabled for PythonAnywhere. Set VITE_ENABLE_SOCKETIO=true to force-enable.');
+    throw new Error('Socket.IO disabled for PythonAnywhere');
+  }
+  const isCapacitor = window.location?.protocol === 'capacitor:' || typeof window.Capacitor !== 'undefined';
+  const preferPolling = isPythonAnywhere || isCapacitor;
+
   const socket = io(socketBaseUrl, {
-    transports: ['websocket', 'polling'],
+    transports: preferPolling ? ['polling'] : ['websocket', 'polling'],
+    upgrade: !preferPolling,
     autoConnect: true,
     withCredentials: true
   });
