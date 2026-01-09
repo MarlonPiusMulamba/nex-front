@@ -1922,9 +1922,10 @@ export default {
       if (!c) return;
       
       const shareUrl = `${window.location.origin}/tabs/feed?comment=${c.id}`;
+      const fullText = `${c.content || 'Check out this comment on NexFi!'}\n\n🔗 ${shareUrl}`;
       const shareData = {
         title: `NexFi - Comment by @${c.username}`,
-        text: c.content || 'Check out this comment on NexFi!',
+        text: fullText,
         url: shareUrl
       };
 
@@ -1958,9 +1959,10 @@ export default {
     
     async share(post) {
       const shareUrl = `${window.location.origin}/tabs/feed?post=${post.post_id}`;
+      const fullText = `${post.content || 'Check out this post on NexFi!'}\n\n🔗 ${shareUrl}`;
       const shareData = {
         title: `NexFi - Post by @${post.username}`,
-        text: post.content || 'Check out this post on NexFi!',
+        text: fullText,
         url: shareUrl
       };
 

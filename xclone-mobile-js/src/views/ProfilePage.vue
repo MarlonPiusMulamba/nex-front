@@ -772,9 +772,10 @@ export default {
 
     async shareProfile() {
       const shareUrl = window.location.href;
+      const fullText = `Check out @${this.username} on NexFi!\n\n🔗 ${shareUrl}`;
       const shareData = {
         title: `@${this.username}'s Profile`,
-        text: `Check out @${this.username} on NexFi!`,
+        text: fullText,
         url: shareUrl
       };
 
