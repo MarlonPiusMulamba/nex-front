@@ -18,7 +18,9 @@
     "axios": "^1.13.2",
     "socket.io-client": "^4.7.5",
     "vue": "^3.2.13",
-    "vue-router": "^4.0.3"
+    "vue-router": "^4.0.3",
+    "@capacitor/push-notifications": "^5.1.0",
+    "@capacitor/local-notifications": "^5.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.1.4",
