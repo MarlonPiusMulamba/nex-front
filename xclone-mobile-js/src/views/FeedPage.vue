@@ -2085,6 +2085,36 @@ export default {
             alert('ℹ️ Installation Tip:\n\nIf the "Install" button didn\'t trigger automatically:\n1. Open your browser menu (three dots at the top right).\n2. Look for "Install app" or "Add to Home screen".');
         }
       }
+    },
+
+    async handleDeepLinks() {
+      const postId = this.$route.query.post;
+      if (postId) {
+        console.log('🔗 Deep link detected for post:', postId);
+        
+        // 1. Try to find in existing loaded posts
+        let targetPost = this.posts.find(p => String(p.post_id) === String(postId));
+        
+        // 2. If not found, fetch specifically
+        if (!targetPost) {
+          try {
+            // this.isLoading = true; // Optional: avoid full screen loader if possible
+            const res = await axios.get(`${this.API_URL}/api/posts/${postId}`);
+            if (res.data.success) {
+              targetPost = res.data.post;
+            }
+          } catch (err) {
+            console.error('❌ Failed to fetch deep linked post:', err);
+          } finally {
+            this.isLoading = false;
+          }
+        }
+        
+        // 3. Open the modal
+        if (targetPost) {
+           this.openPostDetail(targetPost);
+        }
+      }
     }
   },
   
@@ -2098,6 +2128,9 @@ export default {
     this.refreshFeed(null, true);
 
     this.updateNotificationPermission();
+    
+    // Check for deep links (e.g., share links)
+    this.handleDeepLinks();
 
     // PWA Install Prompt Listener
     if (window._deferredPrompt) {
