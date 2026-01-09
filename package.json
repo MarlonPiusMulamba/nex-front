@@ -1,6 +1,12 @@
 {
-  "dependencies": {
-    "@capacitor/local-notifications": "^5.0.0",
-    "@capacitor/push-notifications": "^5.0.0"
+  "name": "nex-front-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install-client": "cd xclone-mobile-js && npm install",
+    "build": "cd xclone-mobile-js && npm install && npm run build"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
   }
 }

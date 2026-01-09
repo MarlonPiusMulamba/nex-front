@@ -1,4 +1,6 @@
 {
+  "version": 2,
+  "outputDirectory": "xclone-mobile-js/dist",
   "rewrites": [
     {
       "source": "/(.*)",
