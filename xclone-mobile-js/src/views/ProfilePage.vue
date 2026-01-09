@@ -771,27 +771,19 @@ export default {
     },
 
     async shareProfile() {
-      const shareUrl = window.location.href;
-      const fullText = `Check out @${this.username} on NexFi!\n\n🔗 ${shareUrl}`;
+      const frontendUrl = window.location.href;
+      // Get base API URL from standard config or environment
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://nexback.pythonanywhere.com';
+      const backendShareUrl = `${apiUrl}/share/profile/${this.username}?redirect=${encodeURIComponent(frontendUrl)}`;
+
       const shareData = {
         title: `@${this.username}'s Profile`,
-        text: fullText,
-        url: shareUrl
+        text: `Check out @${this.username} on NexFi!`,
+        url: backendShareUrl
       };
 
       if (navigator.share) {
         try {
-          if (this.profile && this.profile.profile_pic) {
-            const mediaUrl = this.getImageUrl(this.profile.profile_pic);
-            const response = await fetch(mediaUrl);
-            const blob = await response.blob();
-            const file = new File([blob], 'profile-pic.jpg', { type: blob.type });
-
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-              shareData.files = [file];
-            }
-          }
-
           await navigator.share(shareData);
         } catch (err) {
           console.log('❌ Profile share failed/cancelled:', err);
@@ -799,7 +791,8 @@ export default {
       } else {
         // Fallback for browsers without navigator.share
         try {
-          await navigator.clipboard.writeText(shareUrl);
+          // Use frontend URL for clipboard as it is cleaner
+          await navigator.clipboard.writeText(frontendUrl);
           alert('🔗 Profile link copied to clipboard!');
         } catch (err) {
           console.error('❌ Failed to copy link:', err);

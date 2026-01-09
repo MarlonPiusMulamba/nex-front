@@ -1958,39 +1958,29 @@ export default {
     },
     
     async share(post) {
-      const shareUrl = `${window.location.origin}/tabs/feed?post=${post.post_id}`;
-      const fullText = `${post.content || 'Check out this post on NexFi!'}\n\n🔗 ${shareUrl}`;
+      // Use the backend to generate a rich link preview
+      const frontendUrl = `${window.location.origin}/tabs/feed?post=${post.post_id}`;
+      const backendShareUrl = `${this.apiUrl}/share/post/${post.post_id}?redirect=${encodeURIComponent(frontendUrl)}`;
+      
       const shareData = {
         title: `NexFi - Post by @${post.username}`,
-        text: fullText,
-        url: shareUrl
+        text: post.content || 'Check out this post on NexFi!',
+        url: backendShareUrl
       };
 
       if (navigator.share) {
         try {
-          // Handle images/videos for thumbnails
-          const shareMedia = post.image || (post.media && post.media.find(m => m.type === 'image')?.data);
-          
-          if (shareMedia) {
-            const mediaUrl = this.getImageUrl(shareMedia);
-            const response = await fetch(mediaUrl);
-            const blob = await response.blob();
-            const file = new File([blob], 'post-image.jpg', { type: blob.type });
-
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-              shareData.files = [file];
-            }
-          }
-
+          // We DO NOT send files anymore. We assume the backend URL 
+          // will generate the OG card which is "all clickable".
           await navigator.share(shareData);
-          console.log('✅ Post shared successfully');
+          console.log('✅ Post shared via OG Link');
         } catch (err) {
           console.log('❌ Post share failed/cancelled:', err);
         }
       } else {
-        // Fallback for browsers without navigator.share
+        // Fallback: Copy the DIRECT frontend link (cleaner for clipboard)
         try {
-          await navigator.clipboard.writeText(shareUrl);
+          await navigator.clipboard.writeText(frontendUrl);
           alert('🔗 Link copied to clipboard!');
         } catch (err) {
           console.error('❌ Failed to copy link:', err);
