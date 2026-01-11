@@ -1959,8 +1959,9 @@ export default {
     
     async share(post) {
       // Use the backend to generate a rich link preview
-      const frontendUrl = `${window.location.origin}/tabs/feed?post=${post.post_id}`;
-      const backendShareUrl = `${this.apiUrl}/share/post/${post.post_id}?redirect=${encodeURIComponent(frontendUrl)}`;
+      // The backend will handle the redirect to the frontend
+      // Use this.API_URL (which matches the rest of the file) instead of undefined this.apiUrl
+      const backendShareUrl = `${this.API_URL}/share/post/${post.post_id}`;
       
       const shareData = {
         title: `NexFi - Post by @${post.username}`,
