@@ -120,13 +120,10 @@
                       alt="Quote media"
                       @error="handleImageError"
                     />
-                    <video
+                    <VideoPlayer
                       v-else-if="item.type === 'video'"
-                      class="media-video"
                       :src="getImageUrl(item.data)"
-                      controls
-                      playsinline
-                    ></video>
+                    />
                   </div>
                 </div>
               </div>
@@ -179,13 +176,10 @@
                     alt="Post media"
                     @error="handleImageError"
                   />
-                  <video
+                  <VideoPlayer
                     v-else-if="item.type === 'video'"
-                    class="media-video"
                     :src="getImageUrl(item.data)"
-                    controls
-                    playsinline
-                  ></video>
+                  />
                 </div>
               </div>
             </div>
@@ -297,7 +291,7 @@
             <div class="media-grid" :class="`count-${Math.min(quoteMediaPreviews.length, 4)}`">
               <div v-for="(m, idx) in quoteMediaPreviews.slice(0,4)" :key="idx" class="media-item">
                 <img v-if="m.type==='image'" :src="m.src" class="media-img" alt="Preview" />
-                <video v-else-if="m.type==='video'" :src="m.src" class="media-video" controls playsinline></video>
+                <VideoPlayer v-else-if="m.type==='video'" :src="m.src" />
               </div>
             </div>
           </div>
@@ -345,13 +339,10 @@
                   class="preview-item"
                   :class="`count-${mediaPreviews.length}`">
                   <img v-if="preview.type === 'image'" :src="preview.src" class="preview-img" alt="Preview"/>
-                  <video
+                  <VideoPlayer
                     v-else-if="preview.type === 'video'"
-                    class="preview-video"
                     :src="preview.src"
-                    controls
-                    playsinline
-                  ></video>
+                  />
                   <ion-button 
                     fill="clear" 
                     size="small" 
@@ -632,13 +623,10 @@
                           alt="Post media"
                           @error="handleImageError"
                         />
-                        <video
+                        <VideoPlayer
                           v-else-if="item.type === 'video'"
-                          class="media-video"
                           :src="getImageUrl(item.data)"
-                          controls
-                          playsinline
-                        ></video>
+                        />
                       </div>
                     </div>
                   </div>
@@ -675,13 +663,10 @@
                       alt="Comment media"
                       @error="handleImageError"
                     />
-                    <video
+                    <VideoPlayer
                       v-else
-                      class="comment-video"
                       :src="getMediaSrc(c.image)"
-                      controls
-                      playsinline
-                    ></video>
+                    />
                   </div>
                   <div class="comment-actions">
                     <ion-button fill="clear" size="small" class="action-btn" @click="replyToComment(c)">
@@ -731,7 +716,7 @@
               </ion-button>
               <div v-if="commentMediaPreview" class="comment-preview">
                 <img v-if="commentMedia && commentMedia.type==='image'" :src="commentMediaPreview" class="comment-preview-img" alt="Preview"/>
-                <video v-else-if="commentMedia && commentMedia.type==='video'" :src="commentMediaPreview" class="comment-preview-video" controls playsinline></video>
+                <VideoPlayer v-else-if="commentMedia && commentMedia.type==='video'" :src="commentMediaPreview" />
                 <ion-button 
                   fill="clear" 
                   size="small" 
@@ -781,9 +766,10 @@ import {
 import { 
   add, heart, heartOutline, chatbubbleOutline, shareOutline, sunny, moon, 
   ellipsisHorizontal, ellipsisVertical, repeat, refresh, image, close, chatbubbles, logOut,
-  alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline
+  alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy
 } from 'ionicons/icons';
 import axios from 'axios';
+import VideoPlayer from '@/components/VideoPlayer.vue';
 import config from '@/config/index.js';
 import notificationService from '@/utils/notificationService.js';
 
@@ -793,7 +779,7 @@ export default {
     IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
     IonContent, IonFab, IonFabButton, IonIcon, IonModal, IonTextarea, 
     IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent,
-    IonActionSheet
+    IonActionSheet, VideoPlayer
   },
   data() {
     const API_URL = config.api.baseURL;
@@ -812,7 +798,7 @@ export default {
       API_URL: API_URL,
       add, heart, heartOutline, chatbubbleOutline, shareOutline, sunny, moon, 
       ellipsisHorizontal, ellipsisVertical, repeat, refresh, image, close, chatbubbles, logOut,
-      alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline,
+      alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy,
       theme: window.theme || 'light',
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
       lastFetchTime: 0,

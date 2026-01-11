@@ -194,8 +194,7 @@
                 <div v-for="(m, idx) in post.media.slice(0, 4)" :key="idx" class="media-wrapper" @click="viewMedia(m)">
                   <img v-if="m.type === 'image'" :src="getImageUrl(m.data)" class="post-media-img" />
                   <div v-else-if="m.type === 'video'" class="video-preview">
-                    <video :src="getImageUrl(m.data)" class="post-media-video"></video>
-                    <div class="video-overlay"><ion-icon :icon="images"></ion-icon></div>
+                    <VideoPlayer :src="getImageUrl(m.data)" />
                   </div>
                 </div>
               </div>
@@ -229,8 +228,7 @@
             @click="viewMedia(item)">
             <img v-if="item.type === 'image'" :src="getImageUrl(item.data)" alt="Media" />
             <div v-else-if="item.type === 'video'" class="video-item-preview">
-              <video :src="getImageUrl(item.data)"></video>
-              <div class="video-badge"><ion-icon :icon="images"></ion-icon></div>
+              <VideoPlayer :src="getImageUrl(item.data)" />
             </div>
           </div>
         </div>
@@ -408,17 +406,18 @@ import {
   checkmark, personAdd, mail, camera, 
   images, calendar, arrowBack, person, logOut, sunny, moon, ellipsisVertical,
   grid, heart, documentText, chatbubble, alertCircle,
-  shareOutline, settingsOutline, add, remove
+  shareOutline, settingsOutline, add, remove, happy
 } from 'ionicons/icons';
 import api from '@/utils/api';
 import config from '@/config/index.js';
+import VideoPlayer from '@/components/VideoPlayer.vue';
 
 export default {
   name: 'ProfilePage',
   components: {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
     IonButtons, IonIcon, IonSpinner, IonRefresher, IonRefresherContent,
-    IonModal, IonList, IonItem, IonLabel, IonInput
+    IonModal, IonList, IonItem, IonLabel, IonInput, VideoPlayer
   },
   data() {
     return {
@@ -463,7 +462,8 @@ export default {
       mediaSrc: '',
       mediaZoom: 1,
       postsError: '',
-      followLoading: false
+      followLoading: false,
+      happy
     };
   },
   methods: {
