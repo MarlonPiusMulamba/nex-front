@@ -296,6 +296,19 @@ export default {
 </script>
 
 <style scoped>
+/* Ensure ion-page takes full height */
+ion-page {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Desktop layout container */
+.desktop-layout {
+  height: 100%;
+  width: 100%;
+}
+
+/* Badge styles for mobile tabs */
 .dm-badge {
   position: absolute;
   top: 4px;
@@ -330,5 +343,23 @@ export default {
   align-items: center;
   justify-content: center;
   z-index: 10;
+}
+
+/* Ensure main content doesn't overflow on desktop */
+@media (min-width: 768px) {
+  .main-content {
+    overflow: hidden;
+  }
+
+  .main-content ion-tabs {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .main-content ion-router-outlet {
+    flex: 1;
+    overflow-y: auto;
+  }
 }
 </style>
