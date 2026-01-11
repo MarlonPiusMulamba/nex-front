@@ -5,7 +5,7 @@
       <aside class="left-sidebar desktop-only">
         <!-- Logo -->
         <div class="sidebar-logo">
-          <ion-icon :icon="logoTwitter" class="sidebar-logo-icon"></ion-icon>
+          <img src="/logo.png" alt="NexFi" class="sidebar-logo-img" />
         </div>
 
         <!-- Navigation -->
@@ -36,6 +36,12 @@
             <ion-icon :icon="person" class="nav-icon"></ion-icon>
             <span class="nav-label">Profile</span>
           </router-link>
+
+          <!-- Logout Button (Desktop only) -->
+          <div class="nav-item logout-item" @click="logout">
+            <ion-icon :icon="logOutOutline" class="nav-icon"></ion-icon>
+            <span class="nav-label">Logout</span>
+          </div>
         </nav>
 
         <!-- Profile Button -->
@@ -100,7 +106,7 @@ import {
   IonPage, IonTabs, IonRouterOutlet, IonTabBar, IonTabButton, 
   IonIcon, IonLabel, IonBadge 
 } from '@ionic/vue';
-import { home, search, mail, person, notificationsOutline, logoTwitter } from 'ionicons/icons';
+import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config/index.js';
 import TrendingWidget from '@/components/TrendingWidget.vue';
@@ -122,6 +128,7 @@ export default {
       notificationsOutline,
       person,
       logoTwitter,
+      logOutOutline,
       unreadCount: 0,
       prevUnreadCount: 0,
       unreadNotifCount: 0,
@@ -218,6 +225,15 @@ export default {
     
     goToProfile() {
       this.$router.push('/tabs/profile');
+    },
+
+    logout() {
+      if (confirm('Are you sure you want to logout?')) {
+        localStorage.removeItem('userId');
+        localStorage.removeItem('username');
+        localStorage.removeItem('userAvatar');
+        window.location.href = '/login';
+      }
     }
   },
   mounted() {

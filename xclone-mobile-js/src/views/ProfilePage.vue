@@ -74,16 +74,20 @@
                   fill="solid" 
                   size="small" 
                   class="follow-btn"
-                  @click="toggleFollow">
-                  Follow
+                  @click="toggleFollow"
+                  :disabled="followLoading">
+                  <ion-spinner v-if="followLoading" name="crescent"></ion-spinner>
+                  <template v-else>Follow</template>
                 </ion-button>
                 <ion-button 
                   v-else
                   fill="outline" 
                   size="small" 
                   class="unfollow-btn"
-                  @click="toggleFollow">
-                  Unfollow
+                  @click="toggleFollow"
+                  :disabled="followLoading">
+                  <ion-spinner v-if="followLoading" name="crescent"></ion-spinner>
+                  <template v-else>Unfollow</template>
                 </ion-button>
               </template>
             </div>
@@ -401,11 +405,12 @@ import {
   IonModal, IonList, IonItem, IonLabel, IonInput
 } from '@ionic/vue';
 import {
-  arrowBack, logOut, sunny, moon, ellipsisVertical, calendar,
-  grid, images, heart, documentText, chatbubble, alertCircle,
+  checkmark, personAdd, mail, camera, 
+  images, calendar, arrowBack, person, logOut, sunny, moon, ellipsisVertical,
+  grid, heart, documentText, chatbubble, alertCircle,
   shareOutline, settingsOutline, add, remove
 } from 'ionicons/icons';
-import axios from 'axios';
+import api from '@/utils/api';
 import config from '@/config/index.js';
 
 export default {
@@ -457,7 +462,8 @@ export default {
       showMediaModal: false,
       mediaSrc: '',
       mediaZoom: 1,
-      postsError: ''
+      postsError: '',
+      followLoading: false
     };
   },
   methods: {
@@ -565,18 +571,19 @@ export default {
     },
 
     async loadProfile() {
+      if (!this.username) return;
+      
       try {
         this.loading = true;
-        
         const targetUsername = (typeof this.$route?.params?.username === 'string' && this.$route.params.username) || this.username;
-        const res = await axios.get(`${this.API_URL}/api/profile/${targetUsername}`, {
+        const res = await api.get(`/api/profile/${targetUsername}`, {
           params: { viewer_id: this.userId }
         });
         
-        if (res.data.success) {
-          this.profile = res.data.profile;
-          console.log('✅ Profile loaded:', this.profile.username, 'ID:', this.profile.user_id);
-
+        if (res.success) {
+          this.profile = res.profile;
+          this.profile.user_id = String(this.profile.user_id); // Ensure string
+          
           // Prefill edit fields
           this.editFirstName = this.profile.first_name || '';
           this.editLastName = this.profile.last_name || '';
@@ -587,31 +594,34 @@ export default {
           this.editCoverPreview = this.profile.cover_photo 
             ? this.getImageUrl(this.profile.cover_photo)
             : '';
-          await this.loadUserPosts();
+          
+          await this.loadPosts();
         } else {
-          console.error('Failed to load profile');
+          console.error('Profile not found');
         }
       } catch (err) {
-        console.error('Profile error:', err);
+        console.error('Load profile error:', err);
       } finally {
         this.loading = false;
       }
     },
 
-    async loadUserPosts() {
+    async loadPosts() {
+      if (!this.profile?.user_id) return;
+      
       try {
         this.loadingPosts = true;
         this.postsError = '';
         console.log('📡 Loading posts for user_id:', this.profile.user_id);
-        const res = await axios.post(`${this.API_URL}/api/feed`, {
+        const res = await api.post('/api/feed', {
           user_id: this.profile.user_id,
           mode: 'profile',
           limit: 50
         });
-        console.log('📥 Posts response:', res.data.posts?.length, 'posts');
+        console.log('📥 Posts response:', res.posts?.length, 'posts');
         
-        if (res.data.posts) {
-          this.userPosts = res.data.posts;
+        if (res.posts) {
+          this.userPosts = res.posts;
           
           // Extract media items for the media tab
           const items = [];
@@ -711,13 +721,13 @@ export default {
           payload.cover_photo = this.editCoverPhoto;
         }
 
-        const res = await axios.post(`${this.API_URL}/api/profile/update`, payload);
+        const res = await api.post('/api/profile/update', payload);
 
-        if (res.data.success) {
+        if (res.success) {
           this.showEditModal = false;
           await this.loadProfile();
         } else {
-          alert(res.data.message || 'Failed to update profile');
+          alert(res.message || 'Failed to update profile');
         }
       } catch (err) {
         console.error('Update profile error:', err);
@@ -730,16 +740,16 @@ export default {
       try {
         const isFollowing = this.profile.is_following;
         const endpoint = isFollowing ? '/api/unfollow' : '/api/follow';
-        const res = await axios.post(`${this.API_URL}${endpoint}`, {
+        const res = await api.post(endpoint, {
           follower_id: this.userId,
           following_username: this.profile.username
         });
         
-        if (res.data.success) {
+        if (res.success) {
           this.profile.is_following = !isFollowing;
           this.profile.followers_count += isFollowing ? -1 : 1;
         } else {
-          alert(res.data.message || 'Action failed');
+          alert(res.message || 'Action failed');
         }
       } catch (err) {
         console.error('Follow toggle error:', err);
@@ -924,21 +934,31 @@ export default {
 }
 
 .edit-profile-btn, .follow-btn, .unfollow-btn {
-  --border-width: 2px;
   --border-radius: 20px;
   height: 36px;
   font-weight: 700;
   text-transform: none;
+  font-size: 14px;
 }
 
 .follow-btn {
-  --background: var(--ion-color-primary);
-  --color: #fff;
+  --background: var(--ion-text-color, #0f1419);
+  --color: var(--ion-background-color, #fff);
+  --border-width: 0;
 }
 
 .unfollow-btn {
-  --border-color: var(--ion-color-medium);
-  --color: var(--ion-color-medium);
+  --background: transparent;
+  --color: var(--ion-text-color, #0f1419);
+  --border-color: var(--ion-border-color, #eff3f4);
+  --border-width: 1px;
+}
+
+.edit-profile-btn {
+  --background: transparent;
+  --color: var(--ion-text-color, #0f1419);
+  --border-color: var(--ion-border-color, #eff3f4);
+  --border-width: 1px;
 }
 
 .edit-cover {

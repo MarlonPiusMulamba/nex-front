@@ -28,12 +28,15 @@
         </div>
         <ion-button
           size="small"
-          fill="solid"
+          :fill="user.following ? 'solid' : 'solid'"
           class="follow-btn"
           @click="followUser(user)"
-          :disabled="user.following"
+          :disabled="user.following || user.followLoading"
         >
-          {{ user.following ? 'Following' : 'Follow' }}
+          <ion-spinner v-if="user.followLoading" name="crescent"></ion-spinner>
+          <template v-else>
+            {{ user.following ? 'Following' : 'Follow' }}
+          </template>
         </ion-button>
       </div>
     </div>
@@ -46,7 +49,7 @@
 
 <script>
 import { IonSpinner, IonButton } from '@ionic/vue';
-import axios from 'axios';
+import api from '@/utils/api';
 import config from '@/config/index.js';
 
 export default {
@@ -77,36 +80,42 @@ export default {
     async loadSuggestedUsers() {
       try {
         this.loading = true;
-        const res = await axios.get(`${this.API_URL}/api/search/users`, {
-          params: { q: '', limit: 10 }
+        const res = await api.get('/api/search/users', {
+          params: { q: '', limit: 10, viewer_id: this.userId }
         });
         
-        this.users = (res.data.users || [])
+        this.users = (res.users || [])
           .filter(u => u.user_id !== this.userId)
           .slice(0, 5)
-          .map(u => ({ ...u, following: false }));
+          .map(u => ({ 
+            ...u, 
+            following: !!u.is_following,
+            followLoading: false
+          }));
       } catch (err) {
         console.error('Failed to load suggestions:', err);
-        this.users = [];
       } finally {
         this.loading = false;
       }
     },
     
     async followUser(user) {
-      if (!this.userId) return;
+      if (!this.userId || user.followLoading) return;
       
       try {
-        const res = await axios.post(`${this.API_URL}/api/follow`, {
+        user.followLoading = true;
+        const res = await api.post('/api/follow', {
           follower_id: this.userId,
           following_username: user.username
         });
         
-        if (res.data.success) {
+        if (res.success) {
           user.following = true;
         }
       } catch (err) {
         console.error('Follow error:', err);
+      } finally {
+        user.followLoading = false;
       }
     },
     
@@ -209,6 +218,15 @@ export default {
   font-weight: 700;
   min-width: 80px;
   flex-shrink: 0;
+  --background: var(--ion-text-color, #0f1419);
+  --color: var(--ion-background-color, #fff);
+  margin: 0;
+}
+
+.follow-btn[disabled] {
+  opacity: 0.6;
+  --background: var(--ion-color-medium, #536471);
+  --color: #fff;
 }
 
 .widget-footer {

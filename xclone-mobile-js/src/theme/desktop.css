@@ -125,11 +125,19 @@
 .sidebar-logo {
   padding: 12px 16px;
   margin-bottom: 8px;
+  display: flex;
+  justify-content: center;
 }
 
-.sidebar-logo-icon {
-  font-size: 32px;
-  color: var(--ion-color-primary, #1d9bf0);
+.sidebar-logo-img {
+  width: 100px;
+  height: 100px;
+  display: block;
+  object-fit: cover;
+  border-radius: 50%;
+  background: #fff;
+  padding: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar-nav {

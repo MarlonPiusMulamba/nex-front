@@ -4,9 +4,7 @@
       <div class="login-wrapper">
         <!-- Logo Section -->
         <div class="logo-section">
-          <div class="logo-circle">
-            <ion-icon :icon="flash" class="logo-icon"></ion-icon>
-          </div>
+          <img src="/logo.png" alt="NexFi Logo" class="logo-image" />
           <h1 class="brand-name">NexFi</h1>
           <p class="tagline">Connect with the world</p>
         </div>
@@ -241,21 +239,16 @@ export default {
   animation: fadeInDown 0.6s ease-out;
 }
 
-.logo-circle {
-  width: 80px;
-  height: 80px;
-  background: #000000;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.logo-image {
+  width: 120px;
+  height: 120px;
   margin: 0 auto 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-}
-
-.logo-icon {
-  font-size: 40px;
-  color: #ffffff;
+  display: block;
+  object-fit: cover;
+  border-radius: 50%;
+  background: #fff;
+  padding: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .brand-name {

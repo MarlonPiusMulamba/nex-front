@@ -48,8 +48,16 @@
                 <div class="user-name">{{ user.username }}</div>
                 <div class="user-handle">@{{ user.username }}</div>
               </div>
-              <ion-button size="small" fill="outline" @click.stop="quickFollow(user)">
-                Follow
+              <ion-button 
+                size="small" 
+                :fill="user.is_following ? 'solid' : 'outline'" 
+                @click.stop="quickFollow(user)"
+                :disabled="user.followLoading"
+                class="follow-btn">
+                <ion-spinner v-if="user.followLoading" name="crescent"></ion-spinner>
+                <template v-else>
+                  {{ user.is_following ? 'Following' : 'Follow' }}
+                </template>
               </ion-button>
             </div>
           </div>
@@ -104,8 +112,16 @@
                 <div class="user-name">{{ user.username }}</div>
                 <div class="user-handle">@{{ user.username }}</div>
               </div>
-              <ion-button size="small" fill="outline" @click.stop="quickFollow(user)">
-                Follow
+              <ion-button 
+                size="small" 
+                :fill="user.is_following ? 'solid' : 'outline'" 
+                @click.stop="quickFollow(user)"
+                :disabled="user.followLoading"
+                class="follow-btn">
+                <ion-spinner v-if="user.followLoading" name="crescent"></ion-spinner>
+                <template v-else>
+                  {{ user.is_following ? 'Following' : 'Follow' }}
+                </template>
               </ion-button>
             </div>
           </div>
@@ -267,6 +283,7 @@ import {
   checkmark, mail, shareOutline, calendar, heart, chatbubble, documentText
 } from 'ionicons/icons';
 import axios from 'axios';
+import api from '@/utils/api';
 import config from '@/config/index.js';
 
 export default {
@@ -378,20 +395,23 @@ export default {
         // @username => search users
         if (q.startsWith('@')) {
           this.isPostSearch = false;
-          const res = await axios.get(`${this.API_URL}/api/search/users`, {
-            params: { q: q.replace(/^@/, ''), limit: 20 }
+          const res = await api.get('/api/search/users', {
+            params: { q: q.replace(/^@/, ''), limit: 20, viewer_id: this.userId }
           });
-          this.searchResults = (res.data.users || []).filter(u => u.user_id !== this.userId);
+          this.searchResults = (res.users || []).map(u => ({
+            ...u,
+            followLoading: false
+          })).filter(u => u.user_id !== this.userId);
           this.postResults = [];
           return;
         }
 
         // Anything else (hashtags + normal words/slogans) => search posts
         this.isPostSearch = true;
-        const res = await axios.get(`${this.API_URL}/api/search/posts`, {
+        const res = await api.get('/api/search/posts', {
           params: { q: q, limit: 30, offset: 0 }
         });
-        this.postResults = res.data.posts || [];
+        this.postResults = res.posts || [];
         this.searchResults = [];
       } catch (err) {
         console.error('Search error:', err);
@@ -406,10 +426,10 @@ export default {
     async loadTrending() {
       try {
         this.loadingTrending = true;
-        const res = await axios.get(`${this.API_URL}/api/trending`, {
+        const res = await api.get('/api/trending', {
           params: { limit: 10, days: 7, recent_limit: 2000 }
         });
-        this.trendingTopics = res.data.topics || [];
+        this.trendingTopics = res.topics || [];
       } catch (err) {
         console.error('Failed to load trending:', err);
         this.trendingTopics = [];
@@ -438,13 +458,14 @@ export default {
 
     async loadSuggestedUsers() {
       try {
-        const res = await axios.get(`${this.API_URL}/api/search/users`, {
-          params: { q: '', limit: 10 }
+        const res = await api.get('/api/search/users', {
+          params: { q: '', limit: 10, viewer_id: this.userId }
         });
 
-        this.suggestedUsers = (res.data.users || [])
+        this.suggestedUsers = (res.users || [])
           .filter(u => u.user_id !== this.userId)
-          .slice(0, 5);
+          .slice(0, 5)
+          .map(u => ({ ...u, is_following: !!u.is_following, followLoading: false }));
       } catch (err) {
         console.error('Failed to load suggestions:', err);
       }
@@ -455,12 +476,14 @@ export default {
       this.loadingProfile = true;
 
       try {
-        const res = await axios.get(`${this.API_URL}/api/profile/${user.username}`);
+        const res = await api.get(`/api/profile/${user.username}`, {
+          params: { viewer_id: this.userId }
+        });
         
-        if (res.data.success) {
-          this.userProfile = res.data.profile;
+        if (res.success) {
+          this.userProfile = res.profile;
           await this.loadUserPosts(user.user_id);
-          await this.checkFollowStatus(user.user_id);
+          this.isFollowing = !!res.profile.is_following;
         }
       } catch (err) {
         console.error('Profile error:', err);
@@ -471,12 +494,13 @@ export default {
 
     async loadUserPosts(userId) {
       try {
-        const res = await axios.post(`${this.API_URL}/api/feed`, {
-          user_id: this.userId
+        const res = await api.post('/api/feed', {
+          user_id: userId,
+          mode: 'user'
         });
         
-        if (res.data.posts) {
-          this.userPosts = res.data.posts.filter(p => p.user_id === userId);
+        if (res.posts) {
+          this.userPosts = res.posts;
         }
       } catch (err) {
         console.error('Failed to load posts:', err);
@@ -485,13 +509,7 @@ export default {
     },
 
     async checkFollowStatus(targetUserId) {
-      try {
-        // You'll need a backend endpoint to check if following
-        // For now, we'll assume not following
-        this.isFollowing = false;
-      } catch (err) {
-        console.error('Failed to check follow status:', err);
-      }
+      // Handled by viewProfile directly now
     },
 
     async toggleFollow() {
@@ -501,12 +519,12 @@ export default {
         this.followLoading = true;
         
         const endpoint = this.isFollowing ? '/api/unfollow' : '/api/follow';
-        const res = await axios.post(`${this.API_URL}${endpoint}`, {
+        const res = await api.post(endpoint, {
           follower_id: this.userId,
           following_username: this.selectedUser.username
         });
 
-        if (res.data.success) {
+        if (res.success) {
           this.isFollowing = !this.isFollowing;
           
           // Update follower count
@@ -517,7 +535,7 @@ export default {
             );
           }
         } else {
-          alert(res.data.message);
+          alert(res.message);
         }
       } catch (err) {
         console.error('Follow error:', err);
@@ -528,20 +546,26 @@ export default {
     },
 
     async quickFollow(user) {
+      if (user.followLoading) return;
       try {
-        const res = await axios.post(`${this.API_URL}/api/follow`, {
+        user.followLoading = true;
+        const res = await api.post('/api/follow', {
           follower_id: this.userId,
           following_username: user.username
         });
 
-        if (res.data.success) {
-          alert(`You are now following @${user.username}`);
+        if (res.success) {
+          user.is_following = true;
+          // Optionally show a toast instead of alert for better UX
+          console.log(`Now following @${user.username}`);
         } else {
-          alert(res.data.message);
+          alert(res.message);
         }
       } catch (err) {
         console.error('Quick follow error:', err);
         alert('Failed to follow user');
+      } finally {
+        user.followLoading = false;
       }
     },
 
@@ -736,6 +760,9 @@ export default {
   height: 36px;
   font-weight: 700;
   --border-radius: 20px;
+  --background: var(--ion-text-color, #0f1419);
+  --color: var(--ion-background-color, #fff);
+  --border-width: 0;
 }
 
 .user-details {

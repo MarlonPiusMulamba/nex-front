@@ -4,9 +4,7 @@
       <div class="register-wrapper">
         <!-- Logo Section -->
         <div class="logo-section">
-          <div class="logo-circle">
-            <ion-icon :icon="flash" class="logo-icon"></ion-icon>
-          </div>
+          <img src="/logo.png" alt="NexFi Logo" class="logo-image" />
           <h1 class="brand-name">Join NexFi</h1>
           <p class="tagline">Create your account</p>
         </div>
@@ -509,21 +507,16 @@ export default {
   animation: fadeInDown 0.6s ease-out;
 }
 
-.logo-circle {
-  width: 70px;
-  height: 70px;
-  background: #000000;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.logo-image {
+  width: 100px;
+  height: 100px;
   margin: 0 auto 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-}
-
-.logo-icon {
-  font-size: 36px;
-  color: #ffffff;
+  display: block;
+  object-fit: cover;
+  border-radius: 50%;
+  background: #fff;
+  padding: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .brand-name {
