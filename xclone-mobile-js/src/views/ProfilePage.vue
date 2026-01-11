@@ -771,34 +771,68 @@ export default {
     },
 
     async shareProfile() {
-      const frontendUrl = window.location.href;
-      // Get base API URL from standard config or environment
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://nexback.pythonanywhere.com';
-      const backendShareUrl = `${apiUrl}/share/profile/${this.username}?redirect=${encodeURIComponent(frontendUrl)}`;
+      if (!this.profile || !this.username) return;
+      
+      // Backend share URL for rich link previews
+      const backendShareUrl = `${this.API_URL}/share/profile/${this.username}`;
+      
+      // Frontend URL for direct access
+      const frontendUrl = `${window.location.origin}/tabs/profile/${this.username}`;
+      
+      const displayName = (this.profile.first_name || this.profile.last_name) 
+        ? `${this.profile.first_name || ''} ${this.profile.last_name || ''}`.trim()
+        : this.username;
 
       const shareData = {
-        title: `@${this.username}'s Profile`,
+        title: `${displayName} (@${this.username}) - NexFi`,
         text: `Check out @${this.username} on NexFi!`,
         url: backendShareUrl
       };
 
+      // Check if native share is available
       if (navigator.share) {
         try {
           await navigator.share(shareData);
+          console.log('✅ Profile shared successfully');
         } catch (err) {
-          console.log('❌ Profile share failed/cancelled:', err);
+          if (err.name !== 'AbortError') {
+            console.error('❌ Share failed:', err);
+          }
         }
       } else {
-        // Fallback for browsers without navigator.share
+        // Fallback: Show options
+        const shareOptions = [
+          {
+            label: 'Share to WhatsApp',
+            action: () => {
+              const whatsappText = encodeURIComponent(`${shareData.text}\n\n${backendShareUrl}`);
+              window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
+            }
+          },
+          {
+            label: 'Copy Link',
+            action: async () => {
+              try {
+                await navigator.clipboard.writeText(backendShareUrl);
+                alert('🔗 Profile link copied to clipboard!');
+              } catch (err) {
+                console.error('❌ Failed to copy:', err);
+                alert('Unable to copy link');
+              }
+            }
+          }
+        ];
+        
+        // For now, just copy the link as fallback
         try {
-          // Use frontend URL for clipboard as it is cleaner
-          await navigator.clipboard.writeText(frontendUrl);
+          await navigator.clipboard.writeText(backendShareUrl);
           alert('🔗 Profile link copied to clipboard!');
         } catch (err) {
           console.error('❌ Failed to copy link:', err);
           alert('Unable to share. Please copy the URL manually.');
         }
       }
+      
       this.showOptionsMenu = false;
     },
 

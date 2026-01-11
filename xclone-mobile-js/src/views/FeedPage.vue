@@ -761,6 +761,13 @@
       :buttons="headerActionButtons"
     ></ion-action-sheet>
 
+    <ion-action-sheet
+      :is-open="showShareActionSheet"
+      @didDismiss="showShareActionSheet = false"
+      header="Share Post"
+      :buttons="shareActionSheetButtons"
+    ></ion-action-sheet>
+
   </ion-page>
 </template>
 
@@ -861,7 +868,11 @@ export default {
       showEmojiPicker: false,
       notificationPermission: 'default',
       showHeaderActionSheet: false,
-      deferredPrompt: null
+      deferredPrompt: null,
+      
+      // Share action sheet
+      showShareActionSheet: false,
+      shareActionSheetButtons: []
     };
   },
   computed: {
@@ -1958,10 +1969,13 @@ export default {
     },
     
     async share(post) {
-      // Use the backend to generate a rich link preview
-      // The backend will handle the redirect to the frontend
-      // Use this.API_URL (which matches the rest of the file) instead of undefined this.apiUrl
+      if (!post) return;
+      
+      // Backend share URL for rich link previews
       const backendShareUrl = `${this.API_URL}/share/post/${post.post_id}`;
+      
+      // Frontend URL for direct access
+      const frontendUrl = `${window.location.origin}/tabs/feed?post=${post.post_id}`;
       
       const shareData = {
         title: `NexFi - Post by @${post.username}`,
@@ -1969,24 +1983,49 @@ export default {
         url: backendShareUrl
       };
 
+      // Check if native share is available
       if (navigator.share) {
         try {
-          // We DO NOT send files anymore. We assume the backend URL 
-          // will generate the OG card which is "all clickable".
           await navigator.share(shareData);
-          console.log('✅ Post shared via OG Link');
+          console.log('✅ Post shared successfully');
         } catch (err) {
-          console.log('❌ Post share failed/cancelled:', err);
+          if (err.name !== 'AbortError') {
+            console.error('❌ Share failed:', err);
+          }
         }
       } else {
-        // Fallback: Copy the DIRECT frontend link (cleaner for clipboard)
-        try {
-          await navigator.clipboard.writeText(frontendUrl);
-          alert('🔗 Link copied to clipboard!');
-        } catch (err) {
-          console.error('❌ Failed to copy link:', err);
-          alert('Unable to share. Please copy the URL manually.');
-        }
+        // Fallback: Show action sheet with share options
+        const buttons = [
+          {
+            text: 'Share to WhatsApp',
+            icon: 'logo-whatsapp',
+            handler: () => {
+              const whatsappText = encodeURIComponent(`${shareData.text}\n\n${backendShareUrl}`);
+              window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
+            }
+          },
+          {
+            text: 'Copy Link',
+            icon: 'copy-outline',
+            handler: async () => {
+              try {
+                await navigator.clipboard.writeText(backendShareUrl);
+                alert('🔗 Link copied to clipboard!');
+              } catch (err) {
+                console.error('❌ Failed to copy:', err);
+                alert('Unable to copy link');
+              }
+            }
+          },
+          {
+            text: 'Cancel',
+            role: 'cancel'
+          }
+        ];
+        
+        // Create and show action sheet
+        this.shareActionSheetButtons = buttons;
+        this.showShareActionSheet = true;
       }
     },
     
