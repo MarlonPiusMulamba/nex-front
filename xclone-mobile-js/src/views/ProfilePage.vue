@@ -773,10 +773,10 @@ export default {
     async shareProfile() {
       if (!this.profile || !this.username) return;
       
-      // Backend share URL for rich link previews
+      // Backend share URL for rich link previews (WhatsApp, Facebook, etc.)
       const backendShareUrl = `${this.API_URL}/share/profile/${this.username}`;
       
-      // Frontend URL for direct access
+      // Frontend URL for direct access (cleaner for clipboard)
       const frontendUrl = `${window.location.origin}/tabs/profile/${this.username}`;
       
       const displayName = (this.profile.first_name || this.profile.last_name) 
@@ -786,7 +786,7 @@ export default {
       const shareData = {
         title: `${displayName} (@${this.username}) - NexFi`,
         text: `Check out @${this.username} on NexFi!`,
-        url: backendShareUrl
+        url: backendShareUrl  // Use backend URL for native share (better previews)
       };
 
       // Check if native share is available
@@ -800,32 +800,9 @@ export default {
           }
         }
       } else {
-        // Fallback: Show options
-        const shareOptions = [
-          {
-            label: 'Share to WhatsApp',
-            action: () => {
-              const whatsappText = encodeURIComponent(`${shareData.text}\n\n${backendShareUrl}`);
-              window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
-            }
-          },
-          {
-            label: 'Copy Link',
-            action: async () => {
-              try {
-                await navigator.clipboard.writeText(backendShareUrl);
-                alert('🔗 Profile link copied to clipboard!');
-              } catch (err) {
-                console.error('❌ Failed to copy:', err);
-                alert('Unable to copy link');
-              }
-            }
-          }
-        ];
-        
-        // For now, just copy the link as fallback
+        // Fallback: Copy frontend URL to clipboard (cleaner, user-friendly)
         try {
-          await navigator.clipboard.writeText(backendShareUrl);
+          await navigator.clipboard.writeText(frontendUrl);
           alert('🔗 Profile link copied to clipboard!');
         } catch (err) {
           console.error('❌ Failed to copy link:', err);

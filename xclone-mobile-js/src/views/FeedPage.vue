@@ -1971,16 +1971,16 @@ export default {
     async share(post) {
       if (!post) return;
       
-      // Backend share URL for rich link previews
+      // Backend share URL for rich link previews (WhatsApp, Facebook, etc.)
       const backendShareUrl = `${this.API_URL}/share/post/${post.post_id}`;
       
-      // Frontend URL for direct access
+      // Frontend URL for direct access (cleaner for clipboard)
       const frontendUrl = `${window.location.origin}/tabs/feed?post=${post.post_id}`;
       
       const shareData = {
         title: `NexFi - Post by @${post.username}`,
         text: post.content || 'Check out this post on NexFi!',
-        url: backendShareUrl
+        url: backendShareUrl  // Use backend URL for native share (better previews)
       };
 
       // Check if native share is available
@@ -2000,6 +2000,7 @@ export default {
             text: 'Share to WhatsApp',
             icon: 'logo-whatsapp',
             handler: () => {
+              // Use backend URL for WhatsApp to get rich preview
               const whatsappText = encodeURIComponent(`${shareData.text}\n\n${backendShareUrl}`);
               window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
             }
@@ -2009,7 +2010,8 @@ export default {
             icon: 'copy-outline',
             handler: async () => {
               try {
-                await navigator.clipboard.writeText(backendShareUrl);
+                // Use frontend URL for clipboard (cleaner, user-friendly)
+                await navigator.clipboard.writeText(frontendUrl);
                 alert('🔗 Link copied to clipboard!');
               } catch (err) {
                 console.error('❌ Failed to copy:', err);
