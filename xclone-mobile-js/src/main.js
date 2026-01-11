@@ -16,6 +16,9 @@ import '@ionic/vue/css/text-transformation.css';
 import '@ionic/vue/css/flex-utils.css';
 import '@ionic/vue/css/display.css';
 
+// Desktop layout styles
+import './theme/desktop.css';
+
 console.log('🚀 Step 1: Imports successful');
 
 // Try importing config with error handling
@@ -63,7 +66,7 @@ app.config.errorHandler = (err, instance, info) => {
   console.error('❌ Global Error:', err);
   console.error('Component:', instance?.$options?.name || 'Unknown');
   console.error('Info:', info);
-  
+
   // Show error overlay
   const errorDiv = document.createElement('div');
   errorDiv.style.cssText = `
@@ -156,13 +159,13 @@ router.isReady()
   .then(() => {
     console.log('✅ Step 6: Router ready');
     console.log('Current route:', router.currentRoute.value);
-    
+
     console.log('🚀 Step 7: Mounting app...');
     const mountTarget = document.querySelector('#app');
     if (!mountTarget) {
       throw new Error('Mount target #app not found in DOM');
     }
-    
+
     app.mount('#app');
     console.log('✅ Step 7: App mounted successfully! 🎉');
   })

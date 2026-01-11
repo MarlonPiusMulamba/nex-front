@@ -1,36 +1,96 @@
 <template>
   <ion-page>
-    <ion-tabs>
-      <ion-router-outlet></ion-router-outlet>
-      <ion-tab-bar slot="bottom">
-        <ion-tab-button tab="feed" href="/tabs/feed">
-          <ion-icon :icon="home"></ion-icon>
-          <ion-label>Home</ion-label>
-        </ion-tab-button>
-        
-        <ion-tab-button tab="follow" href="/tabs/follow">
-          <ion-icon :icon="search"></ion-icon>
-          <ion-label>Search</ion-label>
-        </ion-tab-button>
-        
-        <ion-tab-button tab="dm" href="/tabs/dm">
-          <ion-icon :icon="mail"></ion-icon>
-          <ion-badge v-if="unreadCount > 0" class="dm-badge">{{ unreadCount }}</ion-badge>
-          <ion-label>DM</ion-label>
-        </ion-tab-button>
+    <div class="desktop-layout">
+      <!-- Left Sidebar (Desktop/Tablet only) -->
+      <aside class="left-sidebar desktop-only">
+        <!-- Logo -->
+        <div class="sidebar-logo">
+          <ion-icon :icon="logoTwitter" class="sidebar-logo-icon"></ion-icon>
+        </div>
 
-        <ion-tab-button tab="notifications" href="/tabs/notifications">
-          <ion-icon :icon="notificationsOutline"></ion-icon>
-          <ion-badge v-if="unreadNotifCount > 0" class="notif-badge">{{ unreadNotifCount }}</ion-badge>
-          <ion-label>Alerts</ion-label>
-        </ion-tab-button>
-        
-        <ion-tab-button tab="profile" href="/tabs/profile">
-          <ion-icon :icon="person"></ion-icon>
-          <ion-label>Profile</ion-label>
-        </ion-tab-button>
-      </ion-tab-bar>
-    </ion-tabs>
+        <!-- Navigation -->
+        <nav class="sidebar-nav">
+          <router-link to="/tabs/feed" class="nav-item">
+            <ion-icon :icon="home" class="nav-icon"></ion-icon>
+            <span class="nav-label">Home</span>
+          </router-link>
+
+          <router-link to="/tabs/follow" class="nav-item">
+            <ion-icon :icon="search" class="nav-icon"></ion-icon>
+            <span class="nav-label">Search</span>
+          </router-link>
+
+          <router-link to="/tabs/dm" class="nav-item">
+            <ion-icon :icon="mail" class="nav-icon"></ion-icon>
+            <span class="nav-label">Messages</span>
+            <span v-if="unreadCount > 0" class="nav-badge">{{ unreadCount }}</span>
+          </router-link>
+
+          <router-link to="/tabs/notifications" class="nav-item">
+            <ion-icon :icon="notificationsOutline" class="nav-icon"></ion-icon>
+            <span class="nav-label">Alerts</span>
+            <span v-if="unreadNotifCount > 0" class="nav-badge">{{ unreadNotifCount }}</span>
+          </router-link>
+
+          <router-link to="/tabs/profile" class="nav-item">
+            <ion-icon :icon="person" class="nav-icon"></ion-icon>
+            <span class="nav-label">Profile</span>
+          </router-link>
+        </nav>
+
+        <!-- Profile Button -->
+        <div class="sidebar-profile" @click="goToProfile">
+          <img :src="userAvatar || defaultAvatar" class="sidebar-profile-avatar" alt="Profile" />
+          <div class="sidebar-profile-info">
+            <div class="sidebar-profile-name">{{ username || 'User' }}</div>
+            <div class="sidebar-profile-handle">@{{ username || 'user' }}</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <ion-tabs>
+          <ion-router-outlet></ion-router-outlet>
+          
+          <!-- Bottom Tab Bar (Mobile only) -->
+          <ion-tab-bar slot="bottom" class="mobile-tab-bar mobile-only">
+            <ion-tab-button tab="feed" href="/tabs/feed">
+              <ion-icon :icon="home"></ion-icon>
+              <ion-label>Home</ion-label>
+            </ion-tab-button>
+            
+            <ion-tab-button tab="follow" href="/tabs/follow">
+              <ion-icon :icon="search"></ion-icon>
+              <ion-label>Search</ion-label>
+            </ion-tab-button>
+            
+            <ion-tab-button tab="dm" href="/tabs/dm">
+              <ion-icon :icon="mail"></ion-icon>
+              <ion-badge v-if="unreadCount > 0" class="dm-badge">{{ unreadCount }}</ion-badge>
+              <ion-label>DM</ion-label>
+            </ion-tab-button>
+
+            <ion-tab-button tab="notifications" href="/tabs/notifications">
+              <ion-icon :icon="notificationsOutline"></ion-icon>
+              <ion-badge v-if="unreadNotifCount > 0" class="notif-badge">{{ unreadNotifCount }}</ion-badge>
+              <ion-label>Alerts</ion-label>
+            </ion-tab-button>
+            
+            <ion-tab-button tab="profile" href="/tabs/profile">
+              <ion-icon :icon="person"></ion-icon>
+              <ion-label>Profile</ion-label>
+            </ion-tab-button>
+          </ion-tab-bar>
+        </ion-tabs>
+      </main>
+
+      <!-- Right Sidebar (Desktop only) -->
+      <aside class="right-sidebar desktop-only">
+        <TrendingWidget />
+        <SuggestedUsersWidget />
+      </aside>
+    </div>
   </ion-page>
 </template>
 
@@ -40,15 +100,19 @@ import {
   IonPage, IonTabs, IonRouterOutlet, IonTabBar, IonTabButton, 
   IonIcon, IonLabel, IonBadge 
 } from '@ionic/vue';
-import { home, search, mail, person, notificationsOutline } from 'ionicons/icons';
+import { home, search, mail, person, notificationsOutline, logoTwitter } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config/index.js';
+import TrendingWidget from '@/components/TrendingWidget.vue';
+import SuggestedUsersWidget from '@/components/SuggestedUsersWidget.vue';
 
 export default {
   name: 'TabsPage',
   components: { 
     IonPage, IonTabs, IonRouterOutlet, IonTabBar, IonTabButton, 
-    IonIcon, IonLabel, IonBadge 
+    IonIcon, IonLabel, IonBadge,
+    TrendingWidget,
+    SuggestedUsersWidget
   },
   data() {
     return {
@@ -57,17 +121,21 @@ export default {
       mail, 
       notificationsOutline,
       person,
+      logoTwitter,
       unreadCount: 0,
       prevUnreadCount: 0,
       unreadNotifCount: 0,
       prevUnreadNotifCount: 0,
       userId: localStorage.getItem('userId'),
+      username: localStorage.getItem('username'),
+      userAvatar: localStorage.getItem('userAvatar') || '',
       API_URL: config.api.baseURL,
       pollInterval: null,
       notifPollInterval: null,
       audioCtx: null,
       audioUnlocked: false,
-      _unlockAudio: null
+      _unlockAudio: null,
+      defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E'
     };
   },
   methods: {
@@ -146,6 +214,10 @@ export default {
       } catch (err) {
         console.error('Failed to fetch unread notifications count:', err);
       }
+    },
+    
+    goToProfile() {
+      this.$router.push('/tabs/profile');
     }
   },
   mounted() {
