@@ -769,7 +769,8 @@ import {
   alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy
 } from 'ionicons/icons';
 import axios from 'axios';
-import VideoPlayer from '@/components/VideoPlayer.vue';
+// import VideoPlayer from '@/components/VideoPlayer.vue';
+// import EmojiPicker from '@/components/EmojiPicker.vue';
 import config from '@/config/index.js';
 import notificationService from '@/utils/notificationService.js';
 
@@ -779,7 +780,7 @@ export default {
     IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
     IonContent, IonFab, IonFabButton, IonIcon, IonModal, IonTextarea, 
     IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent,
-    IonActionSheet, VideoPlayer
+    IonActionSheet //, VideoPlayer, EmojiPicker
   },
   data() {
     const API_URL = config.api.baseURL;

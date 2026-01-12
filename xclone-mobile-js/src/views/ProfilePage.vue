@@ -410,14 +410,14 @@ import {
 } from 'ionicons/icons';
 import api from '@/utils/api';
 import config from '@/config/index.js';
-import VideoPlayer from '@/components/VideoPlayer.vue';
+// import VideoPlayer from '@/components/VideoPlayer.vue';
 
 export default {
   name: 'ProfilePage',
   components: {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
     IonButtons, IonIcon, IonSpinner, IonRefresher, IonRefresherContent,
-    IonModal, IonList, IonItem, IonLabel, IonInput, VideoPlayer
+    IonModal, IonList, IonItem, IonLabel, IonInput //, VideoPlayer
   },
   data() {
     return {
