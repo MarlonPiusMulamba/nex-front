@@ -58,6 +58,7 @@ import {
 } from '@ionic/vue';
 import { callOutline, closeOutline, videocamOutline } from 'ionicons/icons';
 import axios from 'axios';
+import config from '@/config/index.js';
 
 export default {
   name: 'CallOverlay',
@@ -96,7 +97,7 @@ export default {
     };
   },
   mounted() {
-    this.API_URL = import.meta.env.VITE_API_URL || '';
+    this.API_URL = config.api.baseURL || import.meta.env.VITE_API_URL || 'http://localhost:5000';
     this.userId = localStorage.getItem('userId');
 
     // Create ringtone audio element
