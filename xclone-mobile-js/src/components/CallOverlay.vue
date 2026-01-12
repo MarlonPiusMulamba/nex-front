@@ -22,6 +22,7 @@
           <audio v-show="callMedia === 'voice'" ref="remoteAudio" autoplay></audio>
 
           <div class="call-controls">
+            <!-- Incoming call: Accept/Reject buttons -->
             <template v-if="!isCaller && callStatus === 'ringing'">
               <ion-button color="success" shape="round" class="action-btn" @click="acceptCall()">
                 <ion-icon slot="icon-only" :icon="callIcon"></ion-icon>
@@ -30,6 +31,14 @@
                 <ion-icon slot="icon-only" :icon="closeIcon"></ion-icon>
               </ion-button>
             </template>
+            <!-- Outgoing call: Cancel button -->
+            <template v-else-if="isCaller && callStatus === 'calling'">
+              <ion-button color="danger" shape="round" class="hangup-btn" @click="hangupCall()">
+                <ion-icon slot="start" :icon="closeIcon"></ion-icon>
+                Cancel
+              </ion-button>
+            </template>
+            <!-- Active call: Hang Up button -->
             <template v-else>
               <ion-button color="danger" shape="round" class="hangup-btn" @click="hangupCall()">
                 <ion-icon slot="start" :icon="closeIcon"></ion-icon>
@@ -79,25 +88,129 @@ export default {
       callIcon: callOutline,
       closeIcon: closeOutline,
       videoIcon: videocamOutline,
-      callTimeout: null
+      callTimeout: null,
+      ringtone: null,
+      _socketCallIncomingHandler: null,
+      _socketCallAnsweredHandler: null,
+      _socketCallEndedHandler: null
     };
   },
   mounted() {
     this.API_URL = import.meta.env.VITE_API_URL || '';
     this.userId = localStorage.getItem('userId');
 
+    // Create ringtone audio element
+    this.ringtone = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE');
+    this.ringtone.loop = true;
+
+    // Listen for start-call events from DMPage
     window.addEventListener('start-call', (e) => {
       const { media, user } = e.detail;
       this.startCall(media, user);
     });
 
+    // Setup Socket.IO listeners for real-time call events
+    this.setupSocketListeners();
+
+    // Start polling for incoming calls (fallback)
     this.startGlobalPolling();
   },
   beforeUnmount() {
     this.stopGlobalPolling();
+    this.cleanupSocketListeners();
     this.hangupCall();
+    if (this.ringtone) {
+      this.ringtone.pause();
+      this.ringtone = null;
+    }
   },
   methods: {
+    setupSocketListeners() {
+      const socket = this.$socket;
+      if (!socket || typeof socket.on !== 'function') {
+        console.warn('Socket.IO not available for calls');
+        return;
+      }
+
+      // Incoming call notification
+      this._socketCallIncomingHandler = (payload) => {
+        console.log('📞 Received call:incoming event', payload);
+        if (this.callStatus !== 'idle') {
+          console.log('Already in a call, ignoring incoming call');
+          return;
+        }
+        
+        this.incomingCall({
+          call_id: payload.call_id,
+          caller_id: payload.caller_id,
+          media: payload.media || 'voice'
+        });
+        
+        // Fetch caller details
+        this.otherUser = {
+          user_id: payload.caller_id,
+          username: payload.caller_username || 'Incoming Call'
+        };
+      };
+
+      // Call answered by callee
+      this._socketCallAnsweredHandler = (payload) => {
+        console.log('✅ Received call:answered event', payload);
+        if (this.isCaller && this.currentCallId === payload.call_id) {
+          this.handleCallAnswered(payload.answer);
+        }
+      };
+
+      // Call ended by either party
+      this._socketCallEndedHandler = (payload) => {
+        console.log('❌ Received call:ended event', payload);
+        if (this.currentCallId === payload.call_id) {
+          this.hangupCall();
+        }
+      };
+
+      socket.on('call:incoming', this._socketCallIncomingHandler);
+      socket.on('call:answered', this._socketCallAnsweredHandler);
+      socket.on('call:ended', this._socketCallEndedHandler);
+    },
+
+    cleanupSocketListeners() {
+      const socket = this.$socket;
+      if (socket) {
+        if (this._socketCallIncomingHandler) socket.off('call:incoming', this._socketCallIncomingHandler);
+        if (this._socketCallAnsweredHandler) socket.off('call:answered', this._socketCallAnsweredHandler);
+        if (this._socketCallEndedHandler) socket.off('call:ended', this._socketCallEndedHandler);
+      }
+    },
+
+    async handleCallAnswered(answer) {
+      if (!this.pc || !answer) return;
+      try {
+        await this.pc.setRemoteDescription(new RTCSessionDescription(answer));
+        this.callStatus = 'in_call';
+        if (this.callTimeout) {
+          clearTimeout(this.callTimeout);
+          this.callTimeout = null;
+        }
+        console.log('✅ Call answered, now in call');
+      } catch (e) {
+        console.error('Error handling answer:', e);
+      }
+    },
+
+    playRingtone() {
+      if (this.ringtone) {
+        this.ringtone.play().catch(e => console.warn('Ringtone play failed:', e));
+      }
+    },
+
+    stopRingtone() {
+      if (this.ringtone) {
+        this.ringtone.pause();
+        this.ringtone.currentTime = 0;
+      }
+    },
+
     startGlobalPolling() {
       this.stopGlobalPolling();
       if (!this.userId) return;
@@ -127,13 +240,18 @@ export default {
     },
 
     incomingCall(match) {
+      if (this.callStatus !== 'idle') return; // Prevent duplicate incoming calls
+      
       this.currentCallId = match.call_id;
       this.callMedia = match.media || 'voice';
       this.isCaller = false;
       this.callStatus = 'ringing';
-      this.otherUser = { user_id: match.caller_id, username: 'Incoming Call' };
-      // Fetch user details if possible
-      this.fetchOtherUserDetails(match.caller_id);
+      this.otherUser = this.otherUser || { user_id: match.caller_id, username: 'Incoming Call' };
+      
+      // Play ringtone
+      this.playRingtone();
+      
+      console.log('📞 Incoming call from:', this.otherUser.username);
     },
 
     async fetchOtherUserDetails(userId) {
@@ -207,6 +325,8 @@ export default {
     async acceptCall() {
       if (this.callStatus !== 'ringing') return;
       try {
+        this.stopRingtone();
+        
         const hasPerms = await this.requestCapacitorPermissions(this.callMedia);
         if (!hasPerms) {
           this.hangupCall();
@@ -223,6 +343,8 @@ export default {
     },
 
     async hangupCall() {
+      this.stopRingtone();
+      
       if (this.currentCallId) {
         axios.post(`${this.API_URL}/api/call/hangup`, { call_id: this.currentCallId }).catch(() => {});
       }
