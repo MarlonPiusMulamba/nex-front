@@ -11,7 +11,10 @@
       <ion-content>
         <div class="call-container">
           <div v-if="callStatus === 'ringing' || callStatus === 'calling'" class="call-info">
-             <div class="caller-name">{{ otherUser?.username || 'User' }}</div>
+             <div class="user-info">
+                <div class="user-name">{{ otherUser?.full_name || otherUser?.username || 'User' }}</div>
+                <div class="user-handle" v-if="otherUser?.username">@{{ otherUser.username }}</div>
+             </div>
              <div class="call-media-type">{{ callMedia === 'video' ? 'Video Call' : 'Audio Call' }}</div>
           </div>
 
@@ -344,31 +347,57 @@ export default {
     },
 
     async hangupCall() {
+      console.log(`[CallOverlay] hangupCall called. Current Status: ${this.callStatus}, CallID: ${this.currentCallId}`);
       this.stopRingtone();
       
-      if (this.currentCallId) {
-        axios.post(`${this.API_URL}/api/call/hangup`, { call_id: this.currentCallId }).catch(() => {});
+      const callIdToHangup = this.currentCallId;
+      
+      // Always reset state immediately to close UI
+      this.callStatus = 'idle';
+      this.currentCallId = null;
+      this.isCaller = false;
+
+      if (callIdToHangup) {
+        console.log(`[CallOverlay] Sending hangup API for call ${callIdToHangup}`);
+        axios.post(`${this.API_URL}/api/call/hangup`, { call_id: callIdToHangup }).catch(err => {
+          console.error('[CallOverlay] Hangup API failed:', err);
+        });
       }
+
       if (this.localStream) {
-        this.localStream.getTracks().forEach(t => t.stop());
+        try {
+          this.localStream.getTracks().forEach(t => {
+            console.log(`[CallOverlay] Stopping track: ${t.kind}`);
+            t.stop();
+          });
+        } catch (e) {
+          console.error('[CallOverlay] Error stopping local tracks:', e);
+        }
         this.localStream = null;
       }
+
       if (this.pc) {
-        this.pc.close();
+        try {
+          this.pc.close();
+        } catch (e) {
+          console.error('[CallOverlay] Error closing PeerConnection:', e);
+        }
         this.pc = null;
       }
+      
       if (this.callPollInterval) {
         clearInterval(this.callPollInterval);
         this.callPollInterval = null;
       }
+      
       if (this.callTimeout) {
         clearTimeout(this.callTimeout);
         this.callTimeout = null;
       }
-      this.callStatus = 'idle';
-      this.currentCallId = null;
+      
       this.knownCallerCandidates = [];
       this.knownCalleeCandidates = [];
+      console.log('[CallOverlay] Call cleaned up successfully.');
     },
 
     async pollCallState() {
@@ -485,9 +514,13 @@ export default {
 .call-info {
   text-align: center;
 }
-.caller-name {
+.user-name {
   font-size: 24px;
   font-weight: bold;
+}
+.user-handle {
+  font-size: 16px;
+  color: #aaa;
   margin-bottom: 8px;
 }
 .call-media-type {

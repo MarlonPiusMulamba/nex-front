@@ -69,60 +69,61 @@
             <ion-spinner></ion-spinner>
           </div>
 
-          <div v-else-if="isPostSearch && postResults.length === 0" class="empty-state">
-            <ion-icon :icon="searchOutline" class="empty-icon"></ion-icon>
-            <p>No posts found for "{{ searchQuery }}"</p>
-          </div>
-
-          <div v-else-if="!isPostSearch && searchResults.length === 0" class="empty-state">
-            <ion-icon :icon="searchOutline" class="empty-icon"></ion-icon>
-            <p>No users found for "{{ searchQuery }}"</p>
-          </div>
-
-          <div v-else-if="isPostSearch" class="results-container">
-            <h3 class="section-title">Posts</h3>
-            <div v-for="post in postResults" :key="post.post_id" class="post-item">
-              <div class="post-header">
-                <span class="user-handle">@{{ post.username }}</span>
-                <span class="post-time">{{ formatPostTime(post.timestamp) }}</span>
+          <div class="results-container">
+            <!-- Users Section -->
+            <div v-if="searchResults.length > 0">
+              <h3 class="section-title">Users</h3>
+              <div 
+                v-for="user in searchResults" 
+                :key="user.user_id"
+                class="user-item"
+                @click="viewProfile(user)">
+                <img :src="getImageUrl(user.profile_pic)" class="user-avatar" alt="Avatar" />
+                <div class="user-info">
+                  <div class="user-name">{{ user.full_name || user.username }}</div>
+                  <div class="user-handle">@{{ user.username }}</div>
+                </div>
+                <ion-button 
+                  size="small" 
+                  :fill="user.is_following ? 'solid' : 'outline'" 
+                  @click.stop="quickFollow(user)"
+                  :disabled="user.followLoading"
+                  class="follow-btn">
+                  <ion-spinner v-if="user.followLoading" name="crescent"></ion-spinner>
+                  <template v-else>
+                    {{ user.is_following ? 'Following' : 'Follow' }}
+                  </template>
+                </ion-button>
               </div>
-              <div
-                class="post-content"
-                v-if="post.content"
-                @click="onPostTextClick($event, post)"
-                v-html="formatPostContent(post.content)"
-              ></div>
-              <img
-                v-if="post.image"
-                :src="getImageUrl(post.image)"
-                class="post-image"
-                alt="Post"
-              />
             </div>
-          </div>
 
-          <div v-else class="results-container">
-            <div 
-              v-for="user in searchResults" 
-              :key="user.user_id"
-              class="user-item"
-              @click="viewProfile(user)">
-              <img :src="getImageUrl(user.profile_pic)" class="user-avatar" alt="Avatar" />
-              <div class="user-info">
-                <div class="user-name">{{ user.username }}</div>
-                <div class="user-handle">@{{ user.username }}</div>
+            <!-- Posts Section -->
+            <div v-if="postResults.length > 0" :style="{ marginTop: searchResults.length > 0 ? '24px' : '0' }">
+              <h3 class="section-title">Posts</h3>
+              <div v-for="post in postResults" :key="post.post_id" class="post-item">
+                <div class="post-header">
+                  <span class="user-handle">@{{ post.username }}</span>
+                  <span class="post-time">{{ formatPostTime(post.timestamp) }}</span>
+                </div>
+                <div
+                  class="post-content"
+                  v-if="post.content"
+                  @click="onPostTextClick($event, post)"
+                  v-html="formatPostContent(post.content)"
+                ></div>
+                <img
+                  v-if="post.image"
+                  :src="getImageUrl(post.image)"
+                  class="post-image"
+                  alt="Post"
+                />
               </div>
-              <ion-button 
-                size="small" 
-                :fill="user.is_following ? 'solid' : 'outline'" 
-                @click.stop="quickFollow(user)"
-                :disabled="user.followLoading"
-                class="follow-btn">
-                <ion-spinner v-if="user.followLoading" name="crescent"></ion-spinner>
-                <template v-else>
-                  {{ user.is_following ? 'Following' : 'Follow' }}
-                </template>
-              </ion-button>
+            </div>
+
+            <!-- No Results -->
+            <div v-if="searchResults.length === 0 && postResults.length === 0" class="empty-state">
+              <ion-icon :icon="searchOutline" class="empty-icon"></ion-icon>
+              <p>No results found for "{{ searchQuery }}"</p>
             </div>
           </div>
         </div>
@@ -392,27 +393,36 @@ export default {
         this.searching = true;
         const q = (this.searchQuery || '').trim();
 
-        // @username => search users
+        // Dual search: always try to find users and posts unless it's a specific hashtag
+        const isHashtag = q.startsWith('#');
+        const searchQ = q.replace(/^@/, '');
+
+        // 1. Search Users
+        const userRes = await api.get('/api/search/users', {
+          params: { q: searchQ, limit: 10, viewer_id: this.userId }
+        });
+        this.searchResults = (userRes.users || []).map(u => ({
+          ...u,
+          followLoading: false
+        })).filter(u => u.user_id !== this.userId);
+
+        // 2. Search Posts
+        const postRes = await api.get('/api/search/posts', {
+          params: { q: q, limit: 20, offset: 0 }
+        });
+        this.postResults = postRes.posts || [];
+
+        // Determine view mode
         if (q.startsWith('@')) {
           this.isPostSearch = false;
-          const res = await api.get('/api/search/users', {
-            params: { q: q.replace(/^@/, ''), limit: 20, viewer_id: this.userId }
-          });
-          this.searchResults = (res.users || []).map(u => ({
-            ...u,
-            followLoading: false
-          })).filter(u => u.user_id !== this.userId);
-          this.postResults = [];
-          return;
+        } else if (isHashtag) {
+          this.isPostSearch = true;
+        } else {
+          // Mixed results: if we have users, show them first, or keep isPostSearch=false
+          // to show the users section which we'll now combine with posts in the template.
+          this.isPostSearch = false; 
         }
 
-        // Anything else (hashtags + normal words/slogans) => search posts
-        this.isPostSearch = true;
-        const res = await api.get('/api/search/posts', {
-          params: { q: q, limit: 30, offset: 0 }
-        });
-        this.postResults = res.posts || [];
-        this.searchResults = [];
       } catch (err) {
         console.error('Search error:', err);
         this.searchResults = [];

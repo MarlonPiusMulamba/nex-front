@@ -214,7 +214,7 @@
           @click="startNewChat(user)">
           <img :src="getImageUrl(user.profile_pic)" class="result-avatar" alt="Avatar" />
           <div class="result-info">
-            <div class="result-username">{{ user.username }}</div>
+            <div class="result-username">{{ user.full_name || user.username }}</div>
             <div class="result-handle">@{{ user.username }}</div>
           </div>
         </div>
@@ -592,7 +592,8 @@ export default {
           user: {
             user_id: this.selectedChat.user_id,
             username: this.selectedChat.username,
-            profile_pic: this.selectedChat.profile_pic
+            profile_pic: this.selectedChat.profile_pic,
+            full_name: (this.selectedChat.first_name || this.selectedChat.last_name) ? (this.selectedChat.first_name + ' ' + this.selectedChat.last_name).trim() : this.selectedChat.username
           }
         }
       }));

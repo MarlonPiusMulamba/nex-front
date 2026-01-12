@@ -385,7 +385,7 @@
                   @click="selectMention(user)">
                   <img :src="getImageUrl(user.profile_pic)" class="mention-avatar" alt="avatar" />
                   <div class="mention-meta">
-                    <div class="mention-name">{{ user.username }}</div>
+                    <div class="mention-name">{{ user.full_name || user.username }}</div>
                     <div class="mention-handle">@{{ user.username }}</div>
                   </div>
                 </div>
