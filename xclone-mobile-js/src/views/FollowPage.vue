@@ -15,6 +15,19 @@
             show-clear-button="focus">
           </ion-searchbar>
         </ion-toolbar>
+        <ion-toolbar v-if="searchQuery.length >= 2">
+          <ion-segment v-model="searchTab" mode="md">
+            <ion-segment-button value="top">
+              <ion-label>All</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="people">
+              <ion-label>People</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="posts">
+              <ion-label>Posts</ion-label>
+            </ion-segment-button>
+          </ion-segment>
+        </ion-toolbar>
       </ion-header>
 
       <ion-content :fullscreen="true">
@@ -71,8 +84,8 @@
 
           <div class="results-container">
             <!-- Users Section -->
-            <div v-if="searchResults.length > 0">
-              <h3 class="section-title">Users</h3>
+            <div v-if="(searchTab === 'top' || searchTab === 'people') && searchResults.length > 0">
+              <h3 class="section-title" v-if="searchTab === 'top'">Users</h3>
               <div 
                 v-for="user in searchResults" 
                 :key="user.user_id"
@@ -98,8 +111,8 @@
             </div>
 
             <!-- Posts Section -->
-            <div v-if="postResults.length > 0" :style="{ marginTop: searchResults.length > 0 ? '24px' : '0' }">
-              <h3 class="section-title">Posts</h3>
+            <div v-if="(searchTab === 'top' || searchTab === 'posts') && postResults.length > 0" :style="{ marginTop: (searchTab === 'top' && searchResults.length > 0) ? '24px' : '0' }">
+              <h3 class="section-title" v-if="searchTab === 'top'">Posts</h3>
               <div v-for="post in postResults" :key="post.post_id" class="post-item">
                 <div class="post-header">
                   <span class="user-handle">@{{ post.username }}</span>
@@ -277,7 +290,7 @@
 <script>
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonSearchbar,
-  IonButton, IonButtons, IonIcon, IonSpinner
+  IonButton, IonButtons, IonIcon, IonSpinner, IonSegment, IonSegmentButton, IonLabel
 } from '@ionic/vue';
 import {
   search, searchOutline, arrowBack, chevronForward, personAdd, 
@@ -291,7 +304,7 @@ export default {
   name: 'FollowPage',
   components: {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonSearchbar,
-    IonButton, IonButtons, IonIcon, IonSpinner
+    IonButton, IonButtons, IonIcon, IonSpinner, IonSegment, IonSegmentButton, IonLabel
   },
   data() {
     return {
@@ -300,6 +313,7 @@ export default {
       postResults: [],
       suggestedUsers: [],
       trendingTopics: [],
+      searchTab: 'top',
       selectedUser: null,
       userProfile: null,
       userPosts: [],
