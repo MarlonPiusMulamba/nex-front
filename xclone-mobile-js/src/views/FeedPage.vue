@@ -152,7 +152,10 @@
               class="post-text" 
               v-if="post.content" 
               @click="onPostTextClick($event, post)"
-              v-html="formatPostContent(post.content)">
+              v-html="formatPostContent(getPostDisplayContent(post.content, post.post_id))">
+            </div>
+            <div v-if="post.content && post.content.length > 500" class="show-more-toggle" @click.stop="toggleExpandPost(post.post_id)">
+              {{ isExpanded(post.post_id) ? 'Show less' : 'Show more' }}
             </div>
 
             <div 
@@ -371,8 +374,8 @@
                   </ion-button>
                   <EmojiPicker v-if="showEmojiPicker" @select="addEmoji" class="composer-emoji-picker" />
                 </div>
-                <span class="char-count" :class="{ 'over-limit': postContent.length > 280 }">
-                  {{ postContent.length }}/280
+                <span class="char-count" :class="{ 'over-limit': postContent.length > 1000 }">
+                  {{ postContent.length }}/1000
                 </span>
               </div>
               <div 
@@ -520,8 +523,11 @@
                         class="detail-comment-text"
                         v-if="c.content"
                         @click="onCommentTextClick($event)"
-                        v-html="formatPostContent(c.content)"
+                        v-html="formatPostContent(getPostDisplayContent(c.content, c.id))"
                       ></div>
+                      <div v-if="c.content && c.content.length > 500" class="show-more-toggle" @click.stop="toggleExpandPost(c.id)">
+                        {{ isExpanded(c.id) ? 'Show less' : 'Show more' }}
+                      </div>
                       <img v-if="c.image" :src="getImageUrl(c.image)" class="detail-comment-image" alt="Comment" />
                     </div>
                   </div>
@@ -859,7 +865,8 @@ export default {
       
       // Share action sheet
       showShareActionSheet: false,
-      shareActionSheetButtons: []
+      shareActionSheetButtons: [],
+      expandedPosts: {} // Track which posts are expanded
     };
   },
   computed: {
@@ -934,10 +941,23 @@ export default {
     },
     canPost() {
       return (this.postContent.trim().length > 0 || this.postMedia.length > 0) && 
-             this.postContent.length <= 280;
+             this.postContent.length <= 1000;
     }
   },
   methods: {
+    isExpanded(postId) {
+      return !!this.expandedPosts[postId];
+    },
+    toggleExpandPost(postId) {
+      this.expandedPosts[postId] = !this.expandedPosts[postId];
+    },
+    getPostDisplayContent(content, postId) {
+      if (!content) return '';
+      if (content.length <= 500 || this.isExpanded(postId)) {
+        return content;
+      }
+      return content.substring(0, 500) + '...';
+    },
     async setActiveTab(tab) {
       if (this.activeTab === tab) return;
       this.activeTab = tab;
@@ -1513,10 +1533,10 @@ export default {
 
       toAdd.forEach((file) => {
         const isVideo = file.type.startsWith('video');
-        const maxSize = isVideo ? 20 * 1024 * 1024 : 5 * 1024 * 1024; // 20MB videos, 5MB images
+        const maxSize = 50 * 1024 * 1024; // 50MB for both images and videos
 
         if (file.size > maxSize) {
-          alert(isVideo ? 'Video must be less than 20MB' : 'Image must be less than 5MB');
+          alert('Media must be less than 50MB');
           return;
         }
 
@@ -1695,10 +1715,9 @@ export default {
       const toAdd = files.slice(0, remaining);
 
       toAdd.forEach((file) => {
-        const isVideo = file.type.startsWith('video');
-        const maxSize = isVideo ? 20 * 1024 * 1024 : 5 * 1024 * 1024;
+        const maxSize = 50 * 1024 * 1024;
         if (file.size > maxSize) {
-          alert(isVideo ? 'Video must be less than 20MB' : 'Image must be less than 5MB');
+          alert('Media must be less than 50MB');
           return;
         }
         const reader = new FileReader();
@@ -1874,10 +1893,9 @@ export default {
       const files = Array.from(e.target.files || []);
       if (!files.length) return;
       const file = files[0];
-      const isVideo = file.type.startsWith('video');
-      const maxSize = isVideo ? 20 * 1024 * 1024 : 5 * 1024 * 1024;
+      const maxSize = 50 * 1024 * 1024;
       if (file.size > maxSize) {
-        alert(isVideo ? 'Video must be less than 20MB' : 'Image must be less than 5MB');
+        alert('Media must be less than 50MB');
         return;
       }
       const reader = new FileReader();
@@ -2370,6 +2388,18 @@ ion-toolbar {
 
 .spin {
   animation: spin 1s linear infinite;
+}
+
+.show-more-toggle {
+  color: #1d9bf0;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.show-more-toggle:hover {
+  text-decoration: underline;
 }
 
 /* Feed Container */
