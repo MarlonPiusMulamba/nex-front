@@ -998,7 +998,7 @@ export default {
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#39;');
 
-      const urlRegex = /^(https?:\/\/[^\s]+|www\.[^\s]+)$/i;
+      const urlRegex = /^(https?:\/\/[^\s]+|www\.[^\s]+|[a-z0-9-]+\.[a-z0-9.-]+\.[a-z]{2,}(\/[^\s]*)?)$/i;
       const parts = text.split(/(\s+)/); // keep spaces
 
       return parts
@@ -1008,7 +1008,7 @@ export default {
           const escaped = escapeHtml(part);
 
           // URL
-          if (urlRegex.test(part)) {
+          if (urlRegex.test(part) && !part.startsWith('@') && !part.startsWith('#')) {
             const href = part.startsWith('http') ? part : `https://${part}`;
             return `<a href="${href}" class="post-link" target="_blank" rel="noopener noreferrer">${escaped}</a>`;
           }
@@ -1503,7 +1503,7 @@ export default {
           },
           { 
             signal: controller.signal,
-            timeout: 30000
+            timeout: 300000 // 5 minutes for large media uploads
           }
         );
         
@@ -1543,11 +1543,10 @@ export default {
         const reader = new FileReader();
         reader.onload = (ev) => {
           const dataUrl = ev.target.result;
-          const base64 = dataUrl.split(',')[1];
-
+          // Send full dataUrl to backend to aid in media/type detection
           this.postMedia.push({
             type: isVideo ? 'video' : 'image',
-            data: base64
+            data: dataUrl
           });
 
           this.mediaPreviews.push({
@@ -1723,9 +1722,10 @@ export default {
         const reader = new FileReader();
         reader.onload = (ev) => {
           const dataUrl = ev.target.result;
-          const base64 = dataUrl.split(',')[1];
+          const isVideo = file.type.startsWith('video/');
           const type = isVideo ? 'video' : 'image';
-          this.quoteMedia.push({ type, data: base64 });
+          // Send full dataUrl for better backend detection
+          this.quoteMedia.push({ type, data: dataUrl });
           this.quoteMediaPreviews.push({ type, src: dataUrl });
         };
         reader.readAsDataURL(file);
@@ -1901,6 +1901,7 @@ export default {
       const reader = new FileReader();
       reader.onload = (ev) => {
         const dataUrl = ev.target.result;
+        const isVideo = file.type.startsWith('video/');
         this.commentMedia = {
           type: isVideo ? 'video' : 'image',
           src: dataUrl

@@ -126,7 +126,7 @@
             :class="['message-bubble', msg.sent_by_me ? 'sent' : 'received']">
             <div class="message-content">
               <img v-if="msg.image" :src="getImageUrl(msg.image)" class="message-image" alt="Image" />
-              <div v-if="msg.text" class="message-text">{{ msg.text }}</div>
+              <div v-if="msg.text" class="message-text" v-html="formatPostContent(msg.text)" @click="onPostTextClick($event)"></div>
               <div class="message-meta">
                 <span class="message-time">{{ formatMessageTime(msg.timestamp) }}</span>
                 <ion-icon 
@@ -538,7 +538,8 @@ export default {
       
       const reader = new FileReader();
       reader.onload = (ev) => {
-        this.imagePreview = ev.target.result.split(',')[1]; // Base64 without prefix
+        // Send full dataUrl for better backend detection
+        this.imagePreview = ev.target.result;
       };
       reader.readAsDataURL(file);
     },
@@ -597,6 +598,63 @@ export default {
           }
         }
       }));
+    },
+
+    formatPostContent(text) {
+      if (!text) return '';
+
+      const escapeHtml = (str) =>
+        str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+
+      const urlRegex = /^(https?:\/\/[\S]+|www\.[\S]+|[a-z0-9-]+\.[a-z0-9.-]+\.[a-z]{2,}(\/[\S]*)?)$/i;
+      const parts = text.split(/(\s+)/);
+
+      return parts
+        .map((part) => {
+          if (/\s+/.test(part)) return part;
+
+          const escaped = escapeHtml(part);
+
+          if (urlRegex.test(part) && !part.startsWith('@') && !part.startsWith('#')) {
+            const href = part.startsWith('http') ? part : `https://${part}`;
+            return `<a href="${href}" class="post-link" target="_blank" rel="noopener noreferrer">${escaped}</a>`;
+          }
+
+          if (part.startsWith('#') && part.length > 1) {
+            return `<span class="hashtag" data-hashtag="${escaped}" style="color:#1d9bf0;">${escaped}</span>`;
+          }
+
+          if (part.startsWith('@') && part.length > 1) {
+            const username = escaped.slice(1);
+            return `<span class="mention" data-mention="${username}" style="color:#1d9bf0;">${escaped}</span>`;
+          }
+
+          return escaped;
+        })
+        .join('');
+    },
+
+    onPostTextClick(event) {
+      const target = event.target;
+
+      if (target.classList.contains('mention') && target.dataset.mention) {
+        const username = target.dataset.mention;
+        this.closeChat();
+        this.$router.push(`/tabs/profile/${username}`);
+        return;
+      }
+
+      if (target.classList.contains('hashtag')) {
+        const tag = target.dataset.hashtag?.replace('#', '') || '';
+        this.closeChat();
+        this.$router.push({ path: '/tabs/follow', query: { q: `#${tag}` } });
+        return;
+      }
     },
 
     // AV Calling moved to global CallOverlay.vue
@@ -896,8 +954,23 @@ export default {
 .message-text {
   font-size: 15px;
   line-height: 1.4;
+  word-wrap: break-word;
 }
 
+.message-text .post-link {
+  color: #1d9bf0;
+  text-decoration: none;
+}
+
+.message-text .post-link:hover {
+  text-decoration: underline;
+}
+
+.message-text .hashtag,
+.message-text .mention {
+  color: #1d9bf0;
+  cursor: pointer;
+}
 .message-meta {
   display: flex;
   align-items: center;

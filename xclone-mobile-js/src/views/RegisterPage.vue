@@ -343,7 +343,7 @@ export default {
       const reader = new FileReader();
       reader.onload = (ev) => {
         this.coverPreview = ev.target.result;
-        this.coverPhoto = ev.target.result.split(',')[1];
+        this.coverPhoto = ev.target.result;
       };
       reader.readAsDataURL(file);
     },
@@ -363,7 +363,7 @@ export default {
       const reader = new FileReader();
       reader.onload = (ev) => {
         this.profilePicPreview = ev.target.result;
-        this.profilePic = ev.target.result.split(',')[1];
+        this.profilePic = ev.target.result;
       };
       reader.readAsDataURL(file);
     },

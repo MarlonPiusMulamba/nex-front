@@ -337,7 +337,7 @@ export default {
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#39;');
 
-      const urlRegex = /^(https?:\/\/[\S]+|www\.[\S]+)$/i;
+      const urlRegex = /^(https?:\/\/[\S]+|www\.[\S]+|[a-z0-9-]+\.[a-z0-9.-]+\.[a-z]{2,}(\/[\S]*)?)$/i;
       const parts = text.split(/(\s+)/);
 
       return parts
@@ -346,7 +346,7 @@ export default {
 
           const escaped = escapeHtml(part);
 
-          if (urlRegex.test(part)) {
+          if (urlRegex.test(part) && !part.startsWith('@') && !part.startsWith('#')) {
             const href = part.startsWith('http') ? part : `https://${part}`;
             return `<a href="${href}" class="post-link" target="_blank" rel="noopener noreferrer">${escaped}</a>`;
           }

@@ -51,7 +51,7 @@ const config = {
 
       return apiUrl;
     })(),
-    timeout: 60000, // 60 seconds (increased to match backend)
+    timeout: 300000, // 5 minutes (to support 50MB media uploads)
   },
   app: {
     name: import.meta.env.VITE_APP_TITLE || 'NexFi',
