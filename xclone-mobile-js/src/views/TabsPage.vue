@@ -42,6 +42,11 @@
             <ion-icon :icon="logOutOutline" class="nav-icon"></ion-icon>
             <span class="nav-label">Logout</span>
           </div>
+
+          <!-- Post Button (Desktop only) -->
+          <button class="sidebar-post-button" @click="triggerGlobalPost">
+            Post
+          </button>
         </nav>
 
         <!-- Profile Button -->
@@ -223,6 +228,11 @@ export default {
       }
     },
     
+    triggerGlobalPost() {
+      // Dispatch a global event to open the post modal
+      window.dispatchEvent(new CustomEvent('open-post-modal'));
+    },
+
     goToProfile() {
       this.$router.push('/tabs/profile');
     },

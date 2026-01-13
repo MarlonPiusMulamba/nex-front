@@ -2234,6 +2234,11 @@ export default {
     window.addEventListener('themeChanged', (e) => {
       this.theme = e.detail;
     });
+
+    this._globalPostHandler = () => {
+      this.openPostComposer();
+    };
+    window.addEventListener('open-post-modal', this._globalPostHandler);
   },
   
   beforeUnmount() {
@@ -2253,6 +2258,11 @@ export default {
         this._socketNewPostHandler = null;
       }
     } catch (_) {}
+
+    if (this._globalPostHandler) {
+      window.removeEventListener('open-post-modal', this._globalPostHandler);
+      this._globalPostHandler = null;
+    }
   }
 }
 </script>
