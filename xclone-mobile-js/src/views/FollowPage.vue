@@ -311,10 +311,22 @@ export default {
       isFollowing: false,
       userId: localStorage.getItem('userId'),
       API_URL: config.api.baseURL,
+      searchController: null,
       search, searchOutline, arrowBack, chevronForward, personAdd,
       checkmark, mail, shareOutline, calendar, heart, chatbubble, documentText,
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E'
     };
+  },
+  watch: {
+    '$route.query.q': {
+      handler(newQ) {
+        if (newQ) {
+          this.searchQuery = newQ;
+          this.handleSearch();
+        }
+      },
+      immediate: true
+    }
   },
   methods: {
     getImageUrl(imageData) {
@@ -382,6 +394,7 @@ export default {
     },
 
     async handleSearch() {
+      // Clear previous results if query too short
       if (this.searchQuery.length < 2) {
         this.searchResults = [];
         this.postResults = [];
@@ -389,47 +402,68 @@ export default {
         return;
       }
 
+      // 1. Abort any pending search request
+      if (this.searchController) {
+        this.searchController.abort();
+      }
+      this.searchController = new AbortController();
+
       try {
         this.searching = true;
         const q = (this.searchQuery || '').trim();
-
-        // Dual search: always try to find users and posts unless it's a specific hashtag
-        const isHashtag = q.startsWith('#');
         const searchQ = q.replace(/^@/, '');
+        const isHashtag = q.startsWith('#');
 
-        // 1. Search Users
-        const userRes = await api.get('/api/search/users', {
-          params: { q: searchQ, limit: 10, viewer_id: this.userId }
-        });
-        this.searchResults = (userRes.users || []).map(u => ({
-          ...u,
-          followLoading: false
-        })).filter(u => u.user_id !== this.userId);
+        // 2. Parallel search for Users and Posts
+        const [userRes, postRes] = await Promise.all([
+          api.get('/api/search/users', {
+            params: { q: searchQ, limit: 10, viewer_id: this.userId },
+            signal: this.searchController.signal
+          }).catch(err => {
+            if (err.name === 'CanceledError' || err.name === 'AbortError') throw err;
+            console.error('User search error:', err);
+            return { users: [] };
+          }),
+          api.get('/api/search/posts', {
+            params: { q: q, limit: 20, offset: 0 },
+            signal: this.searchController.signal
+          }).catch(err => {
+            if (err.name === 'CanceledError' || err.name === 'AbortError') throw err;
+            console.error('Post search error:', err);
+            return { posts: [] };
+          })
+        ]);
 
-        // 2. Search Posts
-        const postRes = await api.get('/api/search/posts', {
-          params: { q: q, limit: 20, offset: 0 }
-        });
+        // 3. Process results
+        this.searchResults = (userRes.users || [])
+          .map(u => ({ ...u, followLoading: false }))
+          .filter(u => u.user_id !== this.userId);
+
         this.postResults = postRes.posts || [];
 
-        // Determine view mode
+        // 4. Update view mode
         if (q.startsWith('@')) {
           this.isPostSearch = false;
         } else if (isHashtag) {
           this.isPostSearch = true;
         } else {
-          // Mixed results: if we have users, show them first, or keep isPostSearch=false
-          // to show the users section which we'll now combine with posts in the template.
-          this.isPostSearch = false; 
+          // Default to mixed results, starting with users
+          this.isPostSearch = false;
         }
 
       } catch (err) {
+        if (err.name === 'CanceledError' || err.name === 'AbortError') {
+          // Silently ignore aborted requests
+          return;
+        }
         console.error('Search error:', err);
         this.searchResults = [];
         this.postResults = [];
-        this.isPostSearch = false;
       } finally {
-        this.searching = false;
+        // Only reset searching if this was the last request
+        if (!this.searchController.signal.aborted) {
+          this.searching = false;
+        }
       }
     },
 
