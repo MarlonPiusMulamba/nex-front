@@ -231,7 +231,7 @@ export default {
 
 .widget-footer {
   padding: 16px;
-  color: var(--ion-color-primary, #1d9bf0);
+  color: var(--ion-color-primary, #daa520);
   font-size: 15px;
   cursor: pointer;
   transition: background-color 0.2s;

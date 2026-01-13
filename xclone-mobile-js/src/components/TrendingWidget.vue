@@ -144,7 +144,7 @@ export default {
 .trend-rank {
   font-size: 12px;
   font-weight: 700;
-  color: var(--ion-color-primary, #1d9bf0);
+  color: var(--ion-color-primary, #daa520);
   min-width: 20px;
 }
 

@@ -229,7 +229,7 @@
 
       <!-- Floating Action Button -->
       <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-        <ion-fab-button @click="openPostComposer" color="primary">
+        <ion-fab-button @click="openPostComposer" class="gold-fab">
           <ion-icon :icon="add"></ion-icon>
         </ion-fab-button>
       </ion-fab>
@@ -1015,13 +1015,13 @@ export default {
 
           // Hashtag
           if (part.startsWith('#') && part.length > 1) {
-            return `<span class="hashtag" data-hashtag="${escaped}" style="color:#1d9bf0;">${escaped}</span>`;
+            return `<span class="hashtag" data-hashtag="${escaped}" style="color:#daa520;">${escaped}</span>`;
           }
 
           // Mention
           if (part.startsWith('@') && part.length > 1) {
             const username = escaped.slice(1);
-            return `<span class="mention" data-mention="${username}" style="color:#1d9bf0;">${escaped}</span>`;
+            return `<span class="mention" data-mention="${username}" style="color:#daa520;">${escaped}</span>`;
           }
 
           return escaped;
@@ -2302,13 +2302,21 @@ ion-toolbar {
   width: fit-content;
   margin: 10px auto;
   padding: 10px 14px;
-  background: #1d9bf0;
-  color: #fff;
+  background: #daa520;
+  color: #000;
   border-radius: 999px;
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(29, 155, 240, 0.35);
+  box-shadow: 0 8px 18px rgba(218, 165, 32, 0.35);
+}
+
+.gold-fab {
+  --background: linear-gradient(135deg, #daa520 0%, #ffd700 100%);
+  --background-activated: #b8860b;
+  --background-hover: #ffd700;
+  --color: #000;
+  --box-shadow: 0 4px 12px rgba(218, 165, 32, 0.4);
 }
 
 .perm-badge {
@@ -2382,7 +2390,7 @@ ion-toolbar {
   left: 0;
   right: 0;
   height: 4px;
-  background: var(--ion-color-primary, #1d9bf0);
+  background: var(--ion-color-primary, #daa520);
   border-radius: 4px 4px 0 0;
   opacity: 0;
   transition: opacity 0.2s;
@@ -2402,7 +2410,7 @@ ion-toolbar {
 }
 
 .show-more-toggle {
-  color: #1d9bf0;
+  color: #daa520;
   font-size: 14px;
   cursor: pointer;
   margin-top: 4px;
@@ -2492,7 +2500,7 @@ ion-toolbar {
 }
 
 .post-text .post-link {
-  color: #1d9bf0;
+  color: #daa520;
   text-decoration: none;
 }
 
@@ -2502,12 +2510,12 @@ ion-toolbar {
 
 .post-text .hashtag,
 .post-text .mention {
-  color: #1d9bf0;
+  color: #daa520;
   cursor: pointer;
 }
 
 .detail-text .post-link {
-  color: #1d9bf0;
+  color: #daa520;
   text-decoration: none;
 }
 
@@ -2517,7 +2525,7 @@ ion-toolbar {
 
 .detail-text .hashtag,
 .detail-text .mention {
-  color: #1d9bf0;
+  color: #daa520;
   cursor: pointer;
 }
 
@@ -2633,7 +2641,7 @@ ion-toolbar {
 }
 
 .detail-text .post-link {
-  color: #1d9bf0;
+  color: #daa520;
   text-decoration: none;
 }
 
@@ -2643,7 +2651,7 @@ ion-toolbar {
 
 .detail-text .hashtag,
 .detail-text .mention {
-  color: #1d9bf0;
+  color: #daa520;
   cursor: pointer;
 }
 
@@ -2798,7 +2806,7 @@ ion-toolbar {
 
 .detail-comment-text :deep(.hashtag),
 .detail-comment-text :deep(.mention) {
-  color: #1d9bf0 !important;
+  color: #daa520 !important;
 }
 
 .detail-comment-parent {
@@ -2808,7 +2816,7 @@ ion-toolbar {
 }
 
 .detail-comment-parent-user {
-  color: #1d9bf0;
+  color: #daa520;
   font-weight: 700;
 }
 
@@ -2838,11 +2846,11 @@ ion-toolbar {
 }
 
 .action-btn:hover {
-  color: var(--ion-color-primary, #1d9bf0);
+  color: var(--ion-color-primary, #daa520);
 }
 
 .like-btn:hover, .like-btn.liked {
-  color: #f91880;
+  color: #daa520;
 }
 
 .retweet-btn:hover {

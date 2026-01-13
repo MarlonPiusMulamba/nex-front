@@ -86,7 +86,7 @@
             <div class="signup-section">
               <p class="signup-text">
                 Don't have an account?
-                <a @click="$router.push('/register')" class="signup-link">Sign up</a>
+                <a @click="$router.push('/register')" class="signup-link" style="color:#daa520; font-weight:700;">Sign up</a>
               </p>
             </div>
           </form>
@@ -318,8 +318,8 @@ export default {
 
 .input-wrapper:focus-within {
   background: #ffffff;
-  border-color: #000000;
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.05);
+  border-color: #daa520;
+  box-shadow: 0 0 0 4px rgba(218, 165, 32, 0.05);
 }
 
 .input-icon {
@@ -371,10 +371,11 @@ export default {
 
 /* Login Button */
 .login-button {
-  --background: #000000;
-  --background-hover: #333333;
+  --background: linear-gradient(135deg, #daa520 0%, #ffd700 100%);
+  --background-hover: #ffd700;
   --border-radius: 12px;
-  --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --box-shadow: 0 4px 12px rgba(218, 165, 32, 0.2);
+  --color: #000;
   height: 52px;
   font-size: 16px;
   font-weight: 600;
@@ -467,8 +468,8 @@ export default {
 }
 
 .signup-link {
-  color: #000000;
-  font-weight: 600;
+  color: #daa520;
+  font-weight: 700;
   text-decoration: none;
   cursor: pointer;
   transition: opacity 0.3s ease;

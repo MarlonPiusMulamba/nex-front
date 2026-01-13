@@ -210,7 +210,7 @@
             <div class="login-section">
               <p class="login-text">
                 Already have an account?
-                <a @click="$router.push('/login')" class="login-link">Sign in</a>
+                <a @click="$router.push('/login')" class="login-link" style="color:#daa520; font-weight:700;">Sign in</a>
               </p>
             </div>
           </form>
@@ -605,7 +605,7 @@ export default {
   margin-bottom: 20px;
   cursor: pointer;
   position: relative;
-  background: linear-gradient(135deg, #111827 0%, #020617 50%, #0f172a 100%);
+  background: linear-gradient(135deg, #111827 0%, #daa520 100%);
 }
 
 .cover-preview {
@@ -627,8 +627,8 @@ export default {
 .cover-gradient-overlay {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at top left, rgba(59,130,246,0.35), transparent 55%),
-              radial-gradient(circle at bottom right, rgba(236,72,153,0.35), transparent 55%);
+  background: radial-gradient(circle at top left, rgba(218, 165, 32, 0.35), transparent 55%),
+              radial-gradient(circle at bottom right, rgba(184, 134, 11, 0.35), transparent 55%);
   mix-blend-mode: screen;
 }
 
@@ -666,7 +666,7 @@ export default {
   width: 90px;
   height: 90px;
   border-radius: 50%;
-  border: 2px dashed #6366f1;
+  border: 2px dashed #daa520;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -696,7 +696,7 @@ export default {
 
 .camera-icon {
   font-size: 28px;
-  color: #4f46e5;
+  color: #daa520;
 }
 
 .upload-text {
@@ -715,8 +715,9 @@ export default {
 }
 
 .register-button {
-  --background: #111827;
-  --background-hover: #000000;
+  --background: linear-gradient(135deg, #daa520 0%, #ffd700 100%);
+  --background-hover: #ffd700;
+  --color: #000;
   --border-radius: 999px;
   font-weight: 700;
   margin-top: 8px;
@@ -790,8 +791,8 @@ export default {
 
 .input-wrapper:focus-within {
   background: #ffffff;
-  border-color: #000000;
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.05);
+  border-color: #daa520;
+  box-shadow: 0 0 0 4px rgba(218, 165, 32, 0.05);
 }
 
 .input-icon {

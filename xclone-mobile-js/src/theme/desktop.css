@@ -163,7 +163,7 @@
 }
 
 .nav-item:hover {
-  background-color: rgba(29, 155, 240, 0.1);
+  background-color: rgba(218, 165, 32, 0.1);
 }
 
 .nav-item.router-link-active {
@@ -240,7 +240,7 @@
 }
 
 .sidebar-profile:hover {
-  background-color: rgba(29, 155, 240, 0.1);
+  background-color: rgba(218, 165, 32, 0.1);
 }
 
 .sidebar-profile-avatar {
@@ -342,6 +342,6 @@
 
   .nav-item:hover,
   .sidebar-profile:hover {
-    background-color: rgba(29, 155, 240, 0.15);
+    background-color: rgba(218, 165, 32, 0.15);
   }
 }

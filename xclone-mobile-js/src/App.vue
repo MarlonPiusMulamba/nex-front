@@ -108,7 +108,7 @@ export default {
   --ion-toolbar-text: #000000;
   --ion-tab-bar-background: #ffffff;
   --ion-tab-bar-text: #555555;
-  --ion-tab-bar-hover: #1a73e8;
+  --ion-tab-bar-hover: #daa520;
   --ion-border-color: #e0e0e0;
   --ion-avatar-background: #c7c7c7;
 }
@@ -128,7 +128,7 @@ export default {
   --ion-toolbar-text: #e5e7eb;
   --ion-tab-bar-background: #0b0f14;
   --ion-tab-bar-text: #9ca3af;
-  --ion-tab-bar-hover: #60a5fa;
+  --ion-tab-bar-hover: #ffd700;
   --ion-border-color: #1f2937;
   --ion-avatar-background: #374151;
 }

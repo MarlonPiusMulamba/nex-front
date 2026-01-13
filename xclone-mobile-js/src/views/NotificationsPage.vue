@@ -233,6 +233,6 @@ export default {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #1d9bf0;
+  background: #daa520;
 }
 </style>

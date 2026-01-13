@@ -69,7 +69,7 @@
           <ion-icon :icon="chatbubbles" class="empty-icon"></ion-icon>
           <h3>No messages yet</h3>
           <p>Start a conversation by searching for users</p>
-          <ion-button @click="showSearchModal = true" fill="solid" color="primary">
+          <ion-button @click="showSearchModal = true" fill="solid" class="gold-btn">
             <ion-icon :icon="search" slot="start"></ion-icon>
             Find Users
           </ion-button>
@@ -626,12 +626,12 @@ export default {
           }
 
           if (part.startsWith('#') && part.length > 1) {
-            return `<span class="hashtag" data-hashtag="${escaped}" style="color:#1d9bf0;">${escaped}</span>`;
+            return `<span class="hashtag" data-hashtag="${escaped}" style="color:#daa520;">${escaped}</span>`;
           }
 
           if (part.startsWith('@') && part.length > 1) {
             const username = escaped.slice(1);
-            return `<span class="mention" data-mention="${username}" style="color:#1d9bf0;">${escaped}</span>`;
+            return `<span class="mention" data-mention="${username}" style="color:#daa520;">${escaped}</span>`;
           }
 
           return escaped;
@@ -752,6 +752,15 @@ export default {
 </script>
 
 <style scoped>
+.gold-btn {
+  --background: linear-gradient(135deg, #daa520 0%, #ffd700 100%);
+  --background-activated: #b8860b;
+  --background-hover: #ffd700;
+  --color: #000;
+  --box-shadow: 0 4px 12px rgba(218, 165, 32, 0.4);
+  font-weight: 700;
+}
+
 /* Conversations List */
 .conversations-list {
   max-width: 600px;
@@ -836,7 +845,7 @@ export default {
 }
 
 .read-receipt.read {
-  color: #3b82f6;
+  color: #daa520;
 }
 
 .unread-text {
@@ -932,8 +941,8 @@ export default {
 }
 
 .sent .message-content {
-  background: #3b82f6;
-  color: white;
+  background: #daa520;
+  color: black;
   border-bottom-right-radius: 4px;
 }
 
@@ -958,7 +967,7 @@ export default {
 }
 
 .message-text .post-link {
-  color: #1d9bf0;
+  color: #daa520;
   text-decoration: none;
 }
 
@@ -968,7 +977,7 @@ export default {
 
 .message-text .hashtag,
 .message-text .mention {
-  color: #1d9bf0;
+  color: #daa520;
   cursor: pointer;
 }
 .message-meta {
@@ -990,7 +999,7 @@ export default {
 }
 
 .sent .message-status.read {
-  color: #bfdbfe;
+  color: #000;
 }
 
 /* Message Input */

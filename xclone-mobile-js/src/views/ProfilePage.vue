@@ -502,12 +502,12 @@ export default {
           }
 
           if (part.startsWith('#') && part.length > 1) {
-            return `<span class="hashtag" data-hashtag="${escaped}" style="color:#1d9bf0;">${escaped}</span>`;
+            return `<span class="hashtag" data-hashtag="${escaped}" style="color:#daa520;">${escaped}</span>`;
           }
 
           if (part.startsWith('@') && part.length > 1) {
             const username = escaped.slice(1);
-            return `<span class="mention" data-mention="${username}" style="color:#1d9bf0;">${escaped}</span>`;
+            return `<span class="mention" data-mention="${username}" style="color:#daa520;">${escaped}</span>`;
           }
 
           return escaped;
@@ -1128,8 +1128,8 @@ export default {
 }
 
 .tab-item.active {
-  color: var(--ion-color-primary, #1d9bf0);
-  border-bottom-color: var(--ion-color-primary, #1d9bf0);
+  color: var(--ion-color-primary, #daa520);
+  border-bottom-color: var(--ion-color-primary, #daa520);
   font-weight: 700;
 }
 
@@ -1160,7 +1160,7 @@ export default {
 }
 
 .post-content .post-link {
-  color: #1d9bf0;
+  color: #daa520;
   text-decoration: none;
 }
 
@@ -1170,7 +1170,7 @@ export default {
 
 .post-content .hashtag,
 .post-content .mention {
-  color: #1d9bf0;
+  color: #daa520;
   cursor: pointer;
 }
 
