@@ -63,6 +63,7 @@ import {
 } from '@ionic/vue';
 import axios from 'axios';
 import config from '@/config/index.js';
+import { saveNotificationsOffline, getOfflineNotifications, isNetworkOffline } from '@/utils/offlineDb.js';
 
 export default {
   name: 'NotificationsPage',
@@ -133,13 +134,36 @@ export default {
       }
       this.loading = true;
       try {
+        // Handle offline
+        if (isNetworkOffline()) {
+          console.log('📡 OFFLINE: Loading notifications from IndexedDB');
+          const cachedNotifs = await getOfflineNotifications();
+          if (cachedNotifs && cachedNotifs.length > 0) {
+            this.notifications = cachedNotifs;
+            this.loading = false;
+            return;
+          }
+        }
+
         const res = await axios.get(`${this.API_URL}/api/notifications`, {
           params: { user_id: this.userId, limit: 50, offset: 0 }
         });
+        
         this.notifications = res.data.notifications || [];
+
+        // Save to offline DB
+        if (this.notifications.length > 0) {
+          await saveNotificationsOffline(this.notifications);
+        }
       } catch (e) {
         console.error('Load notifications error:', e);
-        this.notifications = [];
+        // Fallback to offline on error
+        const cachedNotifs = await getOfflineNotifications();
+        if (cachedNotifs) {
+          this.notifications = cachedNotifs;
+        } else {
+          this.notifications = [];
+        }
       } finally {
         this.loading = false;
       }

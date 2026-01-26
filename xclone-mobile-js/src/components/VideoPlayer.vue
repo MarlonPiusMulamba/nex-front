@@ -3,6 +3,7 @@
     <video
       ref="video"
       :src="videoSrc"
+      :poster="poster"
       class="video-player"
       playsinline
       webkit-playsinline
@@ -28,7 +29,7 @@
 
 <script>
 import { IonIcon } from '@ionic/vue';
-import { volumeHigh, volumeMuted, play, pause } from 'ionicons/icons';
+import { volumeHigh, volumeMute, play, pause } from 'ionicons/icons';
 
 export default {
   name: 'VideoPlayer',
@@ -37,6 +38,10 @@ export default {
     src: {
       type: String,
       required: true
+    },
+    poster: {
+      type: String,
+      default: ''
     }
   },
   data() {
@@ -44,7 +49,7 @@ export default {
       isPlaying: false,
       isMuted: true,
       volumeHigh,
-      volumeMuted,
+      volumeMute,
       play,
       pause,
       observer: null

@@ -123,6 +123,7 @@
                     <VideoPlayer
                       v-else-if="item.type === 'video'"
                       :src="getImageUrl(item.data)"
+                      :poster="item.thumbnail ? getImageUrl(item.thumbnail) : ''"
                     />
                   </div>
                 </div>
@@ -182,6 +183,7 @@
                   <VideoPlayer
                     v-else-if="item.type === 'video'"
                     :src="getImageUrl(item.data)"
+                    :poster="item.thumbnail ? getImageUrl(item.thumbnail) : ''"
                   />
                 </div>
               </div>
@@ -294,7 +296,7 @@
             <div class="media-grid" :class="`count-${Math.min(quoteMediaPreviews.length, 4)}`">
               <div v-for="(m, idx) in quoteMediaPreviews.slice(0,4)" :key="idx" class="media-item">
                 <img v-if="m.type==='image'" :src="m.src" class="media-img" alt="Preview" />
-                <VideoPlayer v-else-if="m.type==='video'" :src="m.src" />
+                <VideoPlayer v-else-if="m.type==='video'" :src="m.src" :poster="m.thumbnail || ''" />
               </div>
             </div>
           </div>
@@ -345,6 +347,7 @@
                   <VideoPlayer
                     v-else-if="preview.type === 'video'"
                     :src="preview.src"
+                    :poster="preview.thumbnail || ''"
                   />
                   <ion-button 
                     fill="clear" 
@@ -632,6 +635,7 @@
                         <VideoPlayer
                           v-else-if="item.type === 'video'"
                           :src="getImageUrl(item.data)"
+                          :poster="item.thumbnail ? getImageUrl(item.thumbnail) : ''"
                         />
                       </div>
                     </div>
@@ -672,6 +676,7 @@
                     <VideoPlayer
                       v-else
                       :src="getMediaSrc(c.image)"
+                      :poster="c.thumbnail ? getMediaSrc(c.thumbnail) : ''"
                     />
                   </div>
                   <div class="comment-actions">
@@ -722,7 +727,7 @@
               </ion-button>
               <div v-if="commentMediaPreview" class="comment-preview">
                 <img v-if="commentMedia && commentMedia.type==='image'" :src="commentMediaPreview" class="comment-preview-img" alt="Preview"/>
-                <VideoPlayer v-else-if="commentMedia && commentMedia.type==='video'" :src="commentMediaPreview" />
+                <VideoPlayer v-else-if="commentMedia && commentMedia.type==='video'" :src="commentMediaPreview" :poster="commentMedia.thumbnail || ''" />
                 <ion-button 
                   fill="clear" 
                   size="small" 
@@ -775,10 +780,11 @@ import {
   alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy
 } from 'ionicons/icons';
 import axios from 'axios';
-// import VideoPlayer from '@/components/VideoPlayer.vue';
-// import EmojiPicker from '@/components/EmojiPicker.vue';
+import VideoPlayer from '@/components/VideoPlayer.vue';
+import EmojiPicker from '@/components/EmojiPicker.vue';
 import config from '@/config/index.js';
 import notificationService from '@/utils/notificationService.js';
+import { savePostsOffline, getOfflinePosts, isNetworkOffline } from '@/utils/offlineDb.js';
 
 export default {
   name: 'FeedPage',
@@ -786,7 +792,7 @@ export default {
     IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
     IonContent, IonFab, IonFabButton, IonIcon, IonModal, IonTextarea, 
     IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent,
-    IonActionSheet //, VideoPlayer, EmojiPicker
+    IonActionSheet, VideoPlayer, EmojiPicker
   },
   data() {
     const API_URL = config.api.baseURL;
@@ -1379,6 +1385,23 @@ export default {
         this.hasMorePosts = true;
         this.showNewPostsBanner = false;
         
+        // Try offline first if network is down
+        if (isNetworkOffline()) {
+          console.log('📡 Device is OFFLINE, loading from IndexedDB...');
+          const offlinePosts = await getOfflinePosts();
+          if (offlinePosts && offlinePosts.length > 0) {
+            this.posts = offlinePosts;
+            this.isLoading = false;
+            if (event) event.target.complete();
+            return;
+          } else {
+            this.errorMessage = 'You are offline and no cached posts were found.';
+            this.isLoading = false;
+            if (event) event.target.complete();
+            return;
+          }
+        }
+
         const result = await this.fetchFeedUltraFast(this.pageOffset, this.pageLimit);
         
         if (result.success && result.posts) {
@@ -1388,6 +1411,9 @@ export default {
             comments: p.comments_count || 0
           }));
 
+          // Save to offline DB
+          await savePostsOffline(this.posts);
+
           this.latestPostId = this.posts[0]?.post_id || null;
           if (!result.posts || result.posts.length < this.pageLimit) {
             this.hasMorePosts = false;
@@ -1396,12 +1422,25 @@ export default {
           this.lastFetchTime = now;
           console.log(`⚡ LOADED ${this.posts.length} posts in ULTRA-FAST mode`);
         } else {
-          this.errorMessage = result.error || 'Failed to load feed';
-          throw new Error(this.errorMessage);
+          // Fallback to offline if request failed
+          const offlinePosts = await getOfflinePosts();
+          if (offlinePosts && offlinePosts.length > 0) {
+             console.log('📡 Request failed, falling back to offline data');
+             this.posts = offlinePosts;
+          } else {
+            this.errorMessage = result.error || 'Failed to load feed';
+            throw new Error(this.errorMessage);
+          }
         }
       } catch (err) {
         console.error('❌ Feed error:', err);
-        this.handleFeedError(err);
+        // Last resort: check offline data again
+        const offlinePosts = await getOfflinePosts();
+        if (offlinePosts && offlinePosts.length > 0) {
+          this.posts = offlinePosts;
+        } else {
+          this.handleFeedError(err);
+        }
       } finally {
         this.isLoading = false;
         if (event) event.target.complete();
@@ -1524,43 +1563,100 @@ export default {
       }
     },
     
-    onMediaChange(e) {
+    async onMediaChange(e) {
       const files = Array.from(e.target.files || []);
       if (!files.length) return;
 
       const remainingSlots = 4 - this.postMedia.length;
       const toAdd = files.slice(0, remainingSlots);
 
-      toAdd.forEach((file) => {
+      for (const file of toAdd) {
         const isVideo = file.type.startsWith('video');
-        const maxSize = 50 * 1024 * 1024; // 50MB for both images and videos
+        const maxSize = isVideo ? 150 * 1024 * 1024 : 50 * 1024 * 1024; // 150MB for videos, 50MB for images
 
         if (file.size > maxSize) {
-          alert('Media must be less than 50MB');
-          return;
+          alert(`${isVideo ? 'Video' : 'Image'} must be less than ${isVideo ? '150' : '50'}MB`);
+          continue;
         }
 
         const reader = new FileReader();
-        reader.onload = (ev) => {
+        reader.onload = async (ev) => {
           const dataUrl = ev.target.result;
+          
+          // For videos, generate thumbnail
+          let thumbnail = null;
+          if (isVideo) {
+            try {
+              thumbnail = await this.extractVideoThumbnail(file);
+            } catch (err) {
+              console.error('Failed to generate video thumbnail:', err);
+            }
+          }
+          
           // Send full dataUrl to backend to aid in media/type detection
           this.postMedia.push({
             type: isVideo ? 'video' : 'image',
-            data: dataUrl
+            data: dataUrl,
+            thumbnail: thumbnail // Only set for videos
           });
 
           this.mediaPreviews.push({
             type: isVideo ? 'video' : 'image',
-            src: dataUrl
+            src: dataUrl,
+            thumbnail: thumbnail
           });
         };
         reader.readAsDataURL(file);
-      });
+      }
 
       // Reset input so selecting the same file again works
       if (this.$refs.fileInput) {
         this.$refs.fileInput.value = '';
       }
+    },
+    
+    async extractVideoThumbnail(file) {
+      return new Promise((resolve, reject) => {
+        const video = document.createElement('video');
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        video.preload = 'metadata';
+        video.muted = true;
+        video.playsInline = true;
+        video.src = URL.createObjectURL(file);
+        
+        video.onloadedmetadata = () => {
+          // Seek to 1 second or middle of video, whichever is smaller
+          video.currentTime = Math.min(1, video.duration / 2);
+        };
+        
+        video.onseeked = () => {
+          try {
+            // Set canvas size to video dimensions
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // Draw current video frame to canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Convert canvas to base64 JPEG (0.8 quality for good balance)
+            const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
+            
+            // Clean up
+            URL.revokeObjectURL(video.src);
+            resolve(thumbnail);
+          } catch (err) {
+            URL.revokeObjectURL(video.src);
+            reject(err);
+          }
+        };
+        
+        video.onerror = (err) => {
+          URL.revokeObjectURL(video.src);
+          reject(err);
+        };
+      });
     },
     
     removeMedia(index) {
@@ -1707,29 +1803,41 @@ export default {
       if (this.$refs.quoteMediaInput) this.$refs.quoteMediaInput.value = '';
     },
 
-    onQuoteMediaChange(e) {
+    async onQuoteMediaChange(e) {
       const files = Array.from(e.target.files || []);
       if (!files.length) return;
       const remaining = 4 - this.quoteMedia.length;
       const toAdd = files.slice(0, remaining);
 
-      toAdd.forEach((file) => {
-        const maxSize = 50 * 1024 * 1024;
+      for (const file of toAdd) {
+        const isVideo = file.type.startsWith('video/');
+        const maxSize = isVideo ? 150 * 1024 * 1024 : 50 * 1024 * 1024;
+        
         if (file.size > maxSize) {
-          alert('Media must be less than 50MB');
-          return;
+          alert(`${isVideo ? 'Video' : 'Image'} must be less than ${isVideo ? '150' : '50'}MB`);
+          continue;
         }
+        
         const reader = new FileReader();
-        reader.onload = (ev) => {
+        reader.onload = async (ev) => {
           const dataUrl = ev.target.result;
-          const isVideo = file.type.startsWith('video/');
           const type = isVideo ? 'video' : 'image';
-          // Send full dataUrl for better backend detection
-          this.quoteMedia.push({ type, data: dataUrl });
-          this.quoteMediaPreviews.push({ type, src: dataUrl });
+          
+          // Generate thumbnail for videos
+          let thumbnail = null;
+          if (isVideo) {
+            try {
+              thumbnail = await this.extractVideoThumbnail(file);
+            } catch (err) {
+              console.error('Failed to generate video thumbnail:', err);
+            }
+          }
+          
+          this.quoteMedia.push({ type, data: dataUrl, thumbnail });
+          this.quoteMediaPreviews.push({ type, src: dataUrl, thumbnail });
         };
         reader.readAsDataURL(file);
-      });
+      }
 
       if (this.$refs.quoteMediaInput) this.$refs.quoteMediaInput.value = '';
     },
@@ -1889,22 +1997,36 @@ export default {
         ref.setFocus();
       }
     },
-    onCommentMediaChange(e) {
+    async onCommentMediaChange(e) {
       const files = Array.from(e.target.files || []);
       if (!files.length) return;
       const file = files[0];
-      const maxSize = 50 * 1024 * 1024;
+      const isVideo = file.type.startsWith('video/');
+      const maxSize = isVideo ? 150 * 1024 * 1024 : 50 * 1024 * 1024;
+      
       if (file.size > maxSize) {
-        alert('Media must be less than 50MB');
+        alert(`${isVideo ? 'Video' : 'Image'} must be less than ${isVideo ? '150' : '50'}MB`);
         return;
       }
+      
       const reader = new FileReader();
-      reader.onload = (ev) => {
+      reader.onload = async (ev) => {
         const dataUrl = ev.target.result;
-        const isVideo = file.type.startsWith('video/');
+        
+        // Generate thumbnail for videos
+        let thumbnail = null;
+        if (isVideo) {
+          try {
+            thumbnail = await this.extractVideoThumbnail(file);
+          } catch (err) {
+            console.error('Failed to generate video thumbnail:', err);
+          }
+        }
+        
         this.commentMedia = {
           type: isVideo ? 'video' : 'image',
-          src: dataUrl
+          src: dataUrl,
+          thumbnail
         };
         this.commentMediaPreview = dataUrl;
       };

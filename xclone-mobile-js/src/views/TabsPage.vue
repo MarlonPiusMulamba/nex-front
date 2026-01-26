@@ -116,6 +116,7 @@ import axios from 'axios';
 import config from '@/config/index.js';
 import TrendingWidget from '@/components/TrendingWidget.vue';
 import SuggestedUsersWidget from '@/components/SuggestedUsersWidget.vue';
+import notificationService from '@/utils/notificationService.js';
 
 export default {
   name: 'TabsPage',
@@ -162,22 +163,8 @@ export default {
     },
 
     playNotificationSound() {
-      if (!this.audioUnlocked) return;
-      if (!this.audioCtx) return;
-      try {
-        const ctx = this.audioCtx;
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'sine';
-        o.frequency.setValueAtTime(880, ctx.currentTime);
-        g.gain.setValueAtTime(0.0001, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
-        o.connect(g);
-        g.connect(ctx.destination);
-        o.start();
-        o.stop(ctx.currentTime + 0.2);
-      } catch (_) {}
+      // Use the global notification service to play the msg-ton.mp3
+      notificationService.playSound();
     },
 
     async fetchUnreadCount() {

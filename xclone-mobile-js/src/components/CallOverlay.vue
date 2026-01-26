@@ -1,58 +1,60 @@
 <template>
-  <div v-if="callStatus !== 'idle'" class="call-overlay">
-    <ion-modal :is-open="callStatus !== 'idle'" backdrop-dismiss="false">
-      <ion-header>
-        <ion-toolbar color="primary">
-          <ion-title>
-            {{ isCaller ? (callStatus === 'calling' ? 'Calling...' : 'In Call') : (callStatus === 'ringing' ? 'Incoming Call' : 'In Call') }}
-          </ion-title>
-        </ion-toolbar>
-      </ion-header>
-      <ion-content>
-        <div class="call-container">
-          <div v-if="callStatus === 'ringing' || callStatus === 'calling'" class="call-info">
-             <div class="user-info">
-                <div class="user-name">{{ otherUser?.full_name || otherUser?.username || 'User' }}</div>
-                <div class="user-handle" v-if="otherUser?.username">@{{ otherUser.username }}</div>
-             </div>
-             <div class="call-media-type">{{ callMedia === 'video' ? 'Video Call' : 'Audio Call' }}</div>
-          </div>
-
-          <div v-show="callMedia === 'video'" class="video-call">
-            <video ref="remoteVideo" autoplay playsinline class="remote-video"></video>
-            <video ref="localVideo" autoplay muted playsinline class="local-video"></video>
-          </div>
-          <audio v-show="callMedia === 'voice'" ref="remoteAudio" autoplay></audio>
-
-          <div class="call-controls">
-            <!-- Incoming call: Accept/Reject buttons -->
-            <template v-if="!isCaller && callStatus === 'ringing'">
-              <ion-button color="success" shape="round" class="action-btn" @click="acceptCall()">
-                <ion-icon slot="icon-only" :icon="callIcon"></ion-icon>
-              </ion-button>
-              <ion-button color="danger" shape="round" class="action-btn" @click="hangupCall()">
-                <ion-icon slot="icon-only" :icon="closeIcon"></ion-icon>
-              </ion-button>
-            </template>
-            <!-- Outgoing call: Cancel button -->
-            <template v-else-if="isCaller && callStatus === 'calling'">
-              <ion-button color="danger" shape="round" class="hangup-btn" @click="hangupCall()">
-                <ion-icon slot="start" :icon="closeIcon"></ion-icon>
-                Cancel
-              </ion-button>
-            </template>
-            <!-- Active call: Hang Up button -->
-            <template v-else>
-              <ion-button color="danger" shape="round" class="hangup-btn" @click="hangupCall()">
-                <ion-icon slot="start" :icon="closeIcon"></ion-icon>
-                Hang Up
-              </ion-button>
-            </template>
-          </div>
+  <ion-modal 
+    :is-open="callStatus !== 'idle'" 
+    :backdrop-dismiss="false"
+    @didDismiss="callStatus = 'idle'"
+  >
+    <ion-header>
+      <ion-toolbar color="primary">
+        <ion-title>
+          {{ isCaller ? (callStatus === 'calling' ? 'Calling...' : 'In Call') : (callStatus === 'ringing' ? 'Incoming Call' : 'In Call') }}
+        </ion-title>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content>
+      <div class="call-container">
+        <div v-if="callStatus === 'ringing' || callStatus === 'calling'" class="call-info">
+           <div class="user-info">
+              <div class="user-name">{{ otherUser?.full_name || otherUser?.username || 'User' }}</div>
+              <div class="user-handle" v-if="otherUser?.username">@{{ otherUser.username }}</div>
+           </div>
+           <div class="call-media-type">{{ callMedia === 'video' ? 'Video Call' : 'Audio Call' }}</div>
         </div>
-      </ion-content>
-    </ion-modal>
-  </div>
+
+        <div v-show="callMedia === 'video'" class="video-call">
+          <video ref="remoteVideo" autoplay playsinline class="remote-video"></video>
+          <video ref="localVideo" autoplay muted playsinline class="local-video"></video>
+        </div>
+        <audio v-show="callMedia === 'voice'" ref="remoteAudio" autoplay></audio>
+
+        <div class="call-controls">
+          <!-- Incoming call: Accept/Reject buttons -->
+          <template v-if="!isCaller && callStatus === 'ringing'">
+            <ion-button color="success" shape="round" class="action-btn" @click="acceptCall()">
+              <ion-icon slot="icon-only" :icon="callIcon"></ion-icon>
+            </ion-button>
+            <ion-button color="danger" shape="round" class="action-btn" @click="hangupCall()">
+              <ion-icon slot="icon-only" :icon="closeIcon"></ion-icon>
+            </ion-button>
+          </template>
+          <!-- Outgoing call: Cancel button -->
+          <template v-else-if="isCaller && callStatus === 'calling'">
+            <ion-button color="danger" shape="round" class="hangup-btn" @click="hangupCall()">
+              <ion-icon slot="start" :icon="closeIcon"></ion-icon>
+              Cancel
+            </ion-button>
+          </template>
+          <!-- Active call: Hang Up button -->
+          <template v-else>
+            <ion-button color="danger" shape="round" class="hangup-btn" @click="hangupCall()">
+              <ion-icon slot="start" :icon="closeIcon"></ion-icon>
+              Hang Up
+            </ion-button>
+          </template>
+        </div>
+      </div>
+    </ion-content>
+  </ion-modal>
 </template>
 
 <script>
@@ -83,6 +85,7 @@ export default {
       callPollInterval: null,
       knownCallerCandidates: [],
       knownCalleeCandidates: [],
+      lastHungUpCallId: null, // Track last call to prevent immediate re-trigger
       iceConfig: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -104,7 +107,7 @@ export default {
     this.userId = localStorage.getItem('userId');
 
     // Create ringtone audio element
-    this.ringtone = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE');
+    this.ringtone = new Audio('/call-ton.mp3');
     this.ringtone.loop = true;
 
     // Listen for start-call events from DMPage
@@ -244,7 +247,8 @@ export default {
     },
 
     incomingCall(match) {
-      if (this.callStatus !== 'idle') return; // Prevent duplicate incoming calls
+      if (this.callStatus !== 'idle') return;
+      if (match.call_id === this.lastHungUpCallId) return; // Skip if we just hung up this call
       
       this.currentCallId = match.call_id;
       this.callMedia = match.media || 'voice';
@@ -351,11 +355,19 @@ export default {
       this.stopRingtone();
       
       const callIdToHangup = this.currentCallId;
+      if (callIdToHangup) {
+        this.lastHungUpCallId = callIdToHangup;
+        // Clear memory after 10 seconds
+        setTimeout(() => {
+          if (this.lastHungUpCallId === callIdToHangup) this.lastHungUpCallId = null;
+        }, 10000);
+      }
       
-      // Always reset state immediately to close UI
+      // Reset state immediately and definitively
       this.callStatus = 'idle';
       this.currentCallId = null;
       this.isCaller = false;
+      this.otherUser = null;
 
       if (callIdToHangup) {
         console.log(`[CallOverlay] Sending hangup API for call ${callIdToHangup}`);
@@ -497,10 +509,6 @@ export default {
 </script>
 
 <style scoped>
-.call-overlay {
-  position: fixed;
-  z-index: 10000;
-}
 .call-container {
   height: 100%;
   display: flex;

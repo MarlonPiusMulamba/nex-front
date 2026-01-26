@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unregister Service Worker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            background: #f5f5f5;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .status {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+
+        button:hover {
+            background: #c82333;
+        }
+
+        .primary {
+            background: #007bff;
+        }
+
+        .primary:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔧 Service Worker Fix</h1>
+        <p>This will unregister the old service worker that's causing the white screen issue.</p>
+
+        <div id="status"></div>
+
+        <button onclick="unregisterServiceWorker()">Unregister Service Worker</button>
+        <button class="primary" onclick="clearAndReload()">Clear Everything & Reload</button>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+
+        function showStatus(message, type = 'info') {
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        async function unregisterServiceWorker() {
+            showStatus('🔄 Unregistering service worker...', 'info');
+
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+
+                    if (registrations.length === 0) {
+                        showStatus('ℹ️ No service workers found to unregister.', 'info');
+                        return;
+                    }
+
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                        console.log('Service Worker unregistered:', registration);
+                    }
+
+                    showStatus(`✅ Successfully unregistered ${registrations.length} service worker(s)!<br><br>Now reload the main app: <a href="http://localhost:5173" target="_blank">http://localhost:5173</a>`, 'success');
+                } catch (error) {
+                    showStatus(`❌ Error unregistering service worker: ${error.message}`, 'error');
+                }
+            } else {
+                showStatus('❌ Service Workers not supported in this browser.', 'error');
+            }
+        }
+
+        async function clearAndReload() {
+            showStatus('🔄 Clearing everything...', 'info');
+
+            try {
+                // Unregister service workers
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                    }
+                }
+
+                // Clear cache
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+                }
+
+                // Clear localStorage
+                localStorage.clear();
+
+                // Clear sessionStorage
+                sessionStorage.clear();
+
+                showStatus('✅ Everything cleared! Redirecting to app in 2 seconds...', 'success');
+
+                setTimeout(() => {
+                    window.location.href = 'http://localhost:5173';
+                }, 2000);
+            } catch (error) {
+                showStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            showStatus('👋 Ready to fix the service worker issue. Click the button below.', 'info');
+        });
+    </script>
+</body>
+
+</html>

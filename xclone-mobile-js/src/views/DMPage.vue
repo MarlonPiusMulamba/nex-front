@@ -244,9 +244,12 @@ import {
   search, arrowBack, send, mic, add, call, videocam, chatbubbles,
   checkmark, checkmarkDone, happy
 } from 'ionicons/icons';
-import axios from 'axios';
-import config from '@/config/index.js';
+import api from '@/utils/api.js';
 import EmojiPicker from '@/components/EmojiPicker.vue';
+import { 
+  saveConversationsOffline, getOfflineConversations, 
+  saveMessagesOffline, getOfflineMessages, isNetworkOffline 
+} from '@/utils/offlineDb.js';
 
 export default {
   name: 'DMPage',
@@ -271,7 +274,6 @@ export default {
       showSearchModal: false,
       isLoading: false,
       loadingMessages: false,
-      API_URL: config.api.baseURL,
       searchingUsers: false,
       isSending: false,
       showEmojiPicker: false,
@@ -287,7 +289,7 @@ export default {
       if (typeof imageData !== 'string') return this.defaultAvatar;
       if (imageData.startsWith('http')) return imageData;
       if (imageData.startsWith('data:image')) return imageData;
-      if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
+      if (imageData.startsWith('/static/')) return `${api.defaults.baseURL}${imageData}`;
       return `data:image/png;base64,${imageData}`;
     },
 
@@ -354,19 +356,19 @@ export default {
 
       try {
         this.searchingUsers = true;
-        const res = await axios.get(`${this.API_URL}/api/search/users`, {
+        console.log('📡 Searching users with query:', rawQuery);
+        const res = await api.get('/api/search/users', {
           params: { 
             q: rawQuery,
             limit: 20,
-            user_id: this.userId  // let backend exclude current user & tune caching
+            user_id: this.userId
           }
         });
         
-        // Backend already excludes current user; just ensure we have an array
-        this.searchResults = Array.isArray(res.data.users) ? res.data.users : [];
-        console.log(`Found ${this.searchResults.length} users`);
+        this.searchResults = Array.isArray(res.users) ? res.users : [];
+        console.log(`✅ Search results: ${this.searchResults.length} users`);
       } catch (err) {
-        console.error('Search error:', err);
+        console.error('❌ Search error:', err);
         this.searchResults = [];
       } finally {
         this.searchingUsers = false;
@@ -436,22 +438,45 @@ export default {
     async loadMessages(otherUserId) {
       try {
         this.loadingMessages = true;
-        console.log(`Loading messages with user ${otherUserId}`);
+        console.log(`📡 Loading messages with user ${otherUserId}`);
         
-        const res = await axios.get(`${this.API_URL}/api/messages/${otherUserId}`, {
+        // Handle offline
+        if (isNetworkOffline()) {
+          console.log('📡 OFFLINE: Loading messages from IndexedDB');
+          const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
+          if (cachedMessages) {
+            this.messages = cachedMessages;
+            this.$nextTick(() => this.scrollToBottom());
+            return;
+          }
+        }
+
+        const res = await api.get(`/api/messages/${otherUserId}`, {
           params: { user_id: this.userId }
         });
         
-        this.messages = res.data.messages || [];
-        console.log(`Loaded ${this.messages.length} messages`);
+        this.messages = res.messages || [];
+        console.log(`✅ Loaded ${this.messages.length} messages`);
+        
+        // Save to offline DB
+        if (this.messages.length > 0) {
+          await saveMessagesOffline(this.messages);
+        }
+
         window.dispatchEvent(new Event('dm-refresh'));
         
         this.$nextTick(() => {
           this.scrollToBottom();
         });
       } catch (err) {
-        console.error('Load messages error:', err);
-        this.messages = [];
+        console.error('❌ Load messages error:', err);
+        // Fallback to offline on error
+        const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
+        if (cachedMessages) {
+          this.messages = cachedMessages;
+        } else {
+          this.messages = [];
+        }
       } finally {
         this.loadingMessages = false;
       }
@@ -472,14 +497,14 @@ export default {
           text: messageTextToSend
         });
         
-        const res = await axios.post(`${this.API_URL}/api/messages/send`, {
+        const res = await api.post('/api/messages/send', {
           from_user_id: this.userId,
           to_user_id: this.selectedChat.user_id,
           text: messageTextToSend,
           image: imageToSend || null
         });
 
-        if (res.data.success) {
+        if (res.success) {
           console.log('Message sent successfully');
           
           // Clear input immediately
@@ -512,14 +537,14 @@ export default {
 
     async markAsRead(otherUserId) {
       try {
-        await axios.post(`${this.API_URL}/api/messages/mark_read`, {
+        await api.post('/api/messages/mark_read', {
           user_id: this.userId,
           other_user_id: otherUserId
         });
-        console.log('Messages marked as read');
+        console.log('✅ Messages marked as read');
         window.dispatchEvent(new Event('dm-refresh'));
       } catch (err) {
-        console.error('Mark read error:', err);
+        console.error('❌ Mark read error:', err);
       }
     },
 
@@ -555,20 +580,44 @@ export default {
     async loadConversations() {
       try {
         this.isLoading = true;
-        console.log('Loading conversations...');
+        console.log('📡 Loading conversations for user:', this.userId);
         
-        const res = await axios.get(`${this.API_URL}/api/conversations`, {
+        // Handle offline
+        if (isNetworkOffline()) {
+           console.log('📡 OFFLINE: Loading conversations from IndexedDB');
+           const cachedConv = await getOfflineConversations();
+           if (cachedConv && cachedConv.length > 0) {
+             this.conversations = cachedConv;
+             this.filteredConversations = [...this.conversations];
+             return;
+           }
+        }
+
+        const res = await api.get('/api/conversations', {
           params: { user_id: this.userId }
         });
         
-        this.conversations = res.data.conversations || [];
+        this.conversations = res.conversations || [];
         this.filteredConversations = [...this.conversations];
-        console.log(`Loaded ${this.conversations.length} conversations`);
+        console.log(`✅ Loaded ${this.conversations.length} conversations`);
+
+        // Save to offline DB
+        if (this.conversations.length > 0) {
+          await saveConversationsOffline(this.conversations);
+        }
+
         window.dispatchEvent(new Event('dm-refresh'));
       } catch (err) {
-        console.error('Load conversations error:', err);
-        this.conversations = [];
-        this.filteredConversations = [];
+        console.error('❌ Load conversations error:', err);
+        // Fallback to offline on error
+        const cachedConv = await getOfflineConversations();
+        if (cachedConv) {
+          this.conversations = cachedConv;
+          this.filteredConversations = [...this.conversations];
+        } else {
+          this.conversations = [];
+          this.filteredConversations = [];
+        }
       } finally {
         this.isLoading = false;
       }

@@ -10,41 +10,41 @@ import ProfilePage from '../views/ProfilePage.vue';
 import NotificationsPage from '../views/NotificationsPage.vue';
 
 const routes = [
-  { 
-    path: '/', 
-    redirect: '/tabs/feed' 
+  {
+    path: '/',
+    redirect: '/tabs/feed'
   },
-  { 
-    path: '/login', 
+  {
+    path: '/login',
     component: LoginPage,
     meta: { requiresAuth: false }
   },
-  { 
-    path: '/register', 
+  {
+    path: '/register',
     component: RegisterPage,
     meta: { requiresAuth: false }
   },
-  { 
-    path: '/tabs/', 
+  {
+    path: '/tabs/',
     component: TabsPage,
     meta: { requiresAuth: false },
     children: [
-      { 
-        path: '', 
-        redirect: '/tabs/feed' 
+      {
+        path: '',
+        redirect: '/tabs/feed'
       },
-      { 
-        path: 'feed', 
+      {
+        path: 'feed',
         component: FeedPage,
         meta: { requiresAuth: false }
       },
-      { 
-        path: 'follow', 
+      {
+        path: 'follow',
         component: FollowPage,
         meta: { requiresAuth: true }
       },
-      { 
-        path: 'dm', 
+      {
+        path: 'dm',
         component: DMPage,
         meta: { requiresAuth: true }
       },
@@ -53,8 +53,8 @@ const routes = [
         component: NotificationsPage,
         meta: { requiresAuth: true }
       },
-      { 
-        path: 'profile/:username?', 
+      {
+        path: 'profile/:username?',
         component: ProfilePage,
         meta: { requiresAuth: true }
       }
@@ -62,19 +62,18 @@ const routes = [
   }
 ];
 
-// Use createWebHistory for Capacitor
 const router = createRouter({
-  history: createWebHistory(process.env.BASE_URL),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 });
 
 // Navigation guard
 router.beforeEach((to, from, next) => {
   console.log('🧭 Navigating to:', to.path);
-  
+
   const userId = localStorage.getItem('userId');
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
-  
+
   if (requiresAuth && !userId) {
     console.log('🔒 Auth required, redirecting to login');
     next('/login');

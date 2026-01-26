@@ -1,6 +1,6 @@
 import { createApp } from 'vue';
 import App from './App.vue';
-import router from './router';
+import router from './router/index.js';
 import { IonicVue } from '@ionic/vue';
 import { io } from 'socket.io-client';
 
@@ -21,26 +21,7 @@ import './theme/desktop.css';
 
 console.log('🚀 Step 1: Imports successful');
 
-// Try importing config with error handling
-let config;
-try {
-  config = await import('@/config/index.js');
-  config = config.default || config;
-  console.log('✅ Step 2: Config loaded:', config);
-} catch (error) {
-  console.error('❌ Step 2: Config load failed:', error);
-  // Fallback config
-  config = {
-    api: {
-      baseURL: import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5000`,
-      timeout: 30000,
-    },
-    app: {
-      name: 'NexFi',
-    },
-  };
-  console.log('⚠️ Using fallback config');
-}
+import config from './config/index.js';
 
 console.log('🚀 Step 3: Creating Vue app...');
 

@@ -36,6 +36,24 @@ self.addEventListener('notificationclick', function (event) {
 
 // Required for PWA installability
 self.addEventListener('fetch', function (event) {
-    // Basic fetch handler to satisfy browser requirements
-    event.respondWith(fetch(event.request));
+    // Only handle same-origin requests to avoid CORS issues
+    if (event.request.url.startsWith(self.location.origin)) {
+        event.respondWith(
+            fetch(event.request)
+                .catch(function (error) {
+                    console.log('[Service Worker] Fetch failed; returning offline page instead.', error);
+                    // Return a basic response instead of failing completely
+                    // This prevents the white screen issue
+                    return new Response('Network error occurred', {
+                        status: 408,
+                        statusText: 'Network error occurred',
+                        headers: new Headers({
+                            'Content-Type': 'text/plain'
+                        })
+                    });
+                })
+        );
+    }
+    // For cross-origin requests, let the browser handle them normally
 });
+

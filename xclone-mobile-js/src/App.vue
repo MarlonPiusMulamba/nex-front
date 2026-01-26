@@ -1,25 +1,33 @@
 <template>
   <ion-app :class="theme">
+    <div v-if="isOffline" class="offline-banner">
+      <ion-icon :icon="cloudOfflineOutline"></ion-icon>
+      <span style="margin-left: 8px;">Offline Mode - Using cached data</span>
+    </div>
     <ion-router-outlet />
     <CallOverlay />
   </ion-app>
 </template>
 
 <script>
-import { IonApp, IonRouterOutlet } from '@ionic/vue';
+import { IonApp, IonRouterOutlet, IonIcon } from '@ionic/vue';
+import { cloudOfflineOutline } from 'ionicons/icons';
 import CallOverlay from './components/CallOverlay.vue';
-import notificationService from './utils/notificationService';
+import notificationService from './utils/notificationService.js';
 
 export default {
   name: 'App',
   components: {
     IonApp,
     IonRouterOutlet,
+    IonIcon,
     CallOverlay
   },
   data() {
     return {
-      theme: 'light'
+      theme: 'light',
+      isOffline: !navigator.onLine,
+      cloudOfflineOutline
     };
   },
   methods: {
@@ -42,6 +50,10 @@ export default {
     },
     toggleTheme() {
       this.applyTheme(this.theme === 'dark' ? 'light' : 'dark');
+    },
+    updateOnlineStatus() {
+      this.isOffline = !navigator.onLine;
+      console.log('📡 Network status changed. Offline:', this.isOffline);
     }
   },
   async mounted() {
@@ -87,6 +99,14 @@ export default {
       saved = localStorage.getItem('theme');
     } catch (_) {}
     this.applyTheme(saved === 'dark' ? 'dark' : 'light');
+
+    // Network status listeners
+    window.addEventListener('online', this.updateOnlineStatus);
+    window.addEventListener('offline', this.updateOnlineStatus);
+  },
+  beforeUnmount() {
+    window.removeEventListener('online', this.updateOnlineStatus);
+    window.removeEventListener('offline', this.updateOnlineStatus);
   },
   errorCaptured(err, instance, info) {
     console.error('❌ App Error:', err, info);
@@ -131,5 +151,19 @@ export default {
   --ion-tab-bar-hover: #ffd700;
   --ion-border-color: #1f2937;
   --ion-avatar-background: #374151;
+}
+
+.offline-banner {
+  background: var(--ion-color-warning, #ffc409);
+  color: #000;
+  text-align: center;
+  padding: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  z-index: 9999;
 }
 </style>

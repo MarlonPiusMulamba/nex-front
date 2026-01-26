@@ -1,6 +1,6 @@
 // Notification Service for Web and Mobile Push Notifications
 import axios from 'axios';
-import config from '../config';
+import config from '../config/index.js';
 
 class NotificationService {
     constructor() {
@@ -13,7 +13,7 @@ class NotificationService {
         this.userId = userId;
 
         // Load notification sound with higher volume
-        this.audio = new Audio('/notify.mp3');
+        this.audio = new Audio('/msg-ton.mp3');
         this.audio.volume = 1.0; // Maximum volume
         this.audio.preload = 'auto'; // Preload for faster playback
 
@@ -147,7 +147,7 @@ class NotificationService {
                             body: notification.body || '',
                             id: Date.now(),
                             schedule: { at: new Date(Date.now() + 100) },
-                            sound: 'notify.mp3',
+                            sound: 'msg-ton.mp3',
                             attachments: notification.largeIcon ? [{ id: 'img', url: notification.largeIcon }] : []
                         }]
                     });

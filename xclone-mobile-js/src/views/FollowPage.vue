@@ -299,6 +299,11 @@ import {
 import axios from 'axios';
 import api from '@/utils/api';
 import config from '@/config/index.js';
+import { 
+  isNetworkOffline, saveProfileOffline, getOfflineProfile,
+  savePostsOffline, getOfflinePosts, saveTrendingOffline, getOfflineTrending,
+  saveSuggestedOffline, getOfflineSuggested
+} from '@/utils/offlineDb.js';
 
 export default {
   name: 'FollowPage',
@@ -484,13 +489,37 @@ export default {
     async loadTrending() {
       try {
         this.loadingTrending = true;
+        
+        // Handle offline
+        if (isNetworkOffline()) {
+          console.log('📡 OFFLINE: Loading trending from IndexedDB');
+          const cachedTrending = await getOfflineTrending();
+          if (cachedTrending && cachedTrending.length > 0) {
+            this.trendingTopics = cachedTrending;
+            this.loadingTrending = false;
+            return;
+          }
+        }
+
         const res = await api.get('/api/trending', {
           params: { limit: 10, days: 7, recent_limit: 2000 }
         });
+        
         this.trendingTopics = res.topics || [];
+        
+        // Save to offline DB
+        if (this.trendingTopics.length > 0) {
+          await saveTrendingOffline(this.trendingTopics);
+        }
       } catch (err) {
         console.error('Failed to load trending:', err);
-        this.trendingTopics = [];
+        // Fallback
+        const cachedTrending = await getOfflineTrending();
+        if (cachedTrending) {
+          this.trendingTopics = cachedTrending;
+        } else {
+          this.trendingTopics = [];
+        }
       } finally {
         this.loadingTrending = false;
       }
@@ -516,6 +545,16 @@ export default {
 
     async loadSuggestedUsers() {
       try {
+        // Handle offline
+        if (isNetworkOffline()) {
+          console.log('📡 OFFLINE: Loading suggestions from IndexedDB');
+          const cachedSuggested = await getOfflineSuggested();
+          if (cachedSuggested && cachedSuggested.length > 0) {
+            this.suggestedUsers = cachedSuggested;
+            return;
+          }
+        }
+
         const res = await api.get('/api/search/users', {
           params: { q: '', limit: 10, viewer_id: this.userId }
         });
@@ -524,8 +563,18 @@ export default {
           .filter(u => u.user_id !== this.userId)
           .slice(0, 5)
           .map(u => ({ ...u, is_following: !!u.is_following, followLoading: false }));
+        
+        // Save to offline DB
+        if (this.suggestedUsers.length > 0) {
+          await saveSuggestedOffline(this.suggestedUsers);
+        }
       } catch (err) {
         console.error('Failed to load suggestions:', err);
+        // Fallback
+        const cachedSuggested = await getOfflineSuggested();
+        if (cachedSuggested) {
+          this.suggestedUsers = cachedSuggested;
+        }
       }
     },
 

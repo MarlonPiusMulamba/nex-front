@@ -410,14 +410,15 @@ import {
 } from 'ionicons/icons';
 import api from '@/utils/api';
 import config from '@/config/index.js';
-// import VideoPlayer from '@/components/VideoPlayer.vue';
+import VideoPlayer from '@/components/VideoPlayer.vue';
+import { saveProfileOffline, getOfflineProfile, isNetworkOffline, savePostsOffline, getOfflinePosts } from '@/utils/offlineDb.js';
 
 export default {
   name: 'ProfilePage',
   components: {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
     IonButtons, IonIcon, IonSpinner, IonRefresher, IonRefresherContent,
-    IonModal, IonList, IonItem, IonLabel, IonInput //, VideoPlayer
+    IonModal, IonList, IonItem, IonLabel, IonInput, VideoPlayer
   },
   data() {
     return {
@@ -576,6 +577,21 @@ export default {
       try {
         this.loading = true;
         const targetUsername = (typeof this.$route?.params?.username === 'string' && this.$route.params.username) || this.username;
+        
+        // Handle offline
+        if (isNetworkOffline()) {
+          console.log('📡 OFFLINE: Loading profile from IndexedDB');
+          const cachedProfile = await getOfflineProfile(targetUsername);
+          if (cachedProfile) {
+            this.profile = cachedProfile;
+            this.loading = false;
+            // Also try to load cached posts for this user
+            const cachedPosts = await getOfflinePosts();
+            this.posts = cachedPosts.filter(p => p.username === targetUsername);
+            return;
+          }
+        }
+
         const res = await api.get(`/api/profile/${targetUsername}`, {
           params: { viewer_id: this.userId }
         });
@@ -583,6 +599,9 @@ export default {
         if (res.success) {
           this.profile = res.profile;
           this.profile.user_id = String(this.profile.user_id); // Ensure string
+          
+          // Save to offline DB
+          await saveProfileOffline(this.profile);
           
           // Prefill edit fields
           this.editFirstName = this.profile.first_name || '';
@@ -598,9 +617,19 @@ export default {
           await this.loadPosts();
         } else {
           console.error('Profile not found');
+          // Try fallback if request just failed
+          const cachedProfile = await getOfflineProfile(targetUsername);
+          if (cachedProfile) {
+            this.profile = cachedProfile;
+          }
         }
       } catch (err) {
         console.error('Load profile error:', err);
+        const targetUsername = (typeof this.$route?.params?.username === 'string' && this.$route.params.username) || this.username;
+        const cachedProfile = await getOfflineProfile(targetUsername);
+        if (cachedProfile) {
+          this.profile = cachedProfile;
+        }
       } finally {
         this.loading = false;
       }
@@ -736,24 +765,51 @@ export default {
     },
 
     async toggleFollow() {
-      if (!this.profile || !this.userId) return;
+      if (!this.profile || !this.userId || this.followLoading) return;
+      
+      // Store original state for rollback
+      const originalFollowState = this.profile.is_following;
+      const originalFollowerCount = this.profile.followers_count;
+      
       try {
-        const isFollowing = this.profile.is_following;
-        const endpoint = isFollowing ? '/api/unfollow' : '/api/follow';
+        // Set loading state
+        this.followLoading = true;
+        
+        // Optimistic UI update - update immediately for better UX
+        this.profile.is_following = !originalFollowState;
+        this.profile.followers_count += originalFollowState ? -1 : 1;
+        
+        const endpoint = originalFollowState ? '/api/unfollow' : '/api/follow';
         const res = await api.post(endpoint, {
           follower_id: this.userId,
           following_username: this.profile.username
         });
         
-        if (res.success) {
-          this.profile.is_following = !isFollowing;
-          this.profile.followers_count += isFollowing ? -1 : 1;
+        // Check if the response indicates success
+        if (!res.success) {
+          // Rollback optimistic update on failure
+          this.profile.is_following = originalFollowState;
+          this.profile.followers_count = originalFollowerCount;
+          
+          // Show specific error message from backend
+          const errorMsg = res.message || 'Unable to update follow status';
+          alert(errorMsg);
+          console.error('Follow/unfollow failed:', errorMsg);
         } else {
-          alert(res.message || 'Action failed');
+          // Success - optimistic update was correct, just log it
+          console.log(`✅ Successfully ${originalFollowState ? 'unfollowed' : 'followed'} @${this.profile.username}`);
         }
       } catch (err) {
+        // Rollback optimistic update on error
+        this.profile.is_following = originalFollowState;
+        this.profile.followers_count = originalFollowerCount;
+        
         console.error('Follow toggle error:', err);
-        alert('Action failed');
+        const errorMsg = err.response?.data?.message || err.message || 'Connection error. Please try again.';
+        alert(errorMsg);
+      } finally {
+        // Always clear loading state
+        this.followLoading = false;
       }
     },
 

@@ -27,15 +27,15 @@ const config = {
         apiUrl = envUrl;
         console.log('🔧 Using VITE_API_URL from environment:', envUrl);
       }
-      // Priority 2: For Capacitor apps, always use production backend
+      // Priority 2: For local development, use local backend if available (localhost:5000)
+      else if (isPageLocal) {
+        apiUrl = `http://${pageHost}:5000`;
+        console.log('💻 Local development detected, using local backend defaults');
+      }
+      // Priority 3: For Capacitor apps, always use production backend
       else if (isNative) {
         apiUrl = 'https://nexback.pythonanywhere.com';
         console.log('📱 Capacitor app detected, using production backend');
-      }
-      // Priority 3: For local development, use local backend if available
-      else if (isPageLocal) {
-        apiUrl = `http://${pageHost}:5000`;
-        console.log('💻 Local development detected, using local backend');
       }
       // Priority 4: Default to production backend
       else {
