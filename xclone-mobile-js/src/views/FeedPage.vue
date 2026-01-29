@@ -1956,7 +1956,14 @@ export default {
           parent_comment_id: this.replyToCommentId
         });
 
-        if (res.data.success) {
+        // Defensive: Handle both res.data.success and res.success
+        // Note: axios returns full response, so res.data.success is correct
+        // but we add fallback for consistency
+        const success = res.data?.success !== undefined ? res.data.success : res.success;
+        
+        console.log('Comment submission response:', { success, res });
+
+        if (success) {
           // Reload comments or optimistically add
           await this.loadComments(postId);
           this.newComment = '';
@@ -1970,11 +1977,15 @@ export default {
             post.comments = (post.comments || 0) + 1;
           }
         } else {
-          alert(res.data.message || 'Failed to add comment');
+          const errorMsg = res.data?.message || res.message || 'Failed to add comment';
+          alert(errorMsg);
+          console.error('Comment submission failed:', errorMsg, res);
         }
       } catch (err) {
         console.error('Submit comment error:', err);
-        alert('Failed to add comment');
+        console.error('Error response:', err.response?.data);
+        const errorMsg = err.response?.data?.message || err.message || 'Failed to add comment';
+        alert(errorMsg);
       } finally {
         this.postingComment = false;
       }

@@ -365,10 +365,15 @@ export default {
           }
         });
         
-        this.searchResults = Array.isArray(res.users) ? res.users : [];
-        console.log(`✅ Search results: ${this.searchResults.length} users`);
+        // Defensive: Handle both res.users and res.data.users
+        // API wrapper returns response.data directly, but structure may vary
+        const users = res.users || res.data?.users || res?.data || [];
+        this.searchResults = Array.isArray(users) ? users : [];
+        
+        console.log(`✅ Search results: ${this.searchResults.length} users`, res);
       } catch (err) {
         console.error('❌ Search error:', err);
+        console.error('Error response:', err.response?.data);
         this.searchResults = [];
       } finally {
         this.searchingUsers = false;

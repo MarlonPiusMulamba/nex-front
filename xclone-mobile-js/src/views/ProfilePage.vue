@@ -785,16 +785,22 @@ export default {
           following_username: this.profile.username
         });
         
+        // Defensive: Handle both res.success and res.data.success
+        // API wrapper returns response.data directly, but structure may vary
+        const success = res.success !== undefined ? res.success : res.data?.success;
+        
+        console.log('Follow/unfollow response:', { success, res });
+        
         // Check if the response indicates success
-        if (!res.success) {
+        if (!success) {
           // Rollback optimistic update on failure
           this.profile.is_following = originalFollowState;
           this.profile.followers_count = originalFollowerCount;
           
           // Show specific error message from backend
-          const errorMsg = res.message || 'Unable to update follow status';
+          const errorMsg = res.message || res.data?.message || 'Unable to update follow status';
           alert(errorMsg);
-          console.error('Follow/unfollow failed:', errorMsg);
+          console.error('Follow/unfollow failed:', errorMsg, res);
         } else {
           // Success - optimistic update was correct, just log it
           console.log(`✅ Successfully ${originalFollowState ? 'unfollowed' : 'followed'} @${this.profile.username}`);
@@ -805,6 +811,7 @@ export default {
         this.profile.followers_count = originalFollowerCount;
         
         console.error('Follow toggle error:', err);
+        console.error('Error response:', err.response?.data);
         const errorMsg = err.response?.data?.message || err.message || 'Connection error. Please try again.';
         alert(errorMsg);
       } finally {
