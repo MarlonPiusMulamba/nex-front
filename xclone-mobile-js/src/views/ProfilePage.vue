@@ -1016,8 +1016,8 @@ export default {
 
 .message-btn {
   --background: transparent;
-  --color: var(--ion-text-color, #0f1419);
-  --border-color: #cfd9de;
+  --color: var(--ion-color-primary, #daa520);
+  --border-color: var(--ion-color-primary, #daa520);
   --border-width: 1px;
   --border-radius: 50%;
   --padding-start: 0;
@@ -1029,12 +1029,18 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(218, 165, 32, 0.02);
+}
+
+.message-btn:hover {
+  --background: rgba(218, 165, 32, 0.08);
+  transform: translateY(-1px);
 }
 
 .message-btn:active {
-  --background: rgba(0, 0, 0, 0.05);
-  transform: scale(0.96);
+  --background: rgba(218, 165, 32, 0.15);
+  transform: scale(0.92);
 }
 
 .message-btn ion-icon {
