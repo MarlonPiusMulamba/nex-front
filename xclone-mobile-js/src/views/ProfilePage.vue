@@ -91,11 +91,9 @@
                 </ion-button>
                 <ion-button 
                   fill="outline" 
-                  size="small" 
                   class="message-btn"
                   @click="openDirectMessage">
-                  <ion-icon :icon="mail" slot="start"></ion-icon>
-                  Message
+                  <ion-icon :icon="mail"></ion-icon>
                 </ion-button>
               </template>
             </div>
@@ -1011,13 +1009,37 @@ export default {
 
 .action-buttons {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 12px;
+  flex-wrap: nowrap;
+  align-items: center;
 }
 
 .message-btn {
-  --border-color: var(--ion-color-medium, #cfd9de);
+  --background: transparent;
   --color: var(--ion-text-color, #0f1419);
+  --border-color: #cfd9de;
+  --border-width: 1px;
+  --border-radius: 50%;
+  --padding-start: 0;
+  --padding-end: 0;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.message-btn:active {
+  --background: rgba(0, 0, 0, 0.05);
+  transform: scale(0.96);
+}
+
+.message-btn ion-icon {
+  font-size: 20px;
+  margin: 0;
 }
 
 
