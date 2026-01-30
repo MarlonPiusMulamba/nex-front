@@ -18,7 +18,7 @@
 
       <div v-else>
         <div v-if="notifications.length === 0" class="empty-state">
-          <p>No notifications yet.</p>
+          <p>No notifications yet</p>
         </div>
 
         <ion-list v-else>
