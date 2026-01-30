@@ -121,7 +121,22 @@ export default {
 
     // Start polling for incoming calls (fallback)
     this.startGlobalPolling();
+
+    // Check for incoming call if opened from tray notification
+    this.checkIncomingCallQuery();
   },
+  watch: {
+    '$route.query': {
+      handler(newQuery) {
+        if (newQuery && newQuery.incomingCall === '1') {
+          console.log('📡 Route query changed, checking for incoming call...');
+          this.checkIncomingCallQuery();
+        }
+      },
+      deep: true
+    }
+  },
+
   beforeUnmount() {
     this.stopGlobalPolling();
     this.cleanupSocketListeners();
@@ -244,6 +259,22 @@ export default {
           this.incomingCall(match);
         }
       } catch (_) {}
+    },
+
+    checkIncomingCallQuery() {
+      const q = this.$route && this.$route.query ? this.$route.query : {};
+      if (q.incomingCall === '1' && q.callId) {
+        console.log('🚀 App opened from call notification tray!');
+        this.otherUser = {
+          user_id: q.callerId || null,
+          username: q.caller || 'Incoming Call'
+        };
+        this.incomingCall({
+          call_id: q.callId,
+          caller_id: q.callerId,
+          media: q.media || 'voice'
+        });
+      }
     },
 
     incomingCall(match) {

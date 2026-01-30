@@ -6,31 +6,63 @@ self.addEventListener('push', function (event) {
     if (event.data) {
         try {
             data = event.data.json();
+            // FCM data is usually in data.data or data.notification
+            if (data.data) {
+                data = { ...data.notification, ...data.data };
+            }
         } catch (e) {
             data = { title: 'NexFi', body: event.data.text() };
         }
     }
 
+    const isCall = data.type === 'call';
+
     const options = {
-        body: data.body,
+        body: data.body || data.message || 'New update from NexFi',
         icon: '/favicon.png',
         badge: '/favicon.png',
-        vibrate: [300, 100, 300, 100, 300],
-        requireInteraction: true,
-        data: data.url || '/',
-        tag: data.tag || 'nexfi-push',
-        renotify: true
+        vibrate: isCall ? [500, 200, 500, 200, 500, 200, 500, 200, 500] : [300, 100, 300],
+        requireInteraction: isCall ? true : false,
+        data: data.click_action || data.url || '/',
+        tag: isCall ? 'nexfi-call' : (data.tag || 'nexfi-push'),
+        renotify: true,
+        actions: isCall ? [
+            { action: 'accept', title: '✅ Join Call', icon: '/favicon.png' },
+            { action: 'decline', title: '❌ Decline', icon: '/favicon.png' }
+        ] : []
     };
 
-    event.waitUntil(self.registration.showNotification(data.title, options));
+    event.waitUntil(self.registration.showNotification(data.title || 'NexFi', options));
 });
 
 self.addEventListener('notificationclick', function (event) {
-    console.log('[Service Worker] Notification click Received.');
+    console.log('[Service Worker] Notification click Received.', event.action);
     event.notification.close();
 
+    let targetUrl = event.notification.data || '/';
+
+    if (event.action === 'accept') {
+        // Ensure the URL has the necessary parameters to open the call overlay
+        if (!targetUrl.includes('incomingCall=1')) {
+            targetUrl += (targetUrl.includes('?') ? '&' : '?') + 'incomingCall=1';
+        }
+    } else if (event.action === 'decline') {
+        // Just close and do nothing else
+        return;
+    }
+
     event.waitUntil(
-        clients.openWindow(event.notification.data || '/')
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {
+            for (let i = 0; i < clientList.length; i++) {
+                let client = clientList[i];
+                if (client.url === targetUrl && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow(targetUrl);
+            }
+        })
     );
 });
 

@@ -15,8 +15,8 @@
       @pause="isPlaying = false"
     ></video>
     
-    <div class="mute-overlay" @click.stop="toggleMute">
-      <ion-icon :icon="isMuted ? volumeMuted : volumeHigh"></ion-icon>
+    <div class="mute-overlay" @click.stop="toggleMute" :class="{ 'is-muted': isMuted }">
+      <ion-icon :icon="isMuted ? volumeMute : volumeHigh"></ion-icon>
     </div>
     
     <div class="play-indicator" v-if="!isPlaying" @click="togglePlay">
@@ -49,7 +49,7 @@ export default {
       isPlaying: false,
       isMuted: true,
       volumeHigh,
-      volumeMute,
+      volumeMute, // Fixed: template used 'volumeMute' correctly but logic should ensure consistency
       play,
       pause,
       observer: null
@@ -125,42 +125,56 @@ export default {
   position: relative;
   width: 100%;
   background: #000;
-  border-radius: inherit;
+  border-radius: 12px;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  max-height: 500px;
-  background-color: #000;
+  max-height: 450px;
+  background-color: #0b0f14;
+  margin: 8px 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .video-player {
   width: 100%;
   height: auto;
-  max-height: 500px;
+  max-height: 450px;
   object-fit: contain;
   display: block;
 }
 
 .mute-overlay {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
-  background: rgba(0, 0, 0, 0.6);
+  bottom: 15px;
+  right: 15px;
+  background: rgba(0, 0, 0, 0.7);
   color: #fff;
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 10;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.mute-overlay:active {
+  transform: scale(0.9);
+  background: rgba(29, 155, 240, 0.8);
+}
+
+.mute-overlay.is-muted {
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .mute-overlay ion-icon {
-  font-size: 16px;
+  font-size: 20px;
 }
 
 .play-indicator {
@@ -173,24 +187,35 @@ export default {
   align-items: center;
   justify-content: center;
   z-index: 5;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.2);
   cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.video-container:hover .play-indicator {
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .play-button {
-  width: 50px;
-  height: 50px;
-  background: rgba(29, 155, 240, 0.9);
+  width: 60px;
+  height: 60px;
+  background: rgba(218, 165, 32, 0.95); /* Using NexFi Gold */
   color: #fff;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+  transform: scale(1);
+  transition: transform 0.2s ease;
+}
+
+.play-button:hover {
+  transform: scale(1.1);
 }
 
 .play-button ion-icon {
-  font-size: 24px;
-  margin-left: 2px;
+  font-size: 32px;
+  margin-left: 4px;
 }
 </style>

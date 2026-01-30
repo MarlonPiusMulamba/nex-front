@@ -2,6 +2,8 @@
 import axios from 'axios';
 import config from '../config/index.js';
 
+const VAPID_PUBLIC_KEY = 'BKeAX99jH-XjDDkA--WZ6aP4NcYsQuOXmDI-im79dro2QpT71knlK81rM-BsC8ncJ3udT0IdeapRALXVyzu8QdA';
+
 class NotificationService {
     constructor() {
         this.audio = null;
@@ -71,35 +73,52 @@ class NotificationService {
     async requestWebPermission() {
         try {
             console.log('🔔 Requesting notification permission...');
-            console.log('Current permission:', Notification.permission);
-
-            if (Notification.permission === 'granted') {
-                console.log('✅ Permission already granted');
-                const token = `web_${this.userId}_${Date.now()}`;
-                await this.registerToken(token, 'web');
-                return;
-            }
-
             const permission = await Notification.requestPermission();
             console.log('🔔 Permission result:', permission);
 
             if (permission === 'granted') {
-                console.log('✅ Permission granted! Registering token...');
-                const token = `web_${this.userId}_${Date.now()}`;
-                await this.registerToken(token, 'web');
+                const registration = await navigator.serviceWorker.ready;
 
-                // Test notification to confirm it works
-                console.log('🧪 Sending test notification...');
+                // Check if already subscribed
+                let subscription = await registration.pushManager.getSubscription();
+
+                if (!subscription) {
+                    console.log('📡 Creating new push subscription...');
+                    subscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: this.urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                    });
+                }
+
+                console.log('✅ Web Push Subscription obtained:', subscription);
+                // We send the entire subscription object as the token for Web Push
+                await this.registerToken(JSON.stringify(subscription), 'web');
+
                 this.showWebNotification(
                     'Notifications Enabled!',
-                    'You will now receive notifications for DMs, mentions, and more.'
+                    'You will now receive notifications for DMs, calls, and more in your system tray.'
                 );
             } else {
                 console.warn('⚠️ Notification permission denied');
             }
         } catch (error) {
-            console.error('❌ Error requesting notification permission:', error);
+            console.error('❌ Error requesting web notification permission:', error);
         }
+    }
+
+    urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+            .replace(/\-/g, '+')
+            .replace(/_/g, '/');
+
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
     }
 
     async initializeMobilePush() {
