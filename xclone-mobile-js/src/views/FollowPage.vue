@@ -192,10 +192,10 @@
 
             <div class="action-buttons">
               <ion-button 
-                fill="solid" 
+                fill="outline" 
                 size="small"
                 @click="sendMessage"
-                class="dm-btn">
+                class="message-btn">
                 <ion-icon :icon="mail" slot="start"></ion-icon>
                 Message
               </ion-button>
@@ -862,14 +862,49 @@ export default {
   margin: 12px 0;
 }
 
-.dm-btn, .follow-btn {
+.message-btn {
+  --background: transparent;
+  --color: #0f1419;
+  --border-color: #cfd9de;
+  --border-width: 1px;
+  --border-radius: 20px;
+  height: 36px;
+  font-weight: 700;
+  text-transform: none;
+  font-size: 14px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+  margin: 0;
+  flex: 1;
+}
+
+.message-btn:hover {
+  --background: rgba(0, 0, 0, 0.03);
+  --border-color: #bcc9d2;
+}
+
+.message-btn ion-icon {
+  font-size: 18px;
+  margin-right: 4px;
+}
+
+.follow-btn {
   flex: 1;
   height: 36px;
   font-weight: 700;
   --border-radius: 20px;
-  --background: linear-gradient(135deg, #daa520 0%, #ffd700 100%);
-  --color: #000;
+  --background: var(--ion-color-primary, #daa520);
+  --color: #ffffff;
   --border-width: 0;
+  box-shadow: 0 2px 8px rgba(218, 165, 32, 0.2);
+}
+
+.follow-btn[fill="outline"] {
+  --background: transparent;
+  --color: var(--ion-text-color, #1a1a1a);
+  --border-color: #cfd9de;
+  --border-width: 1px;
+  box-shadow: none;
 }
 
 .user-details {

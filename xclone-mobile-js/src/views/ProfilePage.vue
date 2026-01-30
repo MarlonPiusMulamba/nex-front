@@ -91,9 +91,11 @@
                 </ion-button>
                 <ion-button 
                   fill="outline" 
+                  size="small"
                   class="message-btn"
                   @click="openDirectMessage">
-                  <ion-icon :icon="mail"></ion-icon>
+                  <ion-icon :icon="mail" slot="start"></ion-icon>
+                  Message
                 </ion-button>
               </template>
             </div>
@@ -1016,36 +1018,32 @@ export default {
 
 .message-btn {
   --background: transparent;
-  --color: var(--ion-color-primary, #daa520);
-  --border-color: var(--ion-color-primary, #daa520);
+  --color: #0f1419;
+  --border-color: #cfd9de;
   --border-width: 1px;
-  --border-radius: 50%;
-  --padding-start: 0;
-  --padding-end: 0;
-  width: 36px;
+  --border-radius: 20px;
   height: 36px;
-  min-height: 36px;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-weight: 700;
+  text-transform: none;
+  font-size: 14px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  background: rgba(218, 165, 32, 0.02);
+  background: transparent;
+  margin: 0;
 }
 
 .message-btn:hover {
-  --background: rgba(218, 165, 32, 0.08);
-  transform: translateY(-1px);
+  --background: rgba(0, 0, 0, 0.03);
+  --border-color: #bcc9d2;
 }
 
 .message-btn:active {
-  --background: rgba(218, 165, 32, 0.15);
-  transform: scale(0.92);
+  --background: rgba(0, 0, 0, 0.08);
+  transform: scale(0.96);
 }
 
 .message-btn ion-icon {
-  font-size: 20px;
-  margin: 0;
+  font-size: 18px;
+  margin-right: 4px;
 }
 
 
@@ -1066,23 +1064,34 @@ export default {
 }
 
 .follow-btn {
-  --background: var(--ion-text-color, #0f1419);
-  --color: var(--ion-background-color, #fff);
+  --background: var(--ion-color-primary, #daa520);
+  --color: #ffffff;
   --border-width: 0;
+  box-shadow: 0 2px 8px rgba(218, 165, 32, 0.2);
+}
+
+.follow-btn:hover {
+  --background: var(--ion-color-primary-tint, #deae36);
+  box-shadow: 0 4px 12px rgba(218, 165, 32, 0.3);
 }
 
 .unfollow-btn {
   --background: transparent;
-  --color: var(--ion-text-color, #0f1419);
-  --border-color: var(--ion-border-color, #eff3f4);
+  --color: var(--ion-text-color, #1a1a1a);
+  --border-color: #cfd9de;
   --border-width: 1px;
 }
 
 .edit-profile-btn {
   --background: transparent;
-  --color: var(--ion-text-color, #0f1419);
-  --border-color: var(--ion-border-color, #eff3f4);
+  --color: var(--ion-text-color, #1a1a1a);
+  --border-color: #cfd9de;
   --border-width: 1px;
+}
+
+.edit-profile-btn:hover, .unfollow-btn:hover {
+  --background: rgba(0, 0, 0, 0.03);
+  --border-color: #bcc9d2;
 }
 
 .edit-cover {
