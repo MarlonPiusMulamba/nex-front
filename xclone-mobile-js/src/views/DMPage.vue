@@ -791,6 +791,21 @@ export default {
       this.autoOpenFromQuery();
     });
   },
+  ionViewDidEnter() {
+    console.log('✅ DMPage ionViewDidEnter');
+    this.autoOpenFromQuery();
+  },
+  watch: {
+    '$route.query': {
+      handler(newQuery) {
+        if (newQuery && (newQuery.userId || newQuery.username)) {
+          console.log('📡 Route query changed, auto-opening chat...', newQuery);
+          this.autoOpenFromQuery();
+        }
+      },
+      deep: true
+    }
+  },
   beforeUnmount() {
     try {
       const socket = this.$socket;

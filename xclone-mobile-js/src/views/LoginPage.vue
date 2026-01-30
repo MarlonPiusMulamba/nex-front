@@ -12,7 +12,6 @@
         <!-- Login Card -->
         <div class="login-card">
           <div class="card-header">
-            <h2 class="card-title">Welcome back</h2>
             <p class="card-subtitle">Sign in to continue</p>
           </div>
 
@@ -94,7 +93,7 @@
 
         <!-- Footer -->
         <div class="footer-section">
-          <p class="footer-text">© 2025 NexFi. All rights reserved.</p>
+          <p class="footer-text">© 2026 NexFi. All rights reserved.</p>
         </div>
       </div>
     </ion-content>

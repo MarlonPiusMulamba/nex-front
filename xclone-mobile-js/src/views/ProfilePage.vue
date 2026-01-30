@@ -89,6 +89,14 @@
                   <ion-spinner v-if="followLoading" name="crescent"></ion-spinner>
                   <template v-else>Unfollow</template>
                 </ion-button>
+                <ion-button 
+                  fill="outline" 
+                  size="small" 
+                  class="message-btn"
+                  @click="openDirectMessage">
+                  <ion-icon :icon="mail" slot="start"></ion-icon>
+                  Message
+                </ion-button>
               </template>
             </div>
           </div>
@@ -820,6 +828,19 @@ export default {
       }
     },
 
+    openDirectMessage() {
+      if (!this.profile) return;
+      
+      // Navigate to DM page with query parameters for the profile user
+      this.$router.push({
+        path: '/tabs/dm',
+        query: {
+          userId: this.profile.user_id,
+          username: this.profile.username
+        }
+      });
+    },
+
     showFollowing() {
       console.log('Show following list');
       // TODO: Navigate to following list
@@ -987,6 +1008,18 @@ export default {
   border-radius: 50%;
   background: var(--ion-background-color, #fff);
 }
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.message-btn {
+  --border-color: var(--ion-color-medium, #cfd9de);
+  --color: var(--ion-text-color, #0f1419);
+}
+
 
 .profile-avatar {
   width: 120px;
