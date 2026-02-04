@@ -140,6 +140,27 @@ class NotificationService {
             const permResult = await PushNotifications.requestPermissions();
 
             if (permResult.receive === 'granted') {
+                // Create Notification Channels (Android)
+                await PushNotifications.createChannel({
+                    id: 'calls',
+                    name: 'Incoming Calls',
+                    description: 'Notifications for incoming video and voice calls',
+                    importance: 5, // 5 = High (make sound and pop up)
+                    visibility: 1, // 1 = Public
+                    sound: 'msg_ton.mp3', // Using the custom sound file
+                    vibration: true
+                });
+
+                await PushNotifications.createChannel({
+                    id: 'messages',
+                    name: 'Messages',
+                    description: 'Notifications for new messages',
+                    importance: 4, // 4 = Default (make sound)
+                    visibility: 1,
+                    sound: 'msg_ton.mp3',
+                    vibration: true
+                });
+                
                 // Register with FCM/APNs
                 await PushNotifications.register();
 
