@@ -825,7 +825,7 @@ export default {
       detailPost: null,
       showMediaModal: false,
       mediaSrc: '',
-      // Comments state
+      // Comments section
       showCommentsModal: false,
       comments: [],
       loadingComments: false,
