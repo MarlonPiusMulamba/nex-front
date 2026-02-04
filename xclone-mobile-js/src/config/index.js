@@ -34,12 +34,12 @@ const config = {
       }
       // Priority 3: For Capacitor apps, always use production backend
       else if (isNative) {
-        apiUrl = 'https://nexback.pythonanywhere.com';
+        apiUrl = 'https://nexxback.pythonanywhere.com';
         console.log('📱 Capacitor app detected, using production backend');
       }
       // Priority 4: Default to production backend
       else {
-        apiUrl = 'https://nexback.pythonanywhere.com';
+        apiUrl = 'https://nexxback.pythonanywhere.com';
         console.log('🌐 Using production backend');
       }
 
