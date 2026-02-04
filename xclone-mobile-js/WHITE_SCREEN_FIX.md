@@ -88,7 +88,7 @@ npm run dev
 ### 8. Check Environment Variables
 Make sure `.env` file exists with:
 ```
-VITE_API_URL=https://nexback.pythonanywhere.com
+VITE_API_URL=https://nexxback.pythonanywhere.com
 VITE_APP_TITLE=NexFi
 VITE_DEV_MODE=true
 ```
