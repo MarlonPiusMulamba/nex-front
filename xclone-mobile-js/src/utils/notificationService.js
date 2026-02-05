@@ -1,6 +1,7 @@
-// Notification Service for Web and Mobile Push Notifications
 import axios from 'axios';
 import config from '../config/index.js';
+// We will dynamically import firebaseConfig to avoid build errors if file is missing, 
+// but usually it's better to catch it in the method.
 
 const VAPID_PUBLIC_KEY = 'BKeAX99jH-XjDDkA--WZ6aP4NcYsQuOXmDI-im79dro2QpT71knlK81rM-BsC8ncJ3udT0IdeapRALXVyzu8QdA';
 
@@ -42,7 +43,11 @@ class NotificationService {
 
         if (typeof window !== 'undefined' && 'Notification' in window) {
             await this.requestWebPermission();
-            this.registerServiceWorker();
+            // This part is crucial for FCM. It needs a service worker to handle messages.
+            // The Firebase SDK will automatically register its own 'firebase-messaging-sw.js'
+            // or use an existing one if configured correctly.
+            // You might not need to call registerServiceWorker() directly here if Firebase handles it.
+            // However, if you have custom logic in sw.js that needs to run, keep it.
         } else if (typeof window !== 'undefined' && !isSecure) {
             console.warn('⚠️ Notifications disabled because this is not a secure context (HTTPS required)');
         }
@@ -59,6 +64,7 @@ class NotificationService {
         this.isInitialized = true;
     }
 
+    // Keep this if you have custom service worker logic, otherwise Firebase will manage its own.
     async registerServiceWorker() {
         if ('serviceWorker' in navigator) {
             try {
@@ -77,77 +83,61 @@ class NotificationService {
             console.log('🔔 Permission result:', permission);
 
             if (permission === 'granted') {
-                // Import Firebase dynamically to avoid build errors if not installed
-                // Note: user must 'npm install firebase'
                 try {
+                    // Dynamically import Firebase SDK components
                     const { initializeApp } = await import('firebase/app');
                     const { getMessaging, getToken } = await import('firebase/messaging');
 
-                    // Initialize Firebase (using config from a separate file or inline)
-                    // We need the firebase config here. 
-                    // Assuming standard config structure or minimal config for messaging
-                    // If config/index.js doesn't have firebase config, we might need it.
-                    // For now, I'll attempt to use the VAPID key mechanism which is primary for tokens
+                    // Import your Firebase config
+                    const { firebaseConfig } = await import('../config/firebase.js');
 
-                    const firebaseConfig = {
-                        apiKey: "dummy-api-key-replace-me", // The SDK needs a config, even if minimal
-                        authDomain: "nexfi-app.firebaseapp.com",
-                        projectId: "nexfi-app",
-                        storageBucket: "nexfi-app.appspot.com",
-                        messagingSenderId: "1234567890", // Replace with real one if available
-                        appId: "1:1234567890:web:abcdef"
-                    };
+                    if (firebaseConfig.apiKey === "YOUR_API_KEY_HERE") {
+                        console.warn('⚠️ Firebase Config not set in src/config/firebase.js. PWA notifications may fail.');
+                        // If config is not set, we cannot initialize Firebase, so return.
+                        return;
+                    }
 
-                    // Ideally, we should pull this from a config file.
-                    // For now, since I don't see a firebase config file in the file list, 
-                    // I will revert to a specific strategy:
-                    // The user MUST provide the Firebase Config.
-                    // However, for correct FCM operation, I'll stick to the raw PushManager logic BUT
-                    // I will format the backend to accept it OR I will ask the user to provide the config.
+                    // Initialize Firebase App
+                    const app = initializeApp(firebaseConfig);
+                    const messaging = getMessaging(app);
 
-                    // WAIT. If I can't get the firebase config, I can't use the SDK.
-                    // Let's stick to the raw PushManager approach but fix the Backend to handle it?
-                    // NO, backend changes are safer.
-                    // Let's try to stick to existing logical structure but fix the TOKEN format.
+                    // Get FCM registration token
+                    // The VAPID_PUBLIC_KEY is essential here for FCM to work correctly.
+                    // It should match the key configured in your Firebase project settings -> Cloud Messaging tab.
+                    const currentToken = await getToken(messaging, { vapidKey: VAPID_PUBLIC_KEY });
 
-                    // ACTUALLY, checking the 'sw.js', the payload parsing handles { notification, data }.
-                    // This suggests the previous dev integrated with FCM effectively.
-                    // The 'VAPID_PUBLIC_KEY' is likely the specific one for that project.
-                    // If I use 'pushManager', I get a standard Web Push subscription.
-                    // I can send this to the backend.
-                    // Backend using 'firebase_admin' CANNOT send to this.
+                    if (currentToken) {
+                        console.log('✅ FCM Registration Token obtained:', currentToken);
+                        // Register this FCM token with your backend
+                        await this.registerToken(currentToken, 'fcm-web'); // Changed deviceType to 'fcm-web'
 
-                    // OK, I will Assume the previous code was NEVER working for PWA notifications via Firebase.
+                        this.showWebNotification(
+                            'Notifications Enabled!',
+                            'You will now receive notifications for DMs, calls, and more.'
+                        );
+                    } else {
+                        console.warn('⚠️ No FCM registration token available. Request permission to generate one.');
+                    }
 
-                } catch (e) {
-                    console.log('Firebase SDK not found, falling back to raw push');
+                } catch (error) {
+                    console.error('❌ Error getting FCM token or initializing Firebase:', error);
+                    // Fallback to standard web push if FCM fails, or handle the error appropriately
+                    console.log('Falling back to raw Web Push subscription (FCM preferred)');
+                    const registration = await navigator.serviceWorker.ready;
+                    let subscription = await registration.pushManager.getSubscription();
+
+                    if (!subscription) {
+                        console.log('📡 Creating new push subscription via PushManager...');
+                        subscription = await registration.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: this.urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                        });
+                    }
+                    console.log('✅ Web Push Subscription obtained:', subscription);
+                    const subJson = JSON.stringify(subscription);
+                    await this.registerToken(subJson, 'web-push');
                 }
 
-                const registration = await navigator.serviceWorker.ready;
-
-                // Check if already subscribed
-                let subscription = await registration.pushManager.getSubscription();
-
-                if (!subscription) {
-                    console.log('📡 Creating new push subscription...');
-                    subscription = await registration.pushManager.subscribe({
-                        userVisibleOnly: true,
-                        applicationServerKey: this.urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-                    });
-                }
-
-                console.log('✅ Web Push Subscription obtained:', subscription);
-                // Serialize explicitly
-                const subJson = JSON.stringify(subscription);
-
-                // Register. Note: If backend expects FCM token, this will fail on sending.
-                // We will add a 'type' param to the register API so backend knows it's 'web-push' vs 'fcm-mobile'
-                await this.registerToken(subJson, 'web');
-
-                this.showWebNotification(
-                    'Notifications Enabled!',
-                    'You will now receive notifications for DMs, calls, and more.'
-                );
             } else {
                 console.warn('⚠️ Notification permission denied');
             }
@@ -172,6 +162,7 @@ class NotificationService {
     }
 
     async initializeMobilePush() {
+        // ... (rest of your initializeMobilePush method remains the same)
         try {
             // Only load if Capacitor plugins are available
             let PushNotifications;
@@ -217,7 +208,7 @@ class NotificationService {
                 // Listen for registration
                 PushNotifications.addListener('registration', async (token) => {
                     console.log('Push registration success, token:', token.value);
-                    await this.registerToken(token.value, 'mobile');
+                    await this.registerToken(token.value, 'fcm-mobile'); // Changed deviceType to 'fcm-mobile'
                 });
 
                 // Listen for registration errors
