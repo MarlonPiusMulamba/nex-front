@@ -83,41 +83,41 @@ app.config.warnHandler = (msg, instance, trace) => {
 // Make config available globally
 app.config.globalProperties.$config = config;
 
-// Global Socket.IO client (DM + feed realtime)
+// Global Socket.IO client (DM + feed realtime + presence tracking)
+import socketService from './utils/socketService.js';
+
 try {
   const socketBaseUrl = config?.api?.baseURL || import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5000`;
   const isPythonAnywhere = /pythonanywhere\.com/i.test(socketBaseUrl);
   const enableSocketIo = String(import.meta.env.VITE_ENABLE_SOCKETIO || '').toLowerCase() === 'true';
+
   if (isPythonAnywhere && !enableSocketIo) {
     console.log('ℹ️ Socket.IO disabled for PythonAnywhere. Set VITE_ENABLE_SOCKETIO=true to force-enable.');
     throw new Error('Socket.IO disabled for PythonAnywhere');
   }
-  const isCapacitor = window.location?.protocol === 'capacitor:' || typeof window.Capacitor !== 'undefined';
-  const preferPolling = isPythonAnywhere || isCapacitor;
 
-  const socket = io(socketBaseUrl, {
-    transports: preferPolling ? ['polling'] : ['websocket', 'polling'],
-    upgrade: !preferPolling,
-    autoConnect: true,
-    withCredentials: true
-  });
+  // Make socket service available globally
+  app.config.globalProperties.$socketService = socketService;
+  window.socketService = socketService;
 
-  app.config.globalProperties.$socket = socket;
+  // Auto-connect if user is logged in
+  const userId = localStorage.getItem('userId');
+  if (userId) {
+    socketService.connect(userId);
+  }
 
-  const tryJoin = () => {
-    const userId = localStorage.getItem('userId');
-    if (userId) socket.emit('join', { user_id: userId });
-  };
-
-  socket.on('connect', () => {
-    tryJoin();
-  });
-
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'userId') {
-      tryJoin();
+  // Listen for login events to connect socket
+  window.addEventListener('user:login', (event) => {
+    if (event.detail && event.detail.userId) {
+      socketService.connect(event.detail.userId);
     }
   });
+
+  // Listen for logout events to disconnect socket
+  window.addEventListener('user:logout', () => {
+    socketService.disconnect();
+  });
+
 } catch (e) {
   console.error('❌ Socket init failed:', e);
 }

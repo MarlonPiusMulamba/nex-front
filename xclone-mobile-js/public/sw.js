@@ -5,17 +5,33 @@ self.addEventListener('push', function (event) {
 
     if (event.data) {
         try {
-            data = event.data.json();
-            // FCM data is usually in data.data or data.notification
-            if (data.data) {
-                data = { ...data.notification, ...data.data };
+            const payload = event.data.json();
+            console.log('[Service Worker] Push payload:', payload);
+
+            // FCM sends data in different formats
+            // Format 1: { notification: {...}, data: {...} }
+            // Format 2: { data: {...} } (data-only message)
+            if (payload.notification) {
+                data.title = payload.notification.title || data.title;
+                data.body = payload.notification.body || data.body;
+            }
+
+            if (payload.data) {
+                // Merge data fields
+                data = { ...data, ...payload.data };
+
+                // If title/body are in data, use them
+                if (payload.data.title) data.title = payload.data.title;
+                if (payload.data.body) data.body = payload.data.body;
             }
         } catch (e) {
+            console.error('[Service Worker] Failed to parse push data:', e);
             data = { title: 'NexFi', body: event.data.text() };
         }
     }
 
     const isCall = data.type === 'call';
+    const isMissedCall = data.type === 'missed_call';
 
     const options = {
         body: data.body || data.message || 'New update from NexFi',
@@ -24,7 +40,7 @@ self.addEventListener('push', function (event) {
         vibrate: isCall ? [500, 200, 500, 200, 500, 200, 500, 200, 500] : [300, 100, 300],
         requireInteraction: isCall ? true : false,
         data: data.click_action || data.url || '/',
-        tag: isCall ? 'nexfi-call' : (data.tag || 'nexfi-push'),
+        tag: isCall ? 'nexfi-call' : (isMissedCall ? 'nexfi-missed-call' : (data.tag || 'nexfi-push')),
         renotify: true,
         actions: isCall ? [
             { action: 'accept', title: '✅ Join Call', icon: '/favicon.png' },
