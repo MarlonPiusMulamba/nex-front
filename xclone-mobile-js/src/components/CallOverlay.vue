@@ -124,6 +124,9 @@ export default {
 
     // Check for incoming call if opened from tray notification
     this.checkIncomingCallQuery();
+
+    // Listen for global stop-ringtone event
+    window.addEventListener('stop-ringtone',  this.stopRingtone);
   },
   watch: {
     '$route.query': {

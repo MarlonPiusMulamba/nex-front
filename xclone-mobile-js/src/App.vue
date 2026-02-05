@@ -100,6 +100,27 @@ export default {
     } catch (_) {}
     this.applyTheme(saved === 'dark' ? 'dark' : 'light');
 
+    // Service Worker Message Listener for Background Actions
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        console.log('📨 Received message from SW:', event.data);
+        if (event.data && event.data.type === 'PLAY_RINGTONE') {
+           // We can trigger the CallOverlay to play sound via a global event bus or direct access
+           // For now, let's use a simpler approach: check if CallOverlay is active
+           // Ideally, CallOverlay should pick this up via the 'incomingCall' query param check logic, 
+           // but early ringtone playback helps.
+           // However, iOS/Chrome might block audio without user interaction.
+           // We will rely on the notification sound itself for the first alert, 
+           // and this listener effectively pre-warms the app logic if it was in background (but running).
+           console.log('🔔 SW says PLAY RINGTONE');
+        } else if (event.data && event.data.type === 'STOP_RINGTONE') {
+           console.log('🔕 SW says STOP RINGTONE');
+           // Dispatch event to stop ringtone in components
+           window.dispatchEvent(new CustomEvent('stop-ringtone'));
+        }
+      });
+    }
+
     // Network status listeners
     window.addEventListener('online', this.updateOnlineStatus);
     window.addEventListener('offline', this.updateOnlineStatus);

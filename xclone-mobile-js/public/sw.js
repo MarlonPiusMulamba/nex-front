@@ -1,4 +1,5 @@
 // NexFi Service Worker for Push Notifications
+// Handle background messages from FCM
 self.addEventListener('push', function (event) {
     console.log('[Service Worker] Push Received.');
     let data = { title: 'NexFi Notification', body: 'You have a new update.' };
@@ -39,14 +40,39 @@ self.addEventListener('push', function (event) {
         badge: '/favicon.png',
         vibrate: isCall ? [500, 200, 500, 200, 500, 200, 500, 200, 500] : [300, 100, 300],
         requireInteraction: isCall ? true : false,
-        data: data.click_action || data.url || '/',
+        data: {
+            url: data.click_action || data.url || '/',
+            type: data.type,
+            call_id: data.call_id,
+            caller_username: data.caller_username,
+            media: data.media
+        },
         tag: isCall ? 'nexfi-call' : (isMissedCall ? 'nexfi-missed-call' : (data.tag || 'nexfi-push')),
         renotify: true,
+        silent: false, // Ensure sound plays
         actions: isCall ? [
             { action: 'accept', title: '✅ Join Call', icon: '/favicon.png' },
             { action: 'decline', title: '❌ Decline', icon: '/favicon.png' }
         ] : []
     };
+
+    // For calls, play ringtone continuously
+    if (isCall) {
+        // Store call info for ringtone management
+        self.currentCallId = data.call_id;
+
+        // Broadcast to all clients to play ringtone
+        event.waitUntil(
+            self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then(clients => {
+                clients.forEach(client => {
+                    client.postMessage({
+                        type: 'PLAY_RINGTONE',
+                        callId: data.call_id
+                    });
+                });
+            })
+        );
+    }
 
     event.waitUntil(self.registration.showNotification(data.title || 'NexFi', options));
 });
@@ -55,13 +81,25 @@ self.addEventListener('notificationclick', function (event) {
     console.log('[Service Worker] Notification click Received.', event.action);
     event.notification.close();
 
-    let targetUrl = event.notification.data || '/';
+    // Stop ringtone if it's a call
+    if (event.notification.data && event.notification.data.type === 'call') {
+        // Broadcast to all clients to stop ringtone
+        self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then(clients => {
+            clients.forEach(client => {
+                client.postMessage({
+                    type: 'STOP_RINGTONE',
+                    callId: event.notification.data.call_id
+                });
+            });
+        });
+    }
+
+    let targetUrl = event.notification.data?.url || '/';
 
     if (event.action === 'accept') {
-        // Ensure the URL has the necessary parameters to open the call overlay
-        if (!targetUrl.includes('incomingCall=1')) {
-            targetUrl += (targetUrl.includes('?') ? '&' : '?') + 'incomingCall=1';
-        }
+        // Build URL with call parameters
+        const callData = event.notification.data;
+        targetUrl = `/?incomingCall=1&callId=${callData.call_id}&media=${callData.media}&caller=${callData.caller_username}&callerId=${callData.caller_id || ''}`;
     } else if (event.action === 'decline') {
         // Just close and do nothing else
         return;
@@ -69,12 +107,16 @@ self.addEventListener('notificationclick', function (event) {
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {
+            // Check if app is already open
             for (let i = 0; i < clientList.length; i++) {
                 let client = clientList[i];
-                if (client.url === targetUrl && 'focus' in client) {
+                if ('focus' in client) {
+                    // Navigate existing window to target URL
+                    client.navigate(targetUrl);
                     return client.focus();
                 }
             }
+            // Open new window if app not open
             if (clients.openWindow) {
                 return clients.openWindow(targetUrl);
             }

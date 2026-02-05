@@ -19,6 +19,7 @@
     "android": "^0.0.8",
     "axios": "^1.13.2",
     "dexie": "^4.2.1",
+    "firebase": "^10.8.0",
     "ionicons": "^8.0.13",
     "socket.io-client": "^4.7.5",
     "vue": "^3.2.13",
