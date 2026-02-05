@@ -49,9 +49,9 @@
             </div>
 
             <!-- Forgot Password -->
-            <!-- <div class="forgot-password">
-              <a href="#" class="forgot-link">Forgot password?</a>
-            </div> -->
+            <div class="forgot-password">
+              <a @click="showForgotPasswordModal = true" class="forgot-link">Forgot password?</a>
+            </div>
 
             <!-- Login Button -->
             <ion-button
@@ -97,6 +97,137 @@
         </div>
       </div>
     </ion-content>
+
+    <!-- Forgot Password Modal -->
+    <ion-modal :is-open="showForgotPasswordModal" @did-dismiss="closeForgotPasswordModal">
+      <ion-header>
+        <ion-toolbar>
+          <ion-buttons slot="start">
+            <ion-button @click="closeForgotPasswordModal">Cancel</ion-button>
+          </ion-buttons>
+          <ion-title>Reset Password</ion-title>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <!-- Step 1: Email Input -->
+        <div v-if="resetStep === 1" class="reset-step">
+          <h2>Enter Your Email</h2>
+          <p>We'll send you a 6-digit code to reset your password.</p>
+          
+          <div class="input-group">
+            <div class="input-wrapper">
+              <ion-icon :icon="mailOutline" class="input-icon"></ion-icon>
+              <ion-input
+                v-model="resetEmail"
+                type="email"
+                placeholder="Email address"
+                class="custom-input"
+                :clear-input="true"
+              ></ion-input>
+            </div>
+          </div>
+
+          <ion-button
+            expand="block"
+            @click="sendOTP"
+            :disabled="isResetting || !resetEmail"
+            class="reset-button"
+          >
+            <ion-spinner v-if="isResetting" name="crescent"></ion-spinner>
+            <span v-else>Send Code</span>
+          </ion-button>
+        </div>
+
+        <!-- Step 2: OTP Verification -->
+        <div v-if="resetStep === 2" class="reset-step">
+          <h2>Enter Verification Code</h2>
+          <p>We sent a 6-digit code to <strong>{{ resetEmail }}</strong></p>
+          
+          <div class="input-group">
+            <div class="input-wrapper">
+              <ion-icon :icon="keyOutline" class="input-icon"></ion-icon>
+              <ion-input
+                v-model="resetOTP"
+                type="text"
+                inputmode="numeric"
+                maxlength="6"
+                placeholder="000000"
+                class="custom-input otp-input"
+              ></ion-input>
+            </div>
+          </div>
+
+          <ion-button
+            expand="block"
+            @click="verifyOTP"
+            :disabled="isResetting || resetOTP.length !== 6"
+            class="reset-button"
+          >
+            <ion-spinner v-if="isResetting" name="crescent"></ion-spinner>
+            <span v-else>Verify Code</span>
+          </ion-button>
+
+          <ion-button
+            expand="block"
+            fill="clear"
+            @click="resetStep = 1; resetOTP = ''"
+            class="back-button"
+          >
+            Back to Email
+          </ion-button>
+        </div>
+
+        <!-- Step 3: New Password -->
+        <div v-if="resetStep === 3" class="reset-step">
+          <h2>Create New Password</h2>
+          <p>Enter your new password below.</p>
+          
+          <div class="input-group">
+            <div class="input-wrapper">
+              <ion-icon :icon="lockClosedOutline" class="input-icon"></ion-icon>
+              <ion-input
+                v-model="newPassword"
+                :type="showNewPassword ? 'text' : 'password'"
+                placeholder="New password"
+                class="custom-input"
+              ></ion-input>
+              <ion-icon
+                :icon="showNewPassword ? eyeOffOutline : eyeOutline"
+                class="toggle-password"
+                @click="showNewPassword = !showNewPassword"
+              ></ion-icon>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <div class="input-wrapper">
+              <ion-icon :icon="lockClosedOutline" class="input-icon"></ion-icon>
+              <ion-input
+                v-model="confirmPassword"
+                :type="showConfirmPassword ? 'text' : 'password'"
+                placeholder="Confirm password"
+                class="custom-input"
+              ></ion-input>
+              <ion-icon
+                :icon="showConfirmPassword ? eyeOffOutline : eyeOutline"
+                class="toggle-password"
+                @click="showConfirmPassword = !showConfirmPassword"
+              ></ion-icon>
+            </div>
+          </div>
+
+          <ion-button
+            expand="block"
+            @click="resetPassword"
+            :disabled="isResetting || !newPassword || newPassword !== confirmPassword"
+            class="reset-button"
+          >
+            <ion-spinner v-if="isResetting" name="crescent"></ion-spinner>
+            <span v-else>Reset Password</span>
+          </ion-button>
+        </div>
+      </ion-content>
+    </ion-modal>
   </ion-page>
 </template>
 
@@ -108,7 +239,12 @@ import {
   IonInput,
   IonButton,
   IonIcon,
-  IonSpinner
+  IonSpinner,
+  IonModal,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons
 } from '@ionic/vue';
 import {
   flash,
@@ -117,7 +253,9 @@ import {
   eyeOutline,
   eyeOffOutline,
   logoGoogle,
-  logoApple
+  logoApple,
+  mailOutline,
+  keyOutline
 } from 'ionicons/icons';
 import api from '@/utils/api';
 
@@ -129,7 +267,12 @@ export default {
     IonInput,
     IonButton,
     IonIcon,
-    IonSpinner
+    IonSpinner,
+    IonModal,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonButtons
   },
   async mounted() {
     console.log('Testing API connection...');
@@ -146,13 +289,26 @@ export default {
       password: '',
       showPassword: false,
       isLoading: false,
+      // Forgot password
+      showForgotPasswordModal: false,
+      resetStep: 1,
+      resetEmail: '',
+      resetOTP: '',
+      newPassword: '',
+      confirmPassword: '',
+      showNewPassword: false,
+      showConfirmPassword: false,
+      isResetting: false,
+      // Icons
       flash,
       personOutline,
       lockClosedOutline,
       eyeOutline,
       eyeOffOutline,
       logoGoogle,
-      logoApple
+      logoApple,
+      mailOutline,
+      keyOutline
     };
   },
   methods: {
@@ -210,6 +366,108 @@ export default {
       const button = document.querySelector('.login-button');
       if (button) {
         button.classList.add('success-animation');
+      }
+    },
+
+    // Forgot Password Methods
+    closeForgotPasswordModal() {
+      this.showForgotPasswordModal = false;
+      this.resetStep = 1;
+      this.resetEmail = '';
+      this.resetOTP = '';
+      this.newPassword = '';
+      this.confirmPassword = '';
+      this.showNewPassword = false;
+      this.showConfirmPassword = false;
+    },
+
+    async sendOTP() {
+      if (!this.resetEmail) {
+        this.showAlert('Please enter your email address');
+        return;
+      }
+
+      this.isResetting = true;
+      try {
+        const response = await api.post('/api/auth/forgot-password', {
+          email: this.resetEmail
+        });
+
+        if (response.success) {
+          this.resetStep = 2;
+          this.showAlert('A verification code has been sent to your email');
+        } else {
+          this.showAlert(response.message || 'Failed to send code');
+        }
+      } catch (error) {
+        console.error('Send OTP error:', error);
+        this.showAlert('Failed to send verification code. Please try again.');
+      } finally {
+        this.isResetting = false;
+      }
+    },
+
+    async verifyOTP() {
+      if (this.resetOTP.length !== 6) {
+        this.showAlert('Please enter the 6-digit code');
+        return;
+      }
+
+      this.isResetting = true;
+      try {
+        const response = await api.post('/api/auth/verify-otp', {
+          email: this.resetEmail,
+          otp: this.resetOTP
+        });
+
+        if (response.success) {
+          this.resetStep = 3;
+        } else {
+          this.showAlert(response.message || 'Invalid or expired code');
+        }
+      } catch (error) {
+        console.error('Verify OTP error:', error);
+        this.showAlert(error.response?.data?.message || 'Invalid or expired code');
+      } finally {
+        this.isResetting = false;
+      }
+    },
+
+    async resetPassword() {
+      if (!this.newPassword || !this.confirmPassword) {
+        this.showAlert('Please enter and confirm your new password');
+        return;
+      }
+
+      if (this.newPassword !== this.confirmPassword) {
+        this.showAlert('Passwords do not match');
+        return;
+      }
+
+      if (this.newPassword.length < 6) {
+        this.showAlert('Password must be at least 6 characters');
+        return;
+      }
+
+      this.isResetting = true;
+      try {
+        const response = await api.post('/api/auth/reset-password', {
+          email: this.resetEmail,
+          otp: this.resetOTP,
+          new_password: this.newPassword
+        });
+
+        if (response.success) {
+          this.showAlert('Password reset successful! You can now login with your new password.');
+          this.closeForgotPasswordModal();
+        } else {
+          this.showAlert(response.message || 'Failed to reset password');
+        }
+      } catch (error) {
+        console.error('Reset password error:', error);
+        this.showAlert(error.response?.data?.message || 'Failed to reset password. Please try again.');
+      } finally {
+        this.isResetting = false;
       }
     }
   }
@@ -659,6 +917,62 @@ export default {
 
   .footer-text {
     color: #666666;
+  }
+}
+
+/* Forgot Password Modal Styles */
+.reset-step {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.reset-step h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #000;
+  margin: 0 0 12px;
+  text-align: center;
+}
+
+.reset-step p {
+  font-size: 15px;
+  color: #666;
+  margin: 0 0 32px;
+  text-align: center;
+}
+
+.reset-button {
+  --background: linear-gradient(135deg, #daa520 0%, #ffd700 100%);
+  --background-hover: #ffd700;
+  --border-radius: 12px;
+  --box-shadow: 0 4px 12px rgba(218, 165, 32, 0.2);
+  --color: #000;
+  height: 52px;
+  font-size: 16px;
+  font-weight: 600;
+  text-transform: none;
+  margin-top: 8px;
+}
+
+.back-button {
+  --color: #666;
+  margin-top: 8px;
+}
+
+.otp-input {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .reset-step h2 {
+    color: #fff;
+  }
+  
+  .reset-step p {
+    color: #999;
   }
 }
 </style>
