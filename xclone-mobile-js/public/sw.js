@@ -49,7 +49,8 @@ self.addEventListener('push', function (event) {
         },
         tag: isCall ? 'nexfi-call' : (isMissedCall ? 'nexfi-missed-call' : (data.tag || 'nexfi-push')),
         renotify: true,
-        silent: false, // Ensure sound plays
+        silent: false,
+        sound: isCall ? '/call-ton.mp3' : '/notification.mp3', // Try to play custom sound
         actions: isCall ? [
             { action: 'accept', title: '✅ Join Call', icon: '/favicon.png' },
             { action: 'decline', title: '❌ Decline', icon: '/favicon.png' }

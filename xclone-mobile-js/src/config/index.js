@@ -29,8 +29,8 @@ const config = {
       }
       // Priority 2: For local development, use local backend if available (localhost:5000)
       else if (isPageLocal) {
-        apiUrl = `http://${pageHost}:5000`;
-        console.log('💻 Local development detected, using local backend defaults');
+        apiUrl = ''; // Use relative path so Vite proxy handles it
+        console.log('💻 Local development detected, using Vite Proxy');
       }
       // Priority 3: For Capacitor apps, always use production backend
       else if (isNative) {
