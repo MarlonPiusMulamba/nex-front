@@ -42,6 +42,14 @@ class NotificationService {
         console.log('📢 Notification Supported:', (typeof window !== 'undefined' && 'Notification' in window));
 
         if (typeof window !== 'undefined' && 'Notification' in window) {
+            // Check if we have an old legacy token (JSON format) and clear it to force re-registration
+            const storedToken = localStorage.getItem('fcm_token');
+            if (storedToken && storedToken.trim().startsWith('{')) {
+                console.log('🧹 Clearing legacy Web Push token to force FCM upgrade');
+                localStorage.removeItem('fcm_token');
+                localStorage.removeItem('fcm_token_sent');
+            }
+
             await this.requestWebPermission();
             // This part is crucial for FCM. It needs a service worker to handle messages.
             // The Firebase SDK will automatically register its own 'firebase-messaging-sw.js'
