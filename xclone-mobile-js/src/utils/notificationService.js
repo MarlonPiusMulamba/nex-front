@@ -3,7 +3,7 @@ import config from '../config/index.js';
 // We will dynamically import firebaseConfig to avoid build errors if file is missing, 
 // but usually it's better to catch it in the method.
 
-const VAPID_PUBLIC_KEY = 'BKeAX99jH-XjDDkA--WZ6aP4NcYsQuOXmDI-im79dro2QpT71knlK81rM-BsC8ncJ3udT0IdeapRALXVyzu8QdA';
+const VAPID_PUBLIC_KEY = 'BM4kNY416wmRy8ScGUy04HoAhqv_daS-_atWTLNC0T9GhKJy0SmQxTz8o6zpckex1NW-oSf4I6WWhavRNdZOUNU';
 
 class NotificationService {
     constructor() {
