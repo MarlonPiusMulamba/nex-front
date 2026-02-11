@@ -94,56 +94,131 @@ class NotificationService {
                 try {
                     // Dynamically import Firebase SDK components
                     const { initializeApp } = await import('firebase/app');
-                    const { getMessaging, getToken } = await import('firebase/messaging');
+                    const { getMessaging, getToken, onMessage } = await import('firebase/messaging');
 
                     // Import your Firebase config
                     const { firebaseConfig } = await import('../config/firebase.js');
 
                     if (firebaseConfig.apiKey === "YOUR_API_KEY_HERE") {
                         console.warn('⚠️ Firebase Config not set in src/config/firebase.js. PWA notifications may fail.');
-                        // If config is not set, we cannot initialize Firebase, so return.
                         return;
                     }
 
-                    // Initialize Firebase App
+                    // Step 1: Register the Firebase Messaging service worker FIRST
+                    // This is CRITICAL — FCM needs this specific worker to handle background pushes
+                    let swRegistration = null;
+                    if ('serviceWorker' in navigator) {
+                        try {
+                            swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+                                scope: '/'
+                            });
+                            console.log('✅ Firebase Messaging SW registered:', swRegistration.scope);
+
+                            // Wait for the SW to be ready
+                            await navigator.serviceWorker.ready;
+                            console.log('✅ Service Worker is ready');
+                        } catch (swError) {
+                            console.error('❌ Firebase Messaging SW registration failed:', swError);
+                        }
+                    }
+
+                    // Step 2: Initialize Firebase App
                     const app = initializeApp(firebaseConfig);
                     const messaging = getMessaging(app);
 
-                    // Get FCM registration token
-                    // The VAPID_PUBLIC_KEY is essential here for FCM to work correctly.
-                    // It should match the key configured in your Firebase project settings -> Cloud Messaging tab.
-                    const currentToken = await getToken(messaging, { vapidKey: VAPID_PUBLIC_KEY });
+                    // Step 3: Get FCM token, passing the SW registration so FCM binds to the correct worker
+                    const tokenOptions = { vapidKey: VAPID_PUBLIC_KEY };
+                    if (swRegistration) {
+                        tokenOptions.serviceWorkerRegistration = swRegistration;
+                    }
+
+                    const currentToken = await getToken(messaging, tokenOptions);
 
                     if (currentToken) {
-                        console.log('✅ FCM Registration Token obtained:', currentToken);
-                        // Register this FCM token with your backend
-                        await this.registerToken(currentToken, 'fcm-web'); // Changed deviceType to 'fcm-web'
+                        console.log('✅ FCM Registration Token obtained:', currentToken.substring(0, 20) + '...');
+                        // Register this FCM token with the backend
+                        await this.registerToken(currentToken, 'fcm-web');
 
-                        this.showWebNotification(
-                            'Notifications Enabled!',
-                            'You will now receive notifications for DMs, calls, and more.'
-                        );
+                        // Only show the welcome notification on first registration
+                        const wasRegistered = localStorage.getItem('fcm_token_registered');
+                        if (!wasRegistered) {
+                            this.showWebNotification(
+                                'Notifications Enabled!',
+                                'You will now receive notifications for DMs, calls, and more.'
+                            );
+                            localStorage.setItem('fcm_token_registered', 'true');
+                        }
                     } else {
                         console.warn('⚠️ No FCM registration token available. Request permission to generate one.');
                     }
 
-                } catch (error) {
-                    console.error('❌ Error getting FCM token or initializing Firebase:', error);
-                    // Fallback to standard web push if FCM fails, or handle the error appropriately
-                    console.log('Falling back to raw Web Push subscription (FCM preferred)');
-                    const registration = await navigator.serviceWorker.ready;
-                    let subscription = await registration.pushManager.getSubscription();
+                    // Step 4: Handle foreground messages (when app is open)
+                    onMessage(messaging, (payload) => {
+                        console.log('📨 Foreground FCM message received:', payload);
+                        const data = payload.data || {};
+                        const notification = payload.notification || {};
 
-                    if (!subscription) {
-                        console.log('📡 Creating new push subscription via PushManager...');
-                        subscription = await registration.pushManager.subscribe({
-                            userVisibleOnly: true,
-                            applicationServerKey: this.urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                        const title = data.title || notification.title || 'NexFi';
+                        const body = data.body || notification.body || data.message || 'New update';
+
+                        // Play notification sound
+                        this.playSound();
+
+                        // Show notification (foreground messages don't auto-show)
+                        this.showWebNotification(title, body);
+
+                        // If it's a call, dispatch event so CallOverlay can handle it
+                        if (data.type === 'call') {
+                            window.dispatchEvent(new CustomEvent('call:incoming', {
+                                detail: {
+                                    call_id: data.call_id,
+                                    caller_id: data.caller_id,
+                                    caller_username: data.caller_username,
+                                    media: data.media,
+                                    status: 'ringing'
+                                }
+                            }));
+                        }
+                    });
+
+                    // Step 5: Listen for messages from the service worker (ringtone control)
+                    if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.addEventListener('message', (event) => {
+                            if (event.data?.type === 'PLAY_RINGTONE') {
+                                console.log('🔔 SW requested ringtone for call:', event.data.callId);
+                                this.playSound();
+                            } else if (event.data?.type === 'STOP_RINGTONE') {
+                                console.log('🔇 SW requested ringtone stop for call:', event.data.callId);
+                                if (this.audio) {
+                                    this.audio.pause();
+                                    this.audio.currentTime = 0;
+                                }
+                            }
                         });
                     }
-                    console.log('✅ Web Push Subscription obtained:', subscription);
-                    const subJson = JSON.stringify(subscription);
-                    await this.registerToken(subJson, 'web-push');
+
+                } catch (error) {
+                    console.error('❌ Error getting FCM token or initializing Firebase:', error);
+                    // Fallback: register sw.js for basic push support
+                    console.log('Falling back to basic service worker registration');
+                    try {
+                        const registration = await navigator.serviceWorker.register('/sw.js');
+                        await navigator.serviceWorker.ready;
+                        let subscription = await registration.pushManager.getSubscription();
+
+                        if (!subscription) {
+                            console.log('📡 Creating new push subscription via PushManager...');
+                            subscription = await registration.pushManager.subscribe({
+                                userVisibleOnly: true,
+                                applicationServerKey: this.urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                            });
+                        }
+                        console.log('✅ Web Push Subscription obtained (fallback)');
+                        const subJson = JSON.stringify(subscription);
+                        await this.registerToken(subJson, 'web-push');
+                    } catch (fallbackError) {
+                        console.error('❌ Fallback push registration also failed:', fallbackError);
+                    }
                 }
 
             } else {

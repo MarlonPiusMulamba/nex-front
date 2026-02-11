@@ -3,7 +3,6 @@ import vue from '@vitejs/plugin-vue';
 import path from 'path';
 import topLevelAwait from 'vite-plugin-top-level-await';
 import wasm from 'vite-plugin-wasm';
-import basicSsl from '@vitejs/plugin-basic-ssl';
 
 export default defineConfig(({ command, mode }) => {
   // Load env file based on `mode` in the current working directory
@@ -22,8 +21,7 @@ export default defineConfig(({ command, mode }) => {
         promiseExportName: "__tla",
         // The function to generate import names of top-level await promise in each chunk module
         promiseImportName: i => `__tla_${i}`
-      }),
-      basicSsl()
+      })
     ],
     resolve: {
       alias: {
@@ -36,15 +34,14 @@ export default defineConfig(({ command, mode }) => {
       port: 5173,
       open: true,
       strictPort: true,
-      https: true,
       proxy: {
         '/api': {
-          target: 'https://localhost:5000',
+          target: 'http://localhost:5000',
           changeOrigin: true,
           secure: false
         },
         '/socket.io': {
-          target: 'https://localhost:5000',
+          target: 'http://localhost:5000',
           ws: true,
           changeOrigin: true,
           secure: false
