@@ -411,6 +411,7 @@ export default {
       console.log('Opening chat with:', conversation.username);
       this.selectedChat = conversation;
       this.loadMessages(conversation.user_id);
+      this.checkUserOnlineStatus(conversation.user_id);
       
       // Mark as read
       if (conversation.unread_count > 0) {
@@ -743,6 +744,29 @@ export default {
       }
       if (conv) this.openChat(conv);
     },
+
+    updateUserStatus(userId, isOnline) {
+      const uid = String(userId);
+      const conv = this.conversations.find(c => String(c.user_id) === uid);
+      if (conv) conv.online = isOnline;
+      if (this.selectedChat && String(this.selectedChat.user_id) === uid) {
+        this.selectedChat.online = isOnline;
+      }
+    },
+
+    async checkUserOnlineStatus(userId) {
+      try {
+        const res = await api.post('/api/users/online-status', { user_ids: [userId] });
+        if (res.success && res.statuses) {
+          const status = res.statuses[String(userId)];
+          if (status) {
+            this.updateUserStatus(userId, status.online);
+          }
+        }
+      } catch (err) {
+        console.error('Check online status failed:', err);
+      }
+    },
   },
 
   mounted() {
@@ -782,6 +806,13 @@ export default {
         };
 
         socket.on('dm:new_message', this._socketNewMessageHandler);
+
+        socket.on('user:online', (data) => {
+          if (data && data.user_id) this.updateUserStatus(data.user_id, true);
+        });
+        socket.on('user:offline', (data) => {
+          if (data && data.user_id) this.updateUserStatus(data.user_id, false);
+        });
       }
     } catch (e) {
       console.error('Socket setup failed:', e);

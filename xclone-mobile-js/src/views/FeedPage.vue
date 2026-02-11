@@ -77,12 +77,49 @@
 
       <!-- Empty State -->
       <div v-if="!isLoading && !errorMessage && posts.length === 0" class="empty-state">
-        <ion-icon :icon="chatbubbles" class="empty-icon"></ion-icon>
-        <h2>No posts yet</h2>
-        <p>Be the first to post something!</p>
-        <ion-button @click="showPostModal = true" fill="solid">
-          Create Post
-        </ion-button>
+        
+        <div v-if="activeTab !== 'following'" class="empty-content">
+            <ion-icon :icon="chatbubbles" class="empty-icon"></ion-icon>
+            <h2>No posts yet</h2>
+            <p>Be the first to post something!</p>
+            <ion-button @click="showPostModal = true" fill="solid">
+              Create Post
+            </ion-button>
+        </div>
+
+        <div v-else class="following-empty-state">
+            <div class="empty-content">
+                <ion-icon :icon="people" class="empty-icon"></ion-icon>
+                <h2>No posts from people you follow</h2>
+                <p>Follow more people to see their posts here!</p>
+                
+                <ion-button @click="$router.push('/tabs/search')" fill="outline" class="find-people-btn">
+                  Find People to Follow
+                </ion-button>
+            </div>
+
+            <!-- Suggested Users -->
+            <div v-if="suggestedUsers.length > 0" class="suggested-users-section">
+                <h3 class="suggested-header">Suggested for you</h3>
+                <div class="suggested-users-scroll">
+                    <div v-for="user in suggestedUsers" :key="user.id" class="suggested-user-card">
+                        <div class="card-pfp" @click="openProfile(user)">
+                             <img :src="getImageUrl(user.profile_pic)" class="suggested-avatar" />
+                        </div>
+                        <div class="suggested-info">
+                            <div class="suggested-name">{{ user.display_name }}</div>
+                            <div class="suggested-username">@{{ user.username }}</div>
+                        </div>
+                        <ion-button size="small" @click="followUser(user)" :disabled="user.isFollowing" class="follow-btn">
+                            {{ user.isFollowing ? 'Following' : 'Follow' }}
+                        </ion-button>
+                    </div>
+                </div>
+            </div>
+             <div v-else-if="loadingSuggestions" class="loading-suggestions">
+                <ion-spinner name="dots"></ion-spinner>
+            </div>
+        </div>
       </div>
 
       <!-- Feed Posts -->
@@ -777,7 +814,7 @@ import {
 import { 
   add, heart, heartOutline, chatbubbleOutline, shareOutline, sunny, moon, 
   ellipsisHorizontal, ellipsisVertical, repeat, refresh, image, close, chatbubbles, logOut,
-  alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy
+  alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy, people
 } from 'ionicons/icons';
 import axios from 'axios';
 import VideoPlayer from '@/components/VideoPlayer.vue';
@@ -811,7 +848,7 @@ export default {
       API_URL: API_URL,
       add, heart, heartOutline, chatbubbleOutline, shareOutline, sunny, moon, 
       ellipsisHorizontal, ellipsisVertical, repeat, refresh, image, close, chatbubbles, logOut,
-      alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy,
+      alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy, people,
       theme: window.theme || 'light',
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
       lastFetchTime: 0,
@@ -872,7 +909,11 @@ export default {
       // Share action sheet
       showShareActionSheet: false,
       shareActionSheetButtons: [],
-      expandedPosts: {} // Track which posts are expanded
+      expandedPosts: {}, // Track which posts are expanded
+      
+      // Suggested Users
+      suggestedUsers: [],
+      loadingSuggestions: false
     };
   },
   computed: {
@@ -1483,6 +1524,10 @@ export default {
         console.log('⚡ Response received:', res.data);
         
         if (res.data && res.data.posts !== undefined) {
+             // Check if we need to fetch suggestions (empty following feed)
+            if (this.activeTab === 'following' && offset === 0 && res.data.posts.length === 0) {
+                this.fetchSuggestedUsers();
+            }
           return { success: true, posts: res.data.posts };
         } else {
           return { success: false, error: 'Invalid response' };
@@ -1501,6 +1546,41 @@ export default {
         }
         
         return { success: false, error: err.message };
+      }
+    },
+
+    async fetchSuggestedUsers() {
+      if (!this.userId) return;
+      this.loadingSuggestions = true;
+      try {
+        const res = await axios.get(`${this.API_URL}/api/users/suggested`, {
+          params: { user_id: this.userId, limit: 10 }
+        });
+        if (res.data.success) {
+          this.suggestedUsers = res.data.users.map(u => ({ ...u, isFollowing: false }));
+        }
+      } catch (err) {
+        console.error('Failed to fetch suggestions:', err);
+      } finally {
+        this.loadingSuggestions = false;
+      }
+    },
+
+    async followUser(user) {
+      if (!user || user.isFollowing) return;
+      try {
+        // Optimistic UI update
+        user.isFollowing = true;
+        
+        await axios.post(`${this.API_URL}/api/users/follow`, {
+          follower_id: this.userId,
+          following_username: user.username
+        });
+        
+      } catch (err) {
+        console.error('Follow error:', err);
+        user.isFollowing = false; // Revert
+        alert('Failed to follow user');
       }
     },
     
@@ -1617,22 +1697,37 @@ export default {
     
     async extractVideoThumbnail(file) {
       return new Promise((resolve, reject) => {
+        // Create video element
         const video = document.createElement('video');
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
         video.preload = 'metadata';
         video.muted = true;
         video.playsInline = true;
-        video.src = URL.createObjectURL(file);
         
+        const fileUrl = URL.createObjectURL(file);
+        video.src = fileUrl;
+        
+        // Timeout to avoid hanging forever
+        const timeoutId = setTimeout(() => {
+            URL.revokeObjectURL(fileUrl);
+            reject(new Error('Thumbnail generation timed out'));
+        }, 5000);
+
         video.onloadedmetadata = () => {
           // Seek to 1 second or middle of video, whichever is smaller
-          video.currentTime = Math.min(1, video.duration / 2);
+          // Ensure duration is valid
+          let seekTime = 1.0;
+          if (video.duration && isFinite(video.duration)) {
+              seekTime = Math.min(1.0, video.duration / 2);
+          }
+          video.currentTime = seekTime;
         };
         
         video.onseeked = () => {
           try {
+            // Create canvas
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
             // Set canvas size to video dimensions
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -1640,21 +1735,30 @@ export default {
             // Draw current video frame to canvas
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // Convert canvas to base64 JPEG (0.8 quality for good balance)
-            const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
+            // Convert canvas to base64 JPEG (0.7 quality is enough for thumbnails)
+            const thumbnail = canvas.toDataURL('image/jpeg', 0.7);
             
             // Clean up
-            URL.revokeObjectURL(video.src);
+            clearTimeout(timeoutId);
+            URL.revokeObjectURL(fileUrl);
+            video.remove();
+            
             resolve(thumbnail);
           } catch (err) {
-            URL.revokeObjectURL(video.src);
-            reject(err);
+            clearTimeout(timeoutId);
+            URL.revokeObjectURL(fileUrl);
+            video.remove();
+            console.error('Thumbnail draw error:', err);
+            resolve(null); // Resolve with null instead of rejecting to allow flow to continue
           }
         };
         
-        video.onerror = (err) => {
-          URL.revokeObjectURL(video.src);
-          reject(err);
+        video.onerror = (e) => {
+            clearTimeout(timeoutId);
+            URL.revokeObjectURL(fileUrl);
+            video.remove();
+            console.error('Video error during thumbnail generation:', e);
+            resolve(null);
         };
       });
     },
@@ -1699,7 +1803,7 @@ export default {
           `${this.API_URL}/api/like`, 
           { 
             post_id: postId, 
-            increment: !liked 
+            user_id: this.userId 
           },
           { timeout: 5000 }  // 5 second timeout
         );
@@ -2280,7 +2384,9 @@ export default {
         if (!targetPost) {
           try {
             // this.isLoading = true; // Optional: avoid full screen loader if possible
-            const res = await axios.get(`${this.API_URL}/api/posts/${postId}`);
+            const res = await axios.get(`${this.API_URL}/api/posts/${postId}`, {
+              params: { user_id: this.userId }
+            });
             if (res.data.success) {
               targetPost = res.data.post;
             }
@@ -3264,5 +3370,105 @@ ion-toolbar {
     background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 50%, #2a2a2a 75%);
     background-size: 200% 100%;
   }
+}
+
+/* Suggested Users */
+.empty-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.following-empty-state {
+    width: 100%;
+    padding: 20px 0;
+}
+
+.find-people-btn {
+    margin-top: 15px;
+    --border-radius: 999px;
+}
+
+.suggested-users-section {
+    margin-top: 20px;
+    width: 100%;
+    text-align: left;
+    padding-left: 20px;
+}
+
+.suggested-header {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 15px;
+    color: var(--ion-text-color);
+}
+
+.suggested-users-scroll {
+    display: flex;
+    overflow-x: auto;
+    gap: 15px;
+    padding-bottom: 20px;
+    padding-right: 20px;
+    scrollbar-width: none;
+}
+
+.suggested-users-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.suggested-user-card {
+    min-width: 140px;
+    width: 140px;
+    background: var(--ion-card-background);
+    border: 1px solid var(--ion-border-color);
+    border-radius: 12px;
+    padding: 15px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.card-pfp {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    margin-bottom: 8px;
+}
+
+.suggested-avatar {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--ion-background-color);
+}
+
+.suggested-name {
+    font-weight: 700;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+}
+
+.suggested-username {
+    font-size: 12px;
+    color: var(--ion-color-medium);
+    margin-bottom: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+}
+
+.follow-btn {
+    --border-radius: 999px;
+    height: 30px;
+    font-size: 12px;
+    width: 100%;
 }
 </style>
