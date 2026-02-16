@@ -365,14 +365,20 @@
               <img :src="getImageUrl(userAvatar)" class="avatar-img" alt="Your avatar" />
             </div>
             <div class="compose-input">
-              <ion-textarea
-                v-model="postContent"
-                placeholder="What's happening?"
-                :auto-grow="true"
-                :rows="3"
-                @ionInput="onPostInput"
-                class="compose-textarea"
-              ></ion-textarea>
+                <ion-textarea 
+                  v-model="postContent" 
+                  placeholder="What's happening?" 
+                  class="composer-textarea"
+                  :auto-grow="true"
+                  rows="4"
+                  maxlength="1000"
+                  @input="handlePostInput">
+                </ion-textarea>
+
+                <div v-if="isAnonymous" class="anonymous-indicator">
+                  <ion-icon :icon="skull"></ion-icon>
+                  <span>Posting as Anonymous Ghost</span>
+                </div>
               
               <div v-if="mediaPreviews.length" class="preview-grid">
                 <div 
@@ -814,7 +820,7 @@ import {
 import { 
   add, heart, heartOutline, chatbubbleOutline, shareOutline, sunny, moon, 
   ellipsisHorizontal, ellipsisVertical, repeat, refresh, image, close, chatbubbles, logOut,
-  alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy, people
+  alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy, people, skull
 } from 'ionicons/icons';
 import axios from 'axios';
 import VideoPlayer from '@/components/VideoPlayer.vue';
@@ -844,11 +850,12 @@ export default {
       showPostModal: false,
       isLoading: false,
       isPosting: false,
+      isAnonymous: false, // New state for composer
       activeTab: 'foryou',
       API_URL: API_URL,
       add, heart, heartOutline, chatbubbleOutline, shareOutline, sunny, moon, 
       ellipsisHorizontal, ellipsisVertical, repeat, refresh, image, close, chatbubbles, logOut,
-      alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy, people,
+      alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy, people, skull,
       theme: window.theme || 'light',
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
       lastFetchTime: 0,
@@ -1188,7 +1195,7 @@ export default {
       this.mediaZoom = 1;
     },
 
-    async onPostInput(e) {
+    async handlePostInput(e) {
       const text = this.postContent || '';
       // Find the last @word fragment
       const match = text.match(/@([a-zA-Z0-9_]{1,20})$/);
@@ -1327,6 +1334,30 @@ export default {
         return false;
       }
       return true;
+    },
+
+    async openPostModal() {
+      if (!this.userId) {
+        this.$router.push('/login');
+        return;
+      }
+      
+      // Check for anonymity state before opening
+      try {
+        const username = localStorage.getItem('username');
+        if (username) {
+           const res = await axios.get(`${this.API_URL}/api/profile/${username}`, {
+             params: { viewer_id: this.userId }
+           });
+           if (res.data.success) {
+             this.isAnonymous = !!res.data.profile.is_anonymous;
+           }
+        }
+      } catch (err) {
+        console.warn('Could not fetch anonymity state for composer:', err);
+      }
+
+      this.showPostModal = true;
     },
 
     goToProfile() {
@@ -1596,10 +1627,11 @@ export default {
       }
     },
     
-    openPostComposer() {
-      if (!this.ensureAuthenticated()) return;
-      this.showPostModal = true;
-    },
+    // Renamed from openPostComposer to openPostModal
+    // openPostComposer() {
+    //   if (!this.ensureAuthenticated()) return;
+    //   this.showPostModal = true;
+    // },
 
     async submitPost() {
       if (!this.ensureAuthenticated()) return;
@@ -1774,6 +1806,7 @@ export default {
       this.postMedia = [];
       this.mediaPreviews = [];
       this.showEmojiPicker = false;
+      this.isAnonymous = false; // Reset anonymity state
       if (this.$refs.fileInput) {
         this.$refs.fileInput.value = '';
       }
@@ -2475,7 +2508,7 @@ export default {
     });
 
     this._globalPostHandler = () => {
-      this.openPostComposer();
+      this.openPostModal();
     };
     window.addEventListener('open-post-modal', this._globalPostHandler);
   },
@@ -3110,11 +3143,30 @@ ion-toolbar {
   flex: 1;
 }
 
-.compose-textarea {
+.composer-textarea {
   --padding-start: 0;
-  --padding-top: 0;
-  font-size: 20px;
-  min-height: 120px;
+  --padding-end: 0;
+  font-size: 18px;
+  --placeholder-color: #536471;
+  color: var(--ion-text-color, #0f1419);
+}
+
+.anonymous-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.anonymous-indicator ion-icon {
+  font-size: 16px;
 }
 
 .preview-container {

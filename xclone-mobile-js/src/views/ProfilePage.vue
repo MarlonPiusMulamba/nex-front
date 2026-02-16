@@ -68,6 +68,19 @@
                 @click="editProfile">
                 Edit Profile
               </ion-button>
+              <ion-button 
+                v-if="profile.user_id === userId"
+                fill="solid" 
+                size="small" 
+                :class="['ghost-btn', { 'active': profile.is_anonymous }]"
+                @click="handleAnonymityToggle"
+                :disabled="anonymityLoading">
+                <ion-spinner v-if="anonymityLoading" name="crescent" size="small"></ion-spinner>
+                <template v-else>
+                  <ion-icon :icon="skull" slot="start"></ion-icon>
+                  {{ profile.is_anonymous ? 'Go Public' : 'Go Anonymous' }}
+                </template>
+              </ion-button>
               <template v-else>
                 <ion-button 
                   v-if="!profile.is_following"
@@ -104,6 +117,9 @@
           <div class="user-details">
             <h2 class="display-name">
               {{ (profile.first_name || profile.last_name) ? (profile.first_name + ' ' + profile.last_name).trim() : profile.username }}
+              <ion-badge v-if="profile.is_anonymous" color="medium" class="anonymous-badge">
+                <ion-icon :icon="skull"></ion-icon> Anonymous
+              </ion-badge>
             </h2>
             <p class="username">@{{ profile.username }}</p>
           </div>
@@ -414,7 +430,7 @@ import {
   checkmark, personAdd, mail, camera, 
   images, calendar, arrowBack, person, logOut, sunny, moon, ellipsisVertical,
   grid, heart, documentText, chatbubble, alertCircle,
-  shareOutline, settingsOutline, add, remove, happy
+  shareOutline, checkmarkCircle, skull, colorWand, happy, add, remove, settingsOutline
 } from 'ionicons/icons';
 import api from '@/utils/api';
 import config from '@/config/index.js';
@@ -436,6 +452,7 @@ export default {
       API_URL: config.api.baseURL,
       theme: window.theme || 'light',
       arrowBack,
+      mail,
       logOut,
       sunny,
       moon,
@@ -449,6 +466,9 @@ export default {
       alertCircle,
       shareOutline,
       settingsOutline,
+      checkmarkCircle,
+      logoGhost: skull,
+      colorWand,
       loading: false,
       profile: null,
       userPosts: [],
@@ -466,13 +486,18 @@ export default {
       editProfilePreview: '',
       editCoverPhoto: null,
       editCoverPreview: '',
+      
+      // Anonymity state
+      anonymityLoading: false,
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
       showMediaModal: false,
       mediaSrc: '',
       mediaZoom: 1,
       postsError: '',
       followLoading: false,
-      happy
+      happy,
+      add,
+      remove
     };
   },
   methods: {
@@ -793,38 +818,53 @@ export default {
           following_username: this.profile.username
         });
         
-        // Defensive: Handle both res.success and res.data.success
-        // API wrapper returns response.data directly, but structure may vary
         const success = res.success !== undefined ? res.success : res.data?.success;
         
         console.log('Follow/unfollow response:', { success, res });
         
-        // Check if the response indicates success
         if (!success) {
-          // Rollback optimistic update on failure
           this.profile.is_following = originalFollowState;
           this.profile.followers_count = originalFollowerCount;
-          
-          // Show specific error message from backend
           const errorMsg = res.message || res.data?.message || 'Unable to update follow status';
           alert(errorMsg);
-          console.error('Follow/unfollow failed:', errorMsg, res);
         } else {
-          // Success - optimistic update was correct, just log it
           console.log(`✅ Successfully ${originalFollowState ? 'unfollowed' : 'followed'} @${this.profile.username}`);
         }
       } catch (err) {
-        // Rollback optimistic update on error
         this.profile.is_following = originalFollowState;
         this.profile.followers_count = originalFollowerCount;
-        
         console.error('Follow toggle error:', err);
-        console.error('Error response:', err.response?.data);
         const errorMsg = err.response?.data?.message || err.message || 'Connection error. Please try again.';
         alert(errorMsg);
       } finally {
-        // Always clear loading state
         this.followLoading = false;
+      }
+    },
+
+    async handleAnonymityToggle() {
+      if (this.anonymityLoading) return;
+      
+      try {
+        this.anonymityLoading = true;
+        const res = await api.post('/api/user/toggle-anonymity', {
+          user_id: this.userId
+        });
+        
+        if (res.success) {
+          this.profile.is_anonymous = res.is_anonymous;
+          
+          setTimeout(() => {
+            this.loadProfile();
+            this.loadPosts();
+          }, 100);
+        } else {
+          alert('Failed to toggle anonymity');
+        }
+      } catch (err) {
+        console.error('Anonymity toggle error:', err);
+        alert('Action failed');
+      } finally {
+        this.anonymityLoading = false;
       }
     },
 
@@ -1087,6 +1127,35 @@ export default {
   --color: var(--ion-text-color, #1a1a1a);
   --border-color: #cfd9de;
   --border-width: 1px;
+}
+
+.ghost-btn {
+  --background: #f1f5f9;
+  --color: #475569;
+  --border-radius: 20px;
+  --box-shadow: none;
+}
+
+.ghost-btn.active {
+  --background: #0f172a;
+  --color: #f8fafc;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3);
+}
+
+.anonymous-badge {
+  font-size: 11px;
+  vertical-align: middle;
+  margin-left: 8px;
+  --padding-start: 6px;
+  --padding-end: 8px;
+  --padding-top: 2px;
+  --padding-bottom: 2px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .edit-profile-btn:hover, .unfollow-btn:hover {
