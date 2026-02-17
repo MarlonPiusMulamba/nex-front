@@ -83,7 +83,8 @@
                   {{ profile.is_anonymous ? 'Go Public' : 'Go Anonymous' }}
                 </template>
               </ion-button>
-              <template v-else>
+              <!-- Hide follow/message buttons when viewing others while you are anonymous -->
+              <template v-else-if="!currentUserIsAnonymous">
                 <ion-button 
                   v-if="!profile.is_following"
                   fill="solid" 
@@ -131,8 +132,8 @@
             <p class="bio-text">{{ profile.bio }}</p>
           </div>
 
-          <!-- Metadata -->
-          <div class="metadata">
+          <!-- Metadata (hidden when viewing own profile in anonymous mode) -->
+          <div class="metadata" v-if="!(profile && String(profile.user_id) === String(userId) && profile.is_anonymous)">
             <div class="metadata-item" v-if="profile.date_of_birth">
               <ion-icon :icon="calendar"></ion-icon>
               <span>Born {{ formatBirthday(profile.date_of_birth) }}</span>
@@ -143,8 +144,8 @@
             </div>
           </div>
 
-          <!-- Stats -->
-          <div class="stats-section">
+          <!-- Stats (hidden when viewing own profile in anonymous mode) -->
+          <div class="stats-section" v-if="!currentUserIsAnonymous">
             <div class="stat-item" @click="showFollowing">
               <span class="stat-value">{{ profile.following_count || 0 }}</span>
               <span class="stat-label">Following</span>
@@ -503,6 +504,14 @@ export default {
       remove
     };
   },
+  
+  computed: {
+    currentUserIsAnonymous() {
+      // Check if the current logged-in user is in anonymous mode
+      return this.profile && String(this.profile.user_id) === String(this.userId) && this.profile.is_anonymous;
+    }
+  },
+  
   methods: {
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
@@ -851,12 +860,33 @@ export default {
       
       try {
         this.anonymityLoading = true;
+        
+        // Save current theme before toggling if going anonymous
+        const currentlyAnonymous = this.profile.is_anonymous;
+        if (!currentlyAnonymous) {
+          // Entering anonymous mode - save current theme
+          const currentTheme = document.body.classList.contains('dark') ? 'dark' : 'light';
+          localStorage.setItem('preAnonymousTheme', currentTheme);
+        }
+        
         const res = await api.post('/api/user/toggle-anonymity', {
           user_id: this.userId
         });
         
         if (res.success) {
           this.profile.is_anonymous = res.is_anonymous;
+          
+          // Apply theme based on new anonymity state
+          if (res.is_anonymous) {
+            // Entering anonymous mode - force dark theme
+            document.body.classList.remove('light');
+            document.body.classList.add('dark');
+          } else {
+            // Exiting anonymous mode - restore previous theme
+            const previousTheme = localStorage.getItem('preAnonymousTheme') || 'light';
+            document.body.classList.remove('dark', 'light');
+            document.body.classList.add(previousTheme);
+          }
           
           setTimeout(() => {
             this.loadProfile();

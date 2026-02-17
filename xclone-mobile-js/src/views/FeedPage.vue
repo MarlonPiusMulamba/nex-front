@@ -177,7 +177,7 @@
                 <span class="timestamp">{{ formatRelativeTime(post.timestamp) }}</span>
               </div>
               <ion-button 
-                v-if="post.user_id === userId" 
+                v-if="post.user_id === userId && !isAnonymous" 
                 fill="clear" 
                 size="small" 
                 class="more-btn"
@@ -804,7 +804,10 @@ export default {
       
       // Suggested Users
       suggestedUsers: [],
-      loadingSuggestions: false
+      loadingSuggestions: false,
+      
+      // Current user anonymity state
+      isAnonymous: false
     };
   },
   computed: {
@@ -1440,6 +1443,20 @@ export default {
         console.error('Follow error:', err);
         user.isFollowing = false; // Revert
         alert('Failed to follow user');
+      }
+    },
+    
+    async checkAnonymity() {
+      if (!this.userId) return;
+      try {
+        const res = await axios.get(`${this.API_URL}/api/profile/${this.userId}`, {
+          params: { viewer_id: this.userId }
+        });
+        if (res.data && res.data.success && res.data.profile) {
+          this.isAnonymous = res.data.profile.is_anonymous || false;
+        }
+      } catch (err) {
+        console.error('Failed to check anonymity:', err);
       }
     },
     
