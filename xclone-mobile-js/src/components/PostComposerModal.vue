@@ -35,7 +35,7 @@
 
             <div v-if="isAnonymous" class="anonymous-indicator">
               <ion-icon :icon="skull"></ion-icon>
-              <span>Posting as Anonymous Ghost</span>
+              <span>Posting as {{ ghostName || 'Anonymous Ghost' }}</span>
             </div>
           
           <div v-if="mediaPreviews.length" class="preview-grid">
@@ -143,12 +143,20 @@ export default {
       showEmojiPicker: false,
       isPosting: false,
       isAnonymous: false,
+      ghostName: '',
       mentionSuggestions: [],
       showMentionSuggestions: false,
       mentionQuery: '',
       image, happy, close, skull,
       API_URL: config.api.baseURL
     };
+  },
+  watch: {
+    isOpen(newVal) {
+      if (newVal) {
+        this.checkAnonymity();
+      }
+    }
   },
   computed: {
     canPost() {
@@ -161,6 +169,38 @@ export default {
       this.$emit('update:isOpen', false);
       this.resetForm();
     },
+
+    async checkAnonymity() {
+      try {
+        const userId = localStorage.getItem('userId');
+        if (!userId) return;
+        const res = await axios.get(`${this.API_URL}/api/profile/${this.userId}`, {
+          params: { viewer_id: userId }
+        });
+        if(res.data && res.data.success && res.data.profile && res.data.profile.is_anonymous) {
+            this.isAnonymous = true;
+            this.fetchGhostIdentity();
+        } else {
+            this.isAnonymous = false;
+        }
+      } catch (err) {
+        console.error('Anonymity check error:', err);
+      }
+    },
+
+    async fetchGhostIdentity() {
+        if (!this.userId) return;
+        try {
+            const res = await axios.get(`${this.API_URL}/api/user/ghost-identity`, {
+                params: { user_id: this.userId }
+            });
+            if (res.data.success && res.data.ghost) {
+                this.ghostName = res.data.ghost.username;
+            }
+        } catch (err) {
+            console.error('Failed to fetch ghost identity:', err);
+        }
+    },
     
     resetForm() {
       this.postContent = '';
@@ -168,6 +208,7 @@ export default {
       this.mediaPreviews = [];
       this.showEmojiPicker = false;
       this.isAnonymous = false;
+      this.ghostName = '';
       if (this.$refs.fileInput) {
         this.$refs.fileInput.value = '';
       }

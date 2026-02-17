@@ -15,8 +15,8 @@
           <ion-button @click="toggleTheme">
             <ion-icon :icon="theme === 'light' ? moon : sunny"></ion-icon>
           </ion-button>
-          <ion-button v-if="profile?.user_id === userId" @click="logout">
-            <ion-icon :icon="logOut"></ion-icon>
+          <ion-button v-if="profile && String(profile.user_id) === String(userId)" @click="logout" title="Logout">
+            <ion-icon :icon="logOutOutline"></ion-icon>
           </ion-button>
           <ion-button @click="showOptionsMenu = true">
             <ion-icon :icon="ellipsisVertical"></ion-icon>
@@ -63,7 +63,7 @@
           <div class="action-buttons-row">
             <div class="action-buttons">
               <ion-button 
-                v-if="profile.user_id === userId"
+                v-if="profile && String(profile.user_id) === String(userId)"
                 fill="outline" 
                 size="small" 
                 class="edit-profile-btn"
@@ -71,7 +71,7 @@
                 Edit Profile
               </ion-button>
               <ion-button 
-                v-if="profile.user_id === userId"
+                v-if="profile && String(profile.user_id) === String(userId)"
                 fill="solid" 
                 size="small" 
                 :class="['ghost-btn', { 'active': profile.is_anonymous }]"
@@ -634,7 +634,9 @@ export default {
         
         if (res.success) {
           this.profile = res.profile;
-          this.profile.user_id = String(this.profile.user_id); // Ensure string
+          if (this.profile) {
+              this.profile.user_id = String(this.profile.user_id); // Ensure string
+          }
           
           // Save to offline DB
           await saveProfileOffline(this.profile);
