@@ -59,6 +59,8 @@
                 @error="handleImageError"
               />
             </div>
+          </div>
+          <div class="action-buttons-row">
             <div class="action-buttons">
               <ion-button 
                 v-if="profile.user_id === userId"
@@ -883,13 +885,13 @@ export default {
     },
 
     showFollowing() {
-      console.log('Show following list');
-      // TODO: Navigate to following list
+      if (!this.username) return;
+      this.$router.push(`/tabs/profile/${this.username}/following`);
     },
 
     showFollowers() {
-      console.log('Show followers list');
-      // TODO: Navigate to followers list
+      if (!this.username) return;
+      this.$router.push(`/tabs/profile/${this.username}/followers`);
     },
 
     viewMedia(item) {
@@ -1037,11 +1039,48 @@ export default {
   position: relative;
 }
 
+.stats-section {
+  display: flex;
+  gap: 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ion-border-color, #eff3f4);
+}
+
+.stat-item {
+  display: flex;
+  gap: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.stat-item:hover {
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
+.stat-value {
+  font-weight: 800;
+  color: var(--ion-text-color, #0f1419);
+}
+
+.stat-label {
+  color: var(--ion-color-medium, #536471);
+}
+
 .avatar-section {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: flex-end;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.action-buttons-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -36px;
+  position: relative;
+  z-index: 5;
 }
 
 .avatar-container {

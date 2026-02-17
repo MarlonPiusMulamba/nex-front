@@ -8,6 +8,7 @@ import FollowPage from '../views/FollowPage.vue';
 import DMPage from '../views/DMPage.vue';
 import ProfilePage from '../views/ProfilePage.vue';
 import NotificationsPage from '../views/NotificationsPage.vue';
+import UserFollowListPage from '../views/UserFollowListPage.vue';
 
 const routes = [
   {
@@ -57,6 +58,16 @@ const routes = [
         path: 'profile/:username?',
         component: ProfilePage,
         meta: { requiresAuth: true }
+      },
+      {
+        path: 'profile/:username/following',
+        component: UserFollowListPage,
+        meta: { requiresAuth: true, type: 'following' }
+      },
+      {
+        path: 'profile/:username/followers',
+        component: UserFollowListPage,
+        meta: { requiresAuth: true, type: 'followers' }
       }
     ]
   }

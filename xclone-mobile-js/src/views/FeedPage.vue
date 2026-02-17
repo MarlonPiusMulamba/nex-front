@@ -137,7 +137,7 @@
           <div class="post-content-wrapper">
             <div v-if="post.item_type === 'repost'" class="repost-context">
               <ion-icon :icon="repeat" class="repost-icon"></ion-icon>
-              <span class="repost-text">Reposted by @{{ post.reposted_by_username }}</span>
+              <span class="repost-text">Reposted by @{{ truncateUsername(post.reposted_by_username) }}</span>
             </div>
 
             <div v-if="post.item_type === 'repost' && (post.quote_text || (post.quote_media && post.quote_media.length))" class="quote-container">
@@ -172,7 +172,7 @@
                 <span class="username">
                   {{ (post.first_name || post.last_name) ? (post.first_name + ' ' + post.last_name).trim() : post.username }}
                 </span>
-                <span class="handle">@{{ post.username }}</span>
+                <span class="handle">@{{ truncateUsername(post.username) }}</span>
                 <span class="separator">·</span>
                 <span class="timestamp">{{ formatRelativeTime(post.timestamp) }}</span>
               </div>
@@ -359,7 +359,7 @@
               <img :src="getImageUrl(detailPost.profile_pic)" class="avatar-img" alt="Profile" />
               <div>
                 <div class="detail-name">{{ (detailPost.first_name || detailPost.last_name) ? (detailPost.first_name + ' ' + detailPost.last_name).trim() : detailPost.username }}</div>
-                <div class="detail-handle">@{{ detailPost.username }}</div>
+                <div class="detail-handle">@{{ truncateUsername(detailPost.username) }}</div>
               </div>
             </div>
             <div 
@@ -451,12 +451,12 @@
                     </div>
                     <div class="detail-comment-body">
                       <div class="detail-comment-meta">
-                        <span class="detail-comment-username">@{{ c.username }}</span>
+                        <span class="detail-comment-username">@{{ truncateUsername(c.username) }}</span>
                         <span class="separator">·</span>
                         <span class="detail-comment-time">{{ formatRelativeTime(c.created_at || c.timestamp) }}</span>
                       </div>
                       <div v-if="c.parent" class="detail-comment-parent">
-                        Replying to <span class="detail-comment-parent-user">@{{ c.parent.username }}</span>
+                        Replying to <span class="detail-comment-parent-user">@{{ truncateUsername(c.parent.username) }}</span>
                       </div>
                       <div
                         class="detail-comment-text"
@@ -536,7 +536,7 @@
                       <span class="username">
                         {{ (activeCommentPost.first_name || activeCommentPost.last_name) ? (activeCommentPost.first_name + ' ' + activeCommentPost.last_name).trim() : activeCommentPost.username }}
                       </span>
-                      <span class="handle">@{{ activeCommentPost.username }}</span>
+                      <span class="handle">@{{ truncateUsername(activeCommentPost.username) }}</span>
                       <span class="separator">·</span>
                       <span class="timestamp">{{ formatRelativeTime(activeCommentPost.timestamp) }}</span>
                     </div>
@@ -591,12 +591,12 @@
                 <div class="comment-content-wrapper">
                   <div class="comment-header">
                     <span class="username" @click="goToCommentUser(c)">{{ c.display_name || c.username }}</span>
-                    <span class="handle">@{{ c.username }}</span>
+                    <span class="handle">@{{ truncateUsername(c.username) }}</span>
                     <span class="separator">·</span>
                     <span class="timestamp">{{ formatRelativeTime(c.created_at) }}</span>
                   </div>
                   <div v-if="c.parent" class="parent-preview">
-                    <span class="parent-username">@{{ c.parent.username }}</span>
+                    <span class="parent-username">@{{ truncateUsername(c.parent.username) }}</span>
                     <span class="parent-snippet">{{ c.parent.content }}</span>
                     <span v-if="c.parent.image" class="parent-media-indicator">· media</span>
                   </div>
@@ -1081,6 +1081,11 @@ export default {
 
 
 
+    truncateUsername(username) {
+      if (!username) return '';
+      if (username.length <= 3) return username;
+      return username.substring(0, 3) + '...';
+    },
     async loadMorePosts(ev) {
       if (this.loadingMore || !this.hasMorePosts) {
         if (ev?.target) ev.target.complete();
