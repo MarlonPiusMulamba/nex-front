@@ -82,7 +82,7 @@
             <ion-icon :icon="chatbubbles" class="empty-icon"></ion-icon>
             <h2>No posts yet</h2>
             <p>Be the first to post something!</p>
-            <ion-button @click="showPostModal = true" fill="solid">
+            <ion-button @click="openGlobalPostModal" fill="solid">
               Create Post
             </ion-button>
         </div>
@@ -266,12 +266,7 @@
         </ion-infinite-scroll>
       </div>
 
-      <!-- Floating Action Button -->
-      <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-        <ion-fab-button @click="openPostComposer" class="gold-fab">
-          <ion-icon :icon="add"></ion-icon>
-        </ion-fab-button>
-      </ion-fab>
+
 
       <ion-action-sheet
         :is-open="showRepostSheet"
@@ -340,109 +335,7 @@
         </ion-content>
       </ion-modal>
 
-      <!-- Create Post Modal -->
-      <ion-modal :is-open="showPostModal" @did-dismiss="closePostModal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-buttons slot="start">
-              <ion-button @click="closePostModal" color="medium">Cancel</ion-button>
-            </ion-buttons>
-            <ion-title>New Post</ion-title>
-            <ion-buttons slot="end">
-              <ion-button 
-                @click="submitPost" 
-                :disabled="!canPost || isPosting"
-                :strong="true"
-                color="primary">
-                {{ isPosting ? 'Posting...' : 'Post' }}
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="ion-padding">
-          <div class="compose-container">
-            <div class="compose-avatar">
-              <img :src="getImageUrl(userAvatar)" class="avatar-img" alt="Your avatar" />
-            </div>
-            <div class="compose-input">
-                <ion-textarea 
-                  v-model="postContent" 
-                  placeholder="What's happening?" 
-                  class="composer-textarea"
-                  :auto-grow="true"
-                  rows="4"
-                  maxlength="1000"
-                  @input="handlePostInput">
-                </ion-textarea>
 
-                <div v-if="isAnonymous" class="anonymous-indicator">
-                  <ion-icon :icon="skull"></ion-icon>
-                  <span>Posting as Anonymous Ghost</span>
-                </div>
-              
-              <div v-if="mediaPreviews.length" class="preview-grid">
-                <div 
-                  v-for="(preview, index) in mediaPreviews" 
-                  :key="index"
-                  class="preview-item"
-                  :class="`count-${mediaPreviews.length}`">
-                  <img v-if="preview.type === 'image'" :src="preview.src" class="preview-img" alt="Preview"/>
-                  <VideoPlayer
-                    v-else-if="preview.type === 'video'"
-                    :src="preview.src"
-                    :poster="preview.thumbnail || ''"
-                  />
-                  <ion-button 
-                    fill="clear" 
-                    size="small" 
-                    class="remove-img-btn"
-                    @click.stop="removeMedia(index)">
-                    <ion-icon :icon="close"></ion-icon>
-                  </ion-button>
-                </div>
-              </div>
-              
-              <div class="compose-toolbar">
-                <input 
-                  type="file" 
-                  accept="image/*,video/*" 
-                  multiple
-                  @change="onMediaChange" 
-                  ref="fileInput"
-                  style="display: none;"
-                />
-                <ion-button fill="clear" size="small" @click="$refs.fileInput.click()">
-                  <ion-icon :icon="image"></ion-icon>
-                </ion-button>
-                <div class="emoji-wrapper">
-                  <ion-button fill="clear" size="small" @click="toggleEmojiPicker">
-                    <ion-icon :icon="happy"></ion-icon>
-                  </ion-button>
-                  <EmojiPicker v-if="showEmojiPicker" @select="addEmoji" class="composer-emoji-picker" />
-                </div>
-                <span class="char-count" :class="{ 'over-limit': postContent.length > 1000 }">
-                  {{ postContent.length }}/1000
-                </span>
-              </div>
-              <div 
-                v-if="showMentionSuggestions && mentionSuggestions.length" 
-                class="mention-suggestions">
-                <div 
-                  v-for="user in mentionSuggestions" 
-                  :key="user.user_id"
-                  class="mention-item"
-                  @click="selectMention(user)">
-                  <img :src="getImageUrl(user.profile_pic)" class="mention-avatar" alt="avatar" />
-                  <div class="mention-meta">
-                    <div class="mention-name">{{ user.full_name || user.username }}</div>
-                    <div class="mention-handle">@{{ user.username }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ion-content>
-      </ion-modal>
 
       <!-- Post Detail Modal -->
       <ion-modal :is-open="showPostDetail" @did-dismiss="closePostDetail">
@@ -820,11 +713,10 @@ import {
 import { 
   add, heart, heartOutline, chatbubbleOutline, shareOutline, sunny, moon, 
   ellipsisHorizontal, ellipsisVertical, repeat, refresh, image, close, chatbubbles, logOut,
-  alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy, people, skull
+  alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline
 } from 'ionicons/icons';
 import axios from 'axios';
 import VideoPlayer from '@/components/VideoPlayer.vue';
-import EmojiPicker from '@/components/EmojiPicker.vue';
 import config from '@/config/index.js';
 import notificationService from '@/utils/notificationService.js';
 import { savePostsOffline, getOfflinePosts, isNetworkOffline } from '@/utils/offlineDb.js';
@@ -835,7 +727,7 @@ export default {
     IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
     IonContent, IonFab, IonFabButton, IonIcon, IonModal, IonTextarea, 
     IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent,
-    IonActionSheet, VideoPlayer, EmojiPicker
+    IonActionSheet, VideoPlayer
   },
   data() {
     const API_URL = config.api.baseURL;
@@ -844,18 +736,12 @@ export default {
       userId: localStorage.getItem('userId'),
       userAvatar: localStorage.getItem('userAvatar') || '',
       posts: [],
-      postContent: '',
-      postMedia: [],  // [{ type, data }]
-      mediaPreviews: [], // data URLs for UI
-      showPostModal: false,
       isLoading: false,
-      isPosting: false,
-      isAnonymous: false, // New state for composer
       activeTab: 'foryou',
       API_URL: API_URL,
       add, heart, heartOutline, chatbubbleOutline, shareOutline, sunny, moon, 
       ellipsisHorizontal, ellipsisVertical, repeat, refresh, image, close, chatbubbles, logOut,
-      alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline, happy, people, skull,
+      alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline,
       theme: window.theme || 'light',
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
       lastFetchTime: 0,
@@ -879,11 +765,7 @@ export default {
       commentMedia: null,
       commentMediaPreview: '',
       replyToCommentId: null,
-      // Mention suggestions
-      mentionSuggestions: [],
-      showMentionSuggestions: false,
-      mentionQuery: '',
-
+      
       // Pagination + new post banner
       pageLimit: 20,
       pageOffset: 0,
@@ -908,7 +790,9 @@ export default {
       detailComments: [],
       loadingDetailComments: false,
       mediaZoom: 1,
-      showEmojiPicker: false,
+      loadingDetailComments: false,
+      mediaZoom: 1,
+      notificationPermission: 'default',
       notificationPermission: 'default',
       showHeaderActionSheet: false,
       deferredPrompt: null,
@@ -1195,20 +1079,7 @@ export default {
       this.mediaZoom = 1;
     },
 
-    async handlePostInput(e) {
-      const text = this.postContent || '';
-      // Find the last @word fragment
-      const match = text.match(/@([a-zA-Z0-9_]{1,20})$/);
-      if (match) {
-        const query = match[1];
-        this.mentionQuery = query;
-        await this.fetchMentionSuggestions(query);
-      } else {
-        this.mentionQuery = '';
-        this.mentionSuggestions = [];
-        this.showMentionSuggestions = false;
-      }
-    },
+
 
     async loadMorePosts(ev) {
       if (this.loadingMore || !this.hasMorePosts) {
@@ -1280,36 +1151,7 @@ export default {
       await this.refreshFeed(null, true);
     },
 
-    async fetchMentionSuggestions(query) {
-      if (!query || query.length < 1) {
-        this.mentionSuggestions = [];
-        this.showMentionSuggestions = false;
-        return;
-      }
-      try {
-        const res = await axios.get(`${this.API_URL}/api/search/users`, {
-          params: { q: query, limit: 8, user_id: this.userId }
-        });
-        const users = res.data.users || [];
-        this.mentionSuggestions = users;
-        this.showMentionSuggestions = users.length > 0;
-      } catch (err) {
-        console.error('Mention lookup error:', err);
-        this.mentionSuggestions = [];
-        this.showMentionSuggestions = false;
-      }
-    },
 
-    selectMention(user) {
-      if (!user || !user.username) return;
-      const text = this.postContent || '';
-      // Replace the last @fragment with the selected username
-      const updated = text.replace(/@([a-zA-Z0-9_]{1,20})$/, `@${user.username} `);
-      this.postContent = updated;
-      this.mentionSuggestions = [];
-      this.showMentionSuggestions = false;
-      this.mentionQuery = '';
-    },
     openProfile(post) {
       if (!post || !post.username) return;
       this.$router.push(`/tabs/profile/${post.username}`);
@@ -1336,28 +1178,9 @@ export default {
       return true;
     },
 
-    async openPostModal() {
-      if (!this.userId) {
-        this.$router.push('/login');
-        return;
-      }
-      
-      // Check for anonymity state before opening
-      try {
-        const username = localStorage.getItem('username');
-        if (username) {
-           const res = await axios.get(`${this.API_URL}/api/profile/${username}`, {
-             params: { viewer_id: this.userId }
-           });
-           if (res.data.success) {
-             this.isAnonymous = !!res.data.profile.is_anonymous;
-           }
-        }
-      } catch (err) {
-        console.warn('Could not fetch anonymity state for composer:', err);
-      }
-
-      this.showPostModal = true;
+    openGlobalPostModal() {
+      if (!this.ensureAuthenticated()) return;
+      window.dispatchEvent(new CustomEvent('open-post-modal'));
     },
 
     goToProfile() {
@@ -1633,99 +1456,7 @@ export default {
     //   this.showPostModal = true;
     // },
 
-    async submitPost() {
-      if (!this.ensureAuthenticated()) return;
-      if (!this.canPost || this.isPosting) return;
-      
-      try {
-        this.isPosting = true;
-        
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);  // 30 seconds
-        
-        const res = await axios.post(
-          `${this.API_URL}/api/post`, 
-          {
-            user_id: this.userId,
-            content: this.postContent,
-            // Keep legacy image for backwards compatibility (first image), but send full media list
-            image: this.postMedia.find(m => m.type === 'image')?.data || null,
-            media: this.postMedia
-          },
-          { 
-            signal: controller.signal,
-            timeout: 300000 // 5 minutes for large media uploads
-          }
-        );
-        
-        clearTimeout(timeoutId);
-        
-        if (res.data.success) {
-          this.closePostModal();
-          // Force refresh after posting
-          await this.refreshFeed(null, true);
-        } else {
-          alert(res.data.message || 'Failed to create post');
-        }
-      } catch (err) {
-        console.error('❌ Post error:', err);
-        alert('Failed to create post. Please try again.');
-      } finally {
-        this.isPosting = false;
-      }
-    },
-    
-    async onMediaChange(e) {
-      const files = Array.from(e.target.files || []);
-      if (!files.length) return;
 
-      const remainingSlots = 4 - this.postMedia.length;
-      const toAdd = files.slice(0, remainingSlots);
-
-      for (const file of toAdd) {
-        const isVideo = file.type.startsWith('video');
-        const maxSize = isVideo ? 150 * 1024 * 1024 : 50 * 1024 * 1024; // 150MB for videos, 50MB for images
-
-        if (file.size > maxSize) {
-          alert(`${isVideo ? 'Video' : 'Image'} must be less than ${isVideo ? '150' : '50'}MB`);
-          continue;
-        }
-
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const dataUrl = ev.target.result;
-          
-          // For videos, generate thumbnail
-          let thumbnail = null;
-          if (isVideo) {
-            try {
-              thumbnail = await this.extractVideoThumbnail(file);
-            } catch (err) {
-              console.error('Failed to generate video thumbnail:', err);
-            }
-          }
-          
-          // Send full dataUrl to backend to aid in media/type detection
-          this.postMedia.push({
-            type: isVideo ? 'video' : 'image',
-            data: dataUrl,
-            thumbnail: thumbnail // Only set for videos
-          });
-
-          this.mediaPreviews.push({
-            type: isVideo ? 'video' : 'image',
-            src: dataUrl,
-            thumbnail: thumbnail
-          });
-        };
-        reader.readAsDataURL(file);
-      }
-
-      // Reset input so selecting the same file again works
-      if (this.$refs.fileInput) {
-        this.$refs.fileInput.value = '';
-      }
-    },
     
     async extractVideoThumbnail(file) {
       return new Promise((resolve, reject) => {
@@ -1795,30 +1526,7 @@ export default {
       });
     },
     
-    removeMedia(index) {
-      this.postMedia.splice(index, 1);
-      this.mediaPreviews.splice(index, 1);
-    },
-    
-    closePostModal() {
-      this.showPostModal = false;
-      this.postContent = '';
-      this.postMedia = [];
-      this.mediaPreviews = [];
-      this.showEmojiPicker = false;
-      this.isAnonymous = false; // Reset anonymity state
-      if (this.$refs.fileInput) {
-        this.$refs.fileInput.value = '';
-      }
-    },
 
-    toggleEmojiPicker() {
-      this.showEmojiPicker = !this.showEmojiPicker;
-    },
-
-    addEmoji(emoji) {
-      this.postContent += emoji;
-    },
     
     async toggleLike(postId, liked) {
       if (!this.ensureAuthenticated()) return;

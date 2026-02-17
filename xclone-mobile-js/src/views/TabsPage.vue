@@ -82,6 +82,12 @@
               <ion-label>DM</ion-label>
             </ion-tab-button>
 
+            <!-- Mobile Post Button -->
+            <ion-tab-button class="post-tab-btn" @click="triggerGlobalPost">
+              <ion-icon :icon="add" class="post-icon"></ion-icon>
+              <ion-label>Post</ion-label>
+            </ion-tab-button>
+
             <ion-tab-button tab="notifications" href="/tabs/notifications">
               <ion-icon :icon="notificationsOutline"></ion-icon>
               <ion-badge v-if="unreadNotifCount > 0" class="notif-badge">{{ unreadNotifCount }}</ion-badge>
@@ -102,6 +108,13 @@
         <SuggestedUsersWidget />
       </aside>
     </div>
+
+    <PostComposerModal 
+      v-model:isOpen="showPostModal" 
+      :userId="userId || ''" 
+      :userAvatar="userAvatar || ''"
+      @post-created="handlePostCreated"
+    />
   </ion-page>
 </template>
 
@@ -111,12 +124,13 @@ import {
   IonPage, IonTabs, IonRouterOutlet, IonTabBar, IonTabButton, 
   IonIcon, IonLabel, IonBadge 
 } from '@ionic/vue';
-import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline } from 'ionicons/icons';
+import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline, add } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config/index.js';
 import TrendingWidget from '@/components/TrendingWidget.vue';
 import SuggestedUsersWidget from '@/components/SuggestedUsersWidget.vue';
 import notificationService from '@/utils/notificationService.js';
+import PostComposerModal from '@/components/PostComposerModal.vue';
 
 export default {
   name: 'TabsPage',
@@ -124,7 +138,8 @@ export default {
     IonPage, IonTabs, IonRouterOutlet, IonTabBar, IonTabButton, 
     IonIcon, IonLabel, IonBadge,
     TrendingWidget,
-    SuggestedUsersWidget
+    SuggestedUsersWidget,
+    PostComposerModal
   },
   data() {
     return {
@@ -135,6 +150,7 @@ export default {
       person,
       logoTwitter,
       logOutOutline,
+      add,
       unreadCount: 0,
       prevUnreadCount: 0,
       unreadNotifCount: 0,
@@ -148,6 +164,7 @@ export default {
       audioCtx: null,
       audioUnlocked: false,
       _unlockAudio: null,
+      showPostModal: false,
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E'
     };
   },
@@ -216,8 +233,14 @@ export default {
     },
     
     triggerGlobalPost() {
-      // Dispatch a global event to open the post modal
-      window.dispatchEvent(new CustomEvent('open-post-modal'));
+      // Open local modal (available on all tabs)
+      this.showPostModal = true;
+    },
+
+    handlePostCreated() {
+      // Refresh feed if active
+      // Socket should handle this, but explicit refresh helps
+      window.dispatchEvent(new CustomEvent('feed-refresh'));
     },
 
     goToProfile() {
@@ -277,6 +300,9 @@ export default {
     };
     document.addEventListener('visibilitychange', this._onVisibilityChange);
     window.addEventListener('focus', this._onFocus);
+
+    // Listen for global post trigger
+    window.addEventListener('open-post-modal', this.triggerGlobalPost);
   },
   beforeUnmount() {
     // Clean up interval and event listener
@@ -304,6 +330,7 @@ export default {
 
     if (this._onVisibilityChange) document.removeEventListener('visibilitychange', this._onVisibilityChange);
     if (this._onFocus) window.removeEventListener('focus', this._onFocus);
+    window.removeEventListener('open-post-modal', this.triggerGlobalPost);
   }
 };
 </script>
@@ -338,6 +365,15 @@ ion-page {
   align-items: center;
   justify-content: center;
   z-index: 10;
+}
+
+.post-tab-btn {
+  transform: scale(1.1);
+}
+
+.post-icon {
+  font-size: 28px;
+  font-weight: bold;
 }
 
 .notif-badge {

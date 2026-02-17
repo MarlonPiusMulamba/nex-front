@@ -468,6 +468,7 @@ export default {
       settingsOutline,
       checkmarkCircle,
       logoGhost: skull,
+      skull,
       colorWand,
       loading: false,
       profile: null,
