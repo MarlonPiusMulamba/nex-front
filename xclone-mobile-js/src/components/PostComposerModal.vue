@@ -118,16 +118,16 @@
               ref="fileInput"
               style="display: none;"
             />
-            <ion-button fill="clear" size="small" @click="$refs.fileInput.click()">
-              <ion-icon :icon="image"></ion-icon>
+            <ion-button fill="clear" size="small" class="icon-btn icon-media" @click="$refs.fileInput.click()">
+              <ion-icon :icon="image" style="font-size: 24px;"></ion-icon>
             </ion-button>
-            <ion-button fill="clear" size="small" @click="togglePollCreator" :color="showPollCreator ? 'primary' : ''">
-              <ion-icon :icon="barChart"></ion-icon>
+            <ion-button fill="clear" size="small" class="icon-btn icon-poll" @click="togglePollCreator" :color="showPollCreator ? 'primary' : ''">
+              <ion-icon :icon="barChart" style="font-size: 24px;"></ion-icon>
             </ion-button>
 
             <div class="emoji-wrapper">
-              <ion-button fill="clear" size="small" @click="toggleEmojiPicker">
-                <ion-icon :icon="happy"></ion-icon>
+              <ion-button fill="clear" size="small" class="icon-btn icon-emoji" @click="toggleEmojiPicker">
+                <ion-icon :icon="happy" style="font-size: 24px;"></ion-icon>
               </ion-button>
               <EmojiPicker v-if="showEmojiPicker" @select="addEmoji" class="composer-emoji-picker" />
             </div>
@@ -627,12 +627,39 @@ export default {
   color: white;
 }
 
+
 .compose-toolbar {
   display: flex;
   align-items: center;
   border-top: 1px solid var(--ion-border-color, #eff3f4);
-  padding-top: 8px;
+  padding-top: 12px;
   margin-top: 8px;
+  gap: 8px;
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  --padding-start: 0;
+  --padding-end: 0;
+}
+
+.icon-btn:hover {
+  background-color: rgba(var(--ion-color-primary-rgb), 0.05);
+}
+
+.icon-media {
+  color: #1d9bf0; /* Twitter/Modern Blue */
+}
+
+.icon-poll {
+  color: #f91880; /* Modern Pink/Red or #e67e22 for Orange */
+}
+
+.icon-emoji {
+  color: #ffd400; /* Bright Yellow */
 }
 
 .emoji-wrapper {
@@ -644,7 +671,8 @@ export default {
   top: 100%;
   left: 0;
   z-index: 1000;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  border-radius: 12px;
 }
 
 .char-count {
