@@ -19,10 +19,8 @@
     </ion-header>
     <ion-content class="ion-padding">
       <div class="compose-container">
-        <div class="compose-avatar">
-          <img :src="getImageUrl(userAvatar)" class="avatar-img" alt="Your avatar" />
-        </div>
-        <div class="compose-input">
+        <!-- Avatar removed for more space -->
+        <div class="compose-input full-width">
             <ion-textarea 
               v-model="postContent" 
               placeholder="What's happening?" 
@@ -410,22 +408,15 @@ export default {
 <style scoped>
 .compose-container {
   display: flex;
+  flex-direction: column; /* Changed from row to column for better mobile layout */
   gap: 12px;
 }
 
-.compose-avatar {
-  flex-shrink: 0;
-}
-
-.avatar-img {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-}
+/* Avatar styles removed */
 
 .compose-input {
   flex: 1;
+  width: 100%; /* Ensure full width */
 }
 
 .composer-textarea {
