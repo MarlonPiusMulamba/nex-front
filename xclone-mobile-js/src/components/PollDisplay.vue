@@ -153,39 +153,66 @@ export default {
 
 <style scoped>
 .poll-container {
-  margin-top: 12px;
+  margin-top: 16px;
   width: 100%;
+  background: var(--ion-card-background, #fff);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--ion-border-color, rgba(0,0,0,0.05));
+}
+
+body.dark .poll-container {
+  background: #15181c;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  border-color: #2f3336;
 }
 
 .poll-question {
-  font-size: 16px;
-  font-weight: 500;
-  margin-bottom: 12px;
-  color: #000;
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #0f1419;
+  line-height: 1.4;
 }
 
 body.dark .poll-question {
-  color: #fff;
+  color: #e7e9ea;
 }
 
 .poll-options {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .poll-option {
   position: relative;
-  height: 44px; /* Increased height */
-  border-radius: 8px; /* Slightly more rounded */
-  border: 1px solid var(--ion-color-primary); /* Always outline primary for unvoted */
+  height: 48px;
+  border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: var(--ion-color-light, #f3f4f6);
+  border: 2px solid transparent;
+}
+
+body.dark .poll-option {
+  background: #2f3336;
 }
 
 .poll-option.selectable:active {
-  background-color: rgba(var(--ion-color-primary-rgb), 0.1);
+  transform: scale(0.98);
+}
+
+/* Unvoted State */
+.poll-option.selectable {
+  background: transparent;
+  border: 2px solid var(--ion-color-primary);
+}
+
+.poll-option.selectable:hover {
+  background: rgba(var(--ion-color-primary-rgb), 0.04);
 }
 
 .poll-progress {
@@ -193,16 +220,19 @@ body.dark .poll-question {
   top: 0;
   left: 0;
   height: 100%;
-  background-color: rgba(var(--ion-color-primary-rgb), 0.12); /* Light primary tint */
+  background-color: rgba(var(--ion-color-primary-rgb), 0.15);
   z-index: 1;
-  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 1s cubic-bezier(0.25, 0.8, 0.25, 1);
+  border-radius: 12px 0 0 12px;
 }
 
 .poll-option.voted .poll-progress {
-   background-color: rgba(var(--ion-color-primary-rgb), 0.2);
+   background-color: rgba(var(--ion-color-primary-rgb), 0.25);
 }
 
-/* Winner styling enhancement? maybe later */
+.poll-option.winner .poll-progress {
+   background-color: rgba(var(--ion-color-primary-rgb), 0.35); /* Stronger highlight for winner */
+}
 
 .poll-content {
   position: relative;
@@ -212,32 +242,19 @@ body.dark .poll-question {
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  font-weight: 600; /* Bolder text matching X */
-  color: var(--ion-color-primary); /* Primary colored text default */
+  font-weight: 600;
+  font-size: 15px;
+  color: #0f1419;
 }
 
 body.dark .poll-content {
+  color: #e7e9ea;
+}
+
+.poll-option.selectable .poll-content {
     color: var(--ion-color-primary);
+    font-weight: 700;
 }
-
-/* When showing results, switch to neutral colors unless winner/voted */
-.poll-option:not(.selectable) {
-    border-color: transparent; /* Remove border when showing results, or keep simplified */
-    background-color: #f3f4f6; /* Light gray background base */
-}
-
-body.dark .poll-option:not(.selectable) {
-    background-color: #2f3336; /* Dark gray */
-}
-
-/* Re-apply colored progress */
-.poll-option:not(.selectable) .poll-content {
-    color: #0f1419;
-}
-body.dark .poll-option:not(.selectable) .poll-content {
-    color: #e7e9ea;
-}
-
 
 .poll-label {
   flex: 1;
@@ -247,26 +264,31 @@ body.dark .poll-option:not(.selectable) .poll-content {
 }
 
 .poll-percent {
-  font-weight: 700;
-  margin-left: 8px;
+  font-weight: 800;
+  margin-left: 12px;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
 }
 
 .voted-icon {
   margin-left: 8px;
-  font-size: 20px;
+  font-size: 22px;
   color: var(--ion-color-primary);
+  filter: drop-shadow(0 2px 4px rgba(var(--ion-color-primary-rgb), 0.3));
 }
 
 .poll-footer {
-  margin-top: 12px;
-  font-size: 14px;
+  margin-top: 16px;
+  font-size: 13px;
   color: var(--ion-color-medium);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  font-weight: 500;
 }
 
 .dot {
   font-weight: bold;
+  opacity: 0.5;
 }
 </style>
