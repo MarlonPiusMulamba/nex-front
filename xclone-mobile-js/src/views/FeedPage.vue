@@ -226,6 +226,15 @@
               </div>
             </div>
 
+
+            <!-- Poll Display -->
+            <PollDisplay 
+              v-if="post.poll" 
+              :poll="post.poll" 
+              :postId="post.post_id"
+              @poll-updated="handlePollUpdate"
+            />
+
             <div class="post-actions">
               <ion-button fill="clear" size="small" @click="openComments(post)" class="action-btn">
                 <ion-icon :icon="chatbubbleOutline"></ion-icon>
@@ -402,6 +411,16 @@
             <div class="detail-media" v-else-if="detailPost.image">
               <img :src="getImageUrl(detailPost.image)" alt="Post media" />
             </div>
+
+            
+            <!-- Poll Display (Detail) -->
+            <PollDisplay 
+              v-if="detailPost.poll" 
+              :poll="detailPost.poll" 
+              :postId="detailPost.post_id"
+              @poll-updated="handlePollUpdate"
+            />
+
             <div class="detail-timestamp">
               {{ formatRelativeTime(detailPost.timestamp) }}
             </div>
@@ -720,6 +739,7 @@ import VideoPlayer from '@/components/VideoPlayer.vue';
 import config from '@/config/index.js';
 import notificationService from '@/utils/notificationService.js';
 import { savePostsOffline, getOfflinePosts, isNetworkOffline } from '@/utils/offlineDb.js';
+import PollDisplay from '@/components/PollDisplay.vue';
 
 export default {
   name: 'FeedPage',
@@ -727,7 +747,7 @@ export default {
     IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
     IonContent, IonFab, IonFabButton, IonIcon, IonModal, IonTextarea, 
     IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent,
-    IonActionSheet, VideoPlayer
+    IonActionSheet, VideoPlayer, PollDisplay
   },
   data() {
     const API_URL = config.api.baseURL;
@@ -886,6 +906,26 @@ export default {
     }
   },
   methods: {
+    handlePollUpdate(event) {
+      // event: { postId, options }
+      const updatePost = (post) => {
+        if (post.post_id === event.postId && post.poll) {
+          post.poll.options = event.options;
+          post.poll.has_voted = true;
+          // You might also want to set user_voted_option_id if returned
+        }
+      };
+
+      // Update in main list
+      const post = this.posts.find(p => p.post_id === event.postId);
+      if (post) updatePost(post);
+
+      // Update in detail view if open
+      if (this.detailPost && this.detailPost.post_id === event.postId) {
+        updatePost(this.detailPost);
+      }
+    },
+
     isExpanded(postId) {
       return !!this.expandedPosts[postId];
     },

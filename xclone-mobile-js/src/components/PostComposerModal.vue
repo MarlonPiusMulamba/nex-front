@@ -9,7 +9,7 @@
         <ion-buttons slot="end">
           <ion-button 
             @click="submitPost" 
-            :disabled="!canPost || isPosting"
+          :disabled="!canSubmit || isPosting"
             :strong="true"
             color="primary">
             {{ isPosting ? 'Posting...' : 'Post' }}
@@ -56,7 +56,58 @@
                 <ion-icon :icon="close"></ion-icon>
               </ion-button>
             </div>
+            </div>
           </div>
+          
+          <!-- Poll Creator -->
+          <div v-if="showPollCreator" class="poll-creator">
+            <ion-item lines="none" class="poll-input-item">
+              <ion-input 
+                v-model="pollQuestion" 
+                placeholder="Ask a question..."
+                class="poll-question-input"
+              ></ion-input>
+            </ion-item>
+            
+            <div class="poll-options">
+              <div v-for="(option, index) in pollOptions" :key="index" class="poll-option-row">
+                <ion-input 
+                  v-model="pollOptions[index]" 
+                  :placeholder="'Option ' + (index + 1)"
+                  class="poll-option-input"
+                ></ion-input>
+                <ion-button 
+                  v-if="pollOptions.length > 2" 
+                  fill="clear" 
+                  size="small"
+                  color="medium"
+                  @click="removePollOption(index)">
+                  <ion-icon :icon="close"></ion-icon>
+                </ion-button>
+              </div>
+            </div>
+            
+            <div class="poll-actions">
+              <ion-button 
+                v-if="pollOptions.length < 4" 
+                fill="clear" 
+                size="small" 
+                @click="addPollOption">
+                <ion-icon :icon="add" slot="start"></ion-icon>
+                Add Option
+              </ion-button>
+              
+              <ion-select v-model="pollDuration" interface="popover" placeholder="Duration" class="poll-duration-select">
+                <ion-select-option value="60">1 Hour</ion-select-option>
+                <ion-select-option value="360">6 Hours</ion-select-option>
+                <ion-select-option value="1440">1 Day</ion-select-option>
+                <ion-select-option value="10080">1 Week</ion-select-option>
+              </ion-select>
+            </div>
+          </div>
+          
+          <!-- Poll Creator -->
+
           
           <div class="compose-toolbar">
             <input 
@@ -70,6 +121,10 @@
             <ion-button fill="clear" size="small" @click="$refs.fileInput.click()">
               <ion-icon :icon="image"></ion-icon>
             </ion-button>
+            <ion-button fill="clear" size="small" @click="togglePollCreator" :color="showPollCreator ? 'primary' : ''">
+              <ion-icon :icon="barChart"></ion-icon>
+            </ion-button>
+
             <div class="emoji-wrapper">
               <ion-button fill="clear" size="small" @click="toggleEmojiPicker">
                 <ion-icon :icon="happy"></ion-icon>
@@ -96,7 +151,7 @@
             </div>
           </div>
         </div>
-      </div>
+
     </ion-content>
   </ion-modal>
 </template>
@@ -104,9 +159,9 @@
 <script>
 import {
   IonModal, IonHeader, IonToolbar, IonButtons, IonButton, IonTitle, IonContent,
-  IonTextarea, IonIcon, IonSpinner
+  IonTextarea, IonIcon, IonSpinner, IonItem, IonInput, IonSelect, IonSelectOption
 } from '@ionic/vue';
-import { image, happy, close, skull } from 'ionicons/icons';
+import { image, happy, close, skull, barChart, add } from 'ionicons/icons';
 import VideoPlayer from '@/components/VideoPlayer.vue';
 import EmojiPicker from '@/components/EmojiPicker.vue';
 import axios from 'axios';
@@ -116,7 +171,8 @@ export default {
   name: 'PostComposerModal',
   components: {
     IonModal, IonHeader, IonToolbar, IonButtons, IonButton, IonTitle, IonContent,
-    IonTextarea, IonIcon, IonSpinner, VideoPlayer, EmojiPicker
+    IonTextarea, IonIcon, IonSpinner, VideoPlayer, EmojiPicker,
+    IonItem, IonInput, IonSelect, IonSelectOption
   },
   props: {
     isOpen: {
@@ -145,8 +201,14 @@ export default {
       mentionSuggestions: [],
       showMentionSuggestions: false,
       mentionQuery: '',
-      image, happy, close, skull,
-      API_URL: config.api.baseURL
+      image, happy, close, skull, barChart, add,
+      API_URL: config.api.baseURL,
+      
+      // Poll Data
+      showPollCreator: false,
+      pollQuestion: '',
+      pollOptions: ['', ''],
+      pollDuration: '1440' // Minutes
     };
   },
   watch: {
@@ -158,8 +220,27 @@ export default {
   },
   computed: {
     canPost() {
-      return (this.postContent.trim().length > 0 || this.postMedia.length > 0) && 
-             this.postContent.length <= 1000;
+      const hasContent = this.postContent.trim().length > 0 || this.postMedia.length > 0;
+      const isContentValid = this.postContent.length <= 1000;
+      
+      let hasValidPoll = false;
+      if (this.showPollCreator) {
+          const hasQuestion = this.pollQuestion.trim().length > 0;
+          const validOptions = this.pollOptions.filter(o => o.trim().length > 0);
+          hasValidPoll = hasQuestion && validOptions.length >= 2;
+      }
+
+      return (hasContent || hasValidPoll) && isContentValid;
+    },
+    canSubmit() {
+      if (this.isPosting) return false;
+      if (this.showPollCreator) {
+        // Poll mode: question + 2 valid options required
+        const hasQuestion = this.pollQuestion && this.pollQuestion.trim().length > 0;
+        const validOptions = this.pollOptions.filter(o => o && o.trim().length > 0);
+        return hasQuestion && validOptions.length >= 2;
+      }
+      return this.canPost;
     }
   },
   methods: {
@@ -207,6 +288,7 @@ export default {
       this.showEmojiPicker = false;
       this.isAnonymous = false;
       this.ghostName = '';
+      this.resetPollForm();
       if (this.$refs.fileInput) {
         this.$refs.fileInput.value = '';
       }
@@ -365,21 +447,47 @@ export default {
     },
 
     async submitPost() {
-      if (!this.canPost || this.isPosting) return;
+      // Always prevent double-submit
+      if (this.isPosting) return;
+
+      // Poll Validation
+      if (this.showPollCreator) {
+        if (!this.pollQuestion.trim()) {
+          alert('Please enter a poll question');
+          return;
+        }
+        const validOptions = this.pollOptions.filter(o => o.trim());
+        if (validOptions.length < 2) {
+          alert('Poll must have at least 2 options');
+          return;
+        }
+      } else {
+        // Normal post validation
+        if (!this.canPost) return;
+      }
       
       try {
         this.isPosting = true;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
         
+        const payload = {
+          user_id: this.userId,
+          content: this.postContent,
+          image: this.postMedia.find(m => m.type === 'image')?.data || null,
+          media: this.postMedia,
+          is_anonymous: this.isAnonymous ? 1 : 0
+        };
+
+        if (this.showPollCreator) {
+          payload.poll_question = this.pollQuestion;
+          payload.poll_options = this.pollOptions.filter(o => o.trim());
+          payload.poll_duration = this.pollDuration;
+        }
+        
         const res = await axios.post(
           `${this.API_URL}/api/post`, 
-          {
-            user_id: this.userId,
-            content: this.postContent,
-            image: this.postMedia.find(m => m.type === 'image')?.data || null,
-            media: this.postMedia
-          },
+          payload,
           { 
             signal: controller.signal,
             timeout: 300000 
@@ -392,14 +500,60 @@ export default {
           this.$emit('post-created');
           this.closeModal();
         } else {
-          alert(res.data.message || 'Failed to create post');
+          alert('Failed to create post: ' + (res.data.message || 'Unknown error'));
         }
       } catch (err) {
-        console.error('❌ Post error:', err);
-        alert('Failed to create post. Please try again.');
+        console.error('Post error:', err);
+        // Show the actual error from the server if available
+        const serverMsg = err?.response?.data?.message;
+        const httpStatus = err?.response?.status;
+        if (serverMsg) {
+          alert('Post failed (HTTP ' + httpStatus + '): ' + serverMsg);
+        } else if (err?.code === 'ECONNABORTED' || err?.name === 'AbortError') {
+          alert('Request timed out. Please try again.');
+        } else {
+          alert('Failed to create post: ' + (err?.message || 'Network error'));
+        }
       } finally {
         this.isPosting = false;
       }
+    },
+
+    togglePollCreator() {
+      if (this.showPollCreator) {
+        if ((this.pollQuestion && this.pollQuestion.trim()) || this.pollOptions.some(o => o.trim())) {
+          if (!confirm('Discard poll?')) return;
+        }
+        this.resetPollForm();
+      }
+      this.showPollCreator = !this.showPollCreator;
+    },
+
+    addPollOption() {
+      if (this.pollOptions.length < 4) {
+        this.pollOptions.push('');
+      }
+    },
+
+    removePollOption(index) {
+      if (this.pollOptions.length > 2) {
+        this.pollOptions.splice(index, 1);
+      }
+    },
+
+    resetPollForm() {
+      this.pollQuestion = '';
+      this.pollOptions = ['', ''];
+      this.pollDuration = '1440';
+      this.showPollCreator = false;
+    },
+
+    resetForm() {
+      this.postContent = '';
+      this.postMedia = [];
+      this.mediaPreviews = [];
+      this.showEmojiPicker = false;
+      this.resetPollForm();
     }
   }
 };
@@ -545,5 +699,54 @@ export default {
 .mention-handle {
   font-size: 12px;
   color: var(--ion-color-medium);
+}
+
+.poll-creator {
+  border: 1px solid var(--ion-border-color, #eff3f4);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.poll-question-input {
+  --padding-start: 0;
+  --padding-end: 0;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.poll-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.poll-option-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.poll-option-input {
+  flex: 1;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --background: #f3f4f6;
+  border-radius: 8px;
+  --placeholder-color: #9ca3af;
+}
+
+.poll-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  border-top: 1px solid var(--ion-border-color, #eff3f4);
+  padding-top: 8px;
+}
+
+.poll-duration-select {
+  max-width: 120px;
+  font-size: 14px;
 }
 </style>

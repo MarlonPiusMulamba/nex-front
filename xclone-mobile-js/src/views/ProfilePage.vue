@@ -226,6 +226,15 @@
                 </div>
               </div>
             </div>
+            
+            <!-- Poll Display -->
+            <PollDisplay 
+              v-if="post.poll" 
+              :poll="post.poll" 
+              :postId="post.post_id"
+              @poll-updated="handlePollUpdate"
+            />
+            
             <img 
               v-else-if="post.image" 
               :src="getImageUrl(post.image)" 
@@ -438,6 +447,7 @@ import {
 import api from '@/utils/api';
 import config from '@/config/index.js';
 import VideoPlayer from '@/components/VideoPlayer.vue';
+import PollDisplay from '@/components/PollDisplay.vue';
 import { saveProfileOffline, getOfflineProfile, isNetworkOffline, savePostsOffline, getOfflinePosts } from '@/utils/offlineDb.js';
 
 export default {
@@ -445,7 +455,7 @@ export default {
   components: {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
     IonButtons, IonIcon, IonSpinner, IonRefresher, IonRefresherContent,
-    IonModal, IonList, IonItem, IonLabel, IonInput, VideoPlayer
+    IonModal, IonList, IonItem, IonLabel, IonInput, VideoPlayer, PollDisplay
   },
   data() {
     return {
@@ -513,6 +523,18 @@ export default {
   },
   
   methods: {
+    handlePollUpdate(event) {
+      const updatePost = (post) => {
+        if (post.post_id === event.postId && post.poll) {
+          post.poll.options = event.options;
+          post.poll.has_voted = true;
+        }
+      };
+      
+      const post = this.userPosts.find(p => p.post_id === event.postId);
+      if (post) updatePost(post);
+    },
+
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
       if (typeof imageData !== 'string') return this.defaultAvatar;
