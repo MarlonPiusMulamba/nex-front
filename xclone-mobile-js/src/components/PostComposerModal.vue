@@ -57,28 +57,56 @@
               </ion-button>
             </div>
             </div>
-          </div>
           
           <!-- Poll Creator -->
           <div v-if="showPollCreator" class="poll-creator">
+
+            <!-- Gradient Header -->
+            <div class="poll-creator-header">
+              <span class="poll-creator-icon">📊</span>
+              <div class="poll-type-chips">
+                <button
+                  class="type-chip"
+                  :class="{ active: pollType === 'standard' }"
+                  @click="setPollType('standard')">
+                  Standard
+                </button>
+                <button
+                  class="type-chip battle-chip"
+                  :class="{ active: pollType === 'battle' }"
+                  @click="setPollType('battle')">
+                  ⚔️ Battle
+                </button>
+              </div>
+            </div>
+
+            <!-- Question Input -->
             <ion-item lines="none" class="poll-input-item">
-              <ion-input 
-                v-model="pollQuestion" 
+              <ion-input
+                v-model="pollQuestion"
                 placeholder="Ask a question..."
                 class="poll-question-input"
               ></ion-input>
             </ion-item>
-            
-            <div class="poll-options">
-              <div v-for="(option, index) in pollOptions" :key="index" class="poll-option-row">
-                <ion-input 
-                  v-model="pollOptions[index]" 
-                  :placeholder="'Option ' + (index + 1)"
+
+            <!-- Options -->
+            <div class="poll-options-list">
+              <div
+                v-for="(option, index) in pollOptions"
+                :key="index"
+                class="poll-option-row"
+                :style="{ animationDelay: index * 60 + 'ms' }"
+              >
+                <!-- Color dot preview -->
+                <span class="option-color-dot" :class="'opt-color-' + index"></span>
+                <ion-input
+                  v-model="pollOptions[index]"
+                  :placeholder="'Choice ' + (index + 1) + '…'"
                   class="poll-option-input"
                 ></ion-input>
-                <ion-button 
-                  v-if="pollOptions.length > 2" 
-                  fill="clear" 
+                <ion-button
+                  v-if="pollOptions.length > 2 && pollType !== 'battle'"
+                  fill="clear"
                   size="small"
                   color="medium"
                   @click="removePollOption(index)">
@@ -86,27 +114,83 @@
                 </ion-button>
               </div>
             </div>
-            
+
+            <!-- Add Option + Duration -->
             <div class="poll-actions">
-              <ion-button 
-                v-if="pollOptions.length < 4" 
-                fill="clear" 
-                size="small" 
+              <ion-button
+                v-if="pollOptions.length < 4 && pollType !== 'battle'"
+                fill="clear"
+                size="small"
+                class="add-option-btn"
                 @click="addPollOption">
                 <ion-icon :icon="add" slot="start"></ion-icon>
-                Add Option
+                Add Choice
               </ion-button>
-              
-              <ion-select v-model="pollDuration" interface="popover" placeholder="Duration" class="poll-duration-select">
-                <ion-select-option value="60">1 Hour</ion-select-option>
-                <ion-select-option value="360">6 Hours</ion-select-option>
-                <ion-select-option value="1440">1 Day</ion-select-option>
-                <ion-select-option value="10080">1 Week</ion-select-option>
-              </ion-select>
+
+              <!-- Duration Chips -->
+              <div class="duration-chips">
+                <button
+                  v-for="d in durationOptions"
+                  :key="d.value"
+                  class="duration-chip"
+                  :class="{ active: pollDuration === d.value }"
+                  @click="pollDuration = d.value">
+                  {{ d.label }}
+                </button>
+              </div>
             </div>
           </div>
-          
-          <!-- Poll Creator -->
+          <!-- /Poll Creator -->
+
+          <!-- AMA Creator -->
+          <div v-if="showAMACreator" class="ama-creator">
+            <div class="ama-creator-header">
+              <span class="ama-creator-icon">🎙️</span>
+              <span class="ama-creator-title">Host an AMA Session</span>
+            </div>
+
+            <ion-item lines="none" class="ama-input-item">
+              <ion-textarea
+                v-model="amaDescription"
+                placeholder="What's this AMA about? (Optional)"
+                class="ama-desc-input"
+                rows="2"
+                auto-grow
+              ></ion-textarea>
+            </ion-item>
+
+            <div class="ama-actions">
+              <span class="duration-label">Duration:</span>
+              <div class="duration-chips">
+                <button
+                  v-for="d in amaDurationOptions"
+                  :key="d.value"
+                  class="duration-chip ama-chip"
+                  :class="{ active: amaDuration === d.value }"
+                  @click="amaDuration = d.value">
+                  {{ d.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- /AMA Creator -->
+
+          <!-- Audio Space Creator -->
+          <div v-if="showAudioSpaceCreator" class="audio-space-creator">
+            <div class="space-creator-header">
+              <span class="space-creator-icon">🟣</span>
+              <span class="space-creator-title">Start a NexFi Talk</span>
+            </div>
+            
+            <ion-item lines="none" class="space-input-item">
+              <ion-input
+                v-model="audioSpaceTitle"
+                placeholder="What do you want to talk about?"
+                class="space-title-input"
+              ></ion-input>
+            </ion-item>
+          </div>
+          <!-- /Audio Space Creator -->
 
           
           <div class="compose-toolbar">
@@ -123,6 +207,12 @@
             </ion-button>
             <ion-button fill="clear" size="small" class="icon-btn icon-poll" @click="togglePollCreator" :color="showPollCreator ? 'primary' : ''">
               <ion-icon :icon="barChart" style="font-size: 24px;"></ion-icon>
+            </ion-button>
+            <ion-button fill="clear" size="small" class="icon-btn icon-ama" @click="toggleAMACreator" :class="{ active: showAMACreator }">
+              <ion-icon :icon="mic" style="font-size: 24px;"></ion-icon>
+            </ion-button>
+            <ion-button fill="clear" size="small" class="icon-btn icon-space" @click="toggleAudioSpaceCreator" :class="{ active: showAudioSpaceCreator }">
+              <ion-icon :icon="radio" style="font-size: 24px;"></ion-icon>
             </ion-button>
 
             <div class="emoji-wrapper">
@@ -151,6 +241,7 @@
             </div>
           </div>
         </div>
+      </div>
 
     </ion-content>
   </ion-modal>
@@ -159,9 +250,9 @@
 <script>
 import {
   IonModal, IonHeader, IonToolbar, IonButtons, IonButton, IonTitle, IonContent,
-  IonTextarea, IonIcon, IonSpinner, IonItem, IonInput, IonSelect, IonSelectOption
+  IonTextarea, IonIcon, IonSpinner, IonItem, IonInput
 } from '@ionic/vue';
-import { image, happy, close, skull, barChart, add } from 'ionicons/icons';
+import { image, happy, close, skull, barChart, add, mic, radio } from 'ionicons/icons';
 import VideoPlayer from '@/components/VideoPlayer.vue';
 import EmojiPicker from '@/components/EmojiPicker.vue';
 import axios from 'axios';
@@ -172,7 +263,7 @@ export default {
   components: {
     IonModal, IonHeader, IonToolbar, IonButtons, IonButton, IonTitle, IonContent,
     IonTextarea, IonIcon, IonSpinner, VideoPlayer, EmojiPicker,
-    IonItem, IonInput, IonSelect, IonSelectOption
+    IonItem, IonInput
   },
   props: {
     isOpen: {
@@ -201,14 +292,36 @@ export default {
       mentionSuggestions: [],
       showMentionSuggestions: false,
       mentionQuery: '',
-      image, happy, close, skull, barChart, add,
+      image, happy, close, skull, barChart, add, mic, radio,
       API_URL: config.api.baseURL,
+      
+      // Audio Space
+      showAudioSpaceCreator: false,
+      audioSpaceTitle: '',
+
+      // AMA Data
+      showAMACreator: false,
+      amaDescription: '',
+      amaDuration: '60',
+      amaDurationOptions: [
+        { label: '1h', value: '60' },
+        { label: '4h', value: '240' },
+        { label: '12h', value: '720' },
+        { label: '24h', value: '1440' }
+      ],
       
       // Poll Data
       showPollCreator: false,
       pollQuestion: '',
       pollOptions: ['', ''],
-      pollDuration: '1440' // Minutes
+      pollDuration: '1440', // Minutes
+      pollType: 'standard', // 'standard' | 'battle'
+      durationOptions: [
+        { label: '1h',  value: '60' },
+        { label: '6h',  value: '360' },
+        { label: '1d',  value: '1440' },
+        { label: '1w',  value: '10080' }
+      ]
     };
   },
   watch: {
@@ -229,8 +342,18 @@ export default {
           const validOptions = this.pollOptions.filter(o => o.trim().length > 0);
           hasValidPoll = hasQuestion && validOptions.length >= 2;
       }
+      
+      let hasValidAMA = false;
+      if (this.showAMACreator) {
+          hasValidAMA = true; // Description is optional, presence is enough
+      }
 
-      return (hasContent || hasValidPoll) && isContentValid;
+      let hasValidSpace = false;
+      if (this.showAudioSpaceCreator) {
+          hasValidSpace = !!this.audioSpaceTitle.trim();
+      }
+
+      return (hasContent || hasValidPoll || hasValidAMA || hasValidSpace) && isContentValid;
     },
     canSubmit() {
       if (this.isPosting) return false;
@@ -239,6 +362,12 @@ export default {
         const hasQuestion = this.pollQuestion && this.pollQuestion.trim().length > 0;
         const validOptions = this.pollOptions.filter(o => o && o.trim().length > 0);
         return hasQuestion && validOptions.length >= 2;
+      }
+      if (this.showAMACreator) {
+        return true;
+      }
+      if (this.showAudioSpaceCreator) {
+          return !!this.audioSpaceTitle.trim();
       }
       return this.canPost;
     }
@@ -281,18 +410,7 @@ export default {
         }
     },
     
-    resetForm() {
-      this.postContent = '';
-      this.postMedia = [];
-      this.mediaPreviews = [];
-      this.showEmojiPicker = false;
-      this.isAnonymous = false;
-      this.ghostName = '';
-      this.resetPollForm();
-      if (this.$refs.fileInput) {
-        this.$refs.fileInput.value = '';
-      }
-    },
+
 
     getImageUrl(path) {
       if (!path) return '/default-avatar.png';
@@ -461,6 +579,13 @@ export default {
           alert('Poll must have at least 2 options');
           return;
         }
+      } else if (this.showAMACreator) {
+          // AMA specific validation if any
+      } else if (this.showAudioSpaceCreator) {
+          if (!this.audioSpaceTitle.trim()) {
+              alert('Please enter a title for your space');
+              return;
+          }
       } else {
         // Normal post validation
         if (!this.canPost) return;
@@ -469,11 +594,11 @@ export default {
       try {
         this.isPosting = true;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
         
         const payload = {
           user_id: this.userId,
-          content: this.postContent,
+          content: this.postContent || '',
           image: this.postMedia.find(m => m.type === 'image')?.data || null,
           media: this.postMedia,
           is_anonymous: this.isAnonymous ? 1 : 0
@@ -483,6 +608,11 @@ export default {
           payload.poll_question = this.pollQuestion;
           payload.poll_options = this.pollOptions.filter(o => o.trim());
           payload.poll_duration = this.pollDuration;
+        } else if (this.showAMACreator) {
+            payload.ama_description = this.amaDescription || '';
+            payload.ama_duration = this.amaDuration;
+        } else if (this.showAudioSpaceCreator) {
+            payload.audio_space_title = this.audioSpaceTitle;
         }
         
         const res = await axios.post(
@@ -490,7 +620,7 @@ export default {
           payload,
           { 
             signal: controller.signal,
-            timeout: 300000 
+            timeout: 60000 
           }
         );
         
@@ -529,6 +659,49 @@ export default {
       this.showPollCreator = !this.showPollCreator;
     },
 
+    toggleAMACreator() {
+      if (this.showAMACreator) {
+        if (this.amaDescription.trim()) {
+           if (!confirm('Discard AMA session?')) return;
+        }
+        this.resetAMACreator();
+      } else {
+        // Close others
+        if (this.showPollCreator) this.togglePollCreator();
+        if (this.showAudioSpaceCreator) this.toggleAudioSpaceCreator();
+        this.showAMACreator = true;
+      }
+    },
+    
+    toggleAudioSpaceCreator() {
+        if (this.showAudioSpaceCreator) {
+            if (this.audioSpaceTitle.trim()) {
+                if (!confirm('Discard Audio Space?')) return;
+            }
+            this.showAudioSpaceCreator = false;
+            this.audioSpaceTitle = '';
+        } else {
+            // Close others
+            if (this.showPollCreator) this.togglePollCreator();
+            if (this.showAMACreator) this.toggleAMACreator();
+            this.showAudioSpaceCreator = true;
+        }
+    },
+
+    resetAMACreator() {
+        this.showAMACreator = false;
+        this.amaDescription = '';
+        this.amaDuration = '60';
+    },
+
+    setPollType(type) {
+      this.pollType = type;
+      if (type === 'battle') {
+        // Battle mode: exactly 2 options
+        this.pollOptions = [this.pollOptions[0] || '', this.pollOptions[1] || ''];
+      }
+    },
+
     addPollOption() {
       if (this.pollOptions.length < 4) {
         this.pollOptions.push('');
@@ -545,6 +718,7 @@ export default {
       this.pollQuestion = '';
       this.pollOptions = ['', ''];
       this.pollDuration = '1440';
+      this.pollType = 'standard';
       this.showPollCreator = false;
     },
 
@@ -553,7 +727,15 @@ export default {
       this.postMedia = [];
       this.mediaPreviews = [];
       this.showEmojiPicker = false;
+      this.isAnonymous = false;
+      this.ghostName = '';
       this.resetPollForm();
+      this.resetAMACreator();
+      this.showAudioSpaceCreator = false;
+      this.audioSpaceTitle = '';
+      if (this.$refs.fileInput) {
+        this.$refs.fileInput.value = '';
+      }
     }
   }
 };
@@ -658,6 +840,59 @@ export default {
   color: #f91880; /* Modern Pink/Red or #e67e22 for Orange */
 }
 
+.icon-ama {
+  color: #ffd700; /* Gold */
+}
+.icon-ama.active {
+    background-color: rgba(255, 215, 0, 0.1);
+}
+
+.icon-space {
+  color: #8a2be2; /* Purple */
+}
+.icon-space.active {
+    background-color: rgba(138, 43, 226, 0.1);
+}
+
+.audio-space-creator {
+  background: #f8f9fa;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid #e1e8ed;
+}
+
+.space-creator-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.space-creator-icon {
+  font-size: 24px;
+  margin-right: 8px;
+}
+
+.space-creator-title {
+  font-weight: 700;
+  font-size: 16px;
+  color: #8a2be2;
+}
+
+.space-input-item {
+  --background: white;
+  --border-radius: 12px;
+  --padding-start: 0;
+  border: 1px solid #e1e8ed;
+  border-radius: 12px;
+  margin-top: 8px;
+}
+
+.space-title-input {
+  --padding-start: 12px;
+  font-weight: 600;
+}
+
 .icon-emoji {
   color: #ffd400; /* Bright Yellow */
 }
@@ -729,52 +964,221 @@ export default {
   color: var(--ion-color-medium);
 }
 
+/* ========== POLL CREATOR ========== */
 .poll-creator {
-  border: 1px solid var(--ion-border-color, #eff3f4);
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 16px;
   margin: 12px 0;
+  overflow: hidden;
+  background: linear-gradient(160deg, rgba(120,86,255,0.06), rgba(29,155,240,0.06));
+  border: 1.5px solid rgba(120,86,255,0.2);
+}
+
+.poll-creator-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #7856ff, #1d9bf0);
+}
+
+.poll-creator-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.poll-type-chips {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.type-chip {
+  border: none;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.8);
+  transition: all 0.2s ease;
+}
+
+.type-chip.active,
+.type-chip:active {
+  background: #fff;
+  color: #7856ff;
+}
+
+.battle-chip.active {
+  color: #f91880;
+}
+
+.poll-input-item {
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --inner-padding-end: 0;
 }
 
 .poll-question-input {
   --padding-start: 0;
   --padding-end: 0;
-  font-weight: 500;
-  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 15px;
 }
 
-.poll-options {
+.poll-options-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 8px 14px 4px;
 }
 
 .poll-option-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  animation: slide-in-option 0.3s ease both;
 }
+
+@keyframes slide-in-option {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Color dots matching PollDisplay colors */
+.option-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.opt-color-0 { background: linear-gradient(135deg, #7856ff, #b04bff); }
+.opt-color-1 { background: linear-gradient(135deg, #1d9bf0, #00cfff); }
+.opt-color-2 { background: linear-gradient(135deg, #f91880, #ff7043); }
+.opt-color-3 { background: linear-gradient(135deg, #00ba7c, #00e5a0); }
 
 .poll-option-input {
   flex: 1;
   --padding-start: 12px;
   --padding-end: 12px;
-  --background: #f3f4f6;
-  border-radius: 8px;
+  --background: rgba(255,255,255,0.7);
+  border-radius: 10px;
   --placeholder-color: #9ca3af;
+}
+
+body.dark .poll-option-input {
+  --background: rgba(255,255,255,0.06);
 }
 
 .poll-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 12px;
-  border-top: 1px solid var(--ion-border-color, #eff3f4);
-  padding-top: 8px;
+  padding: 10px 14px 12px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.poll-duration-select {
-  max-width: 120px;
+.add-option-btn {
+  --color: #7856ff;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* Duration Chips */
+.duration-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.duration-chip {
+  border: 1.5px solid rgba(29,155,240,0.3);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: transparent;
+  color: #687684;
+  transition: all 0.2s ease;
+}
+
+.duration-chip.active {
+  background: linear-gradient(135deg, #1d9bf0, #7856ff);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(29,155,240,0.35);
+}
+
+/* ========== AMA CREATOR ========== */
+.ama-creator {
+  border-radius: 16px;
+  margin: 12px 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
+  border: 1px solid #ffd700;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.15);
+}
+
+.ama-creator-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 215, 0, 0.1);
+  border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+}
+
+.ama-creator-icon {
+  font-size: 18px;
+}
+
+.ama-creator-title {
+  color: #ffd700;
+  font-weight: 700;
   font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ama-input-item {
+  --background: transparent;
+  --padding-start: 10px;
+  --min-height: 0;
+}
+
+.ama-desc-input {
+  --background: transparent;
+  --color: #fff;
+  --placeholder-color: #666;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.ama-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.duration-label {
+    font-size: 12px;
+    color: #888;
+    margin-right: 8px;
+}
+
+.ama-chip {
+    background: rgba(255, 255, 255, 0.05);
+    color: #888;
+}
+
+.ama-chip.active {
+    background: #ffd700;
+    color: #000;
+    font-weight: 700;
 }
 </style>

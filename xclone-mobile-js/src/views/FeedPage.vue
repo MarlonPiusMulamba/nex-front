@@ -235,6 +235,21 @@
               @poll-updated="handlePollUpdate"
             />
 
+            <!-- AMA Card -->
+            <AMACard
+              v-if="post.ama"
+              :ama="post.ama"
+              :currentUser="{ id: userId, username: username, profile_pic: userAvatar }"
+            />
+
+            <!-- Audio Space Card -->
+            <AudioSpaceCard
+              v-if="post.audio_space"
+              :space="post.audio_space"
+              @join-space="handleJoinSpace"
+            />
+
+
             <div class="post-actions">
               <ion-button fill="clear" size="small" @click="openComments(post)" class="action-btn">
                 <ion-icon :icon="chatbubbleOutline"></ion-icon>
@@ -420,6 +435,21 @@
               :postId="detailPost.post_id"
               @poll-updated="handlePollUpdate"
             />
+            
+            <!-- AMA Card (Detail) -->
+             <AMACard
+              v-if="detailPost.ama"
+              :ama="detailPost.ama"
+              :currentUser="{ id: userId, username: username, profile_pic: userAvatar }"
+            />
+
+            <!-- Audio Space Card (Detail) -->
+            <AudioSpaceCard
+              v-if="detailPost.audio_space"
+              :space="detailPost.audio_space"
+              @join-space="handleJoinSpace"
+            />
+
 
             <div class="detail-timestamp">
               {{ formatRelativeTime(detailPost.timestamp) }}
@@ -719,7 +749,18 @@
       :buttons="shareActionSheetButtons"
     ></ion-action-sheet>
 
+    <!-- Audio Space Modal -->
+    <AudioSpaceModal
+      :is-open="showSpaceModal"
+      :space="currentSpace"
+      :currentUser="{ id: userId, username: username, first_name: '', profile_pic: userAvatar }"
+      @close="showSpaceModal = false"
+      @minimize="showSpaceModal = false"
+      @leave="leaveSpace"
+    />
+
   </ion-page>
+
 </template>
 
 <script>
@@ -736,10 +777,15 @@ import {
 } from 'ionicons/icons';
 import axios from 'axios';
 import VideoPlayer from '@/components/VideoPlayer.vue';
+import EmojiPicker from '@/components/EmojiPicker.vue';
+import PostComposerModal from '@/components/PostComposerModal.vue'; 
+import AMACard from '@/components/AMACard.vue';
 import config from '@/config/index.js';
 import notificationService from '@/utils/notificationService.js';
 import { savePostsOffline, getOfflinePosts, isNetworkOffline } from '@/utils/offlineDb.js';
 import PollDisplay from '@/components/PollDisplay.vue';
+import AudioSpaceCard from '@/components/AudioSpaceCard.vue';
+import AudioSpaceModal from '@/components/AudioSpaceModal.vue';
 
 export default {
   name: 'FeedPage',
@@ -747,13 +793,15 @@ export default {
     IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
     IonContent, IonFab, IonFabButton, IonIcon, IonModal, IonTextarea, 
     IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent,
-    IonActionSheet, VideoPlayer, PollDisplay
+    IonActionSheet, VideoPlayer, PollDisplay, EmojiPicker, PostComposerModal, AMACard,
+    AudioSpaceCard, AudioSpaceModal
   },
   data() {
     const API_URL = config.api.baseURL;
     
     return {
       userId: localStorage.getItem('userId'),
+      username: localStorage.getItem('username'),
       userAvatar: localStorage.getItem('userAvatar') || '',
       posts: [],
       isLoading: false,
@@ -810,6 +858,11 @@ export default {
       detailComments: [],
       loadingDetailComments: false,
       mediaZoom: 1,
+
+      // Audio Space
+      showSpaceModal: false,
+      currentSpace: null,
+
       loadingDetailComments: false,
       mediaZoom: 1,
       notificationPermission: 'default',
@@ -906,6 +959,18 @@ export default {
     }
   },
   methods: {
+    handleJoinSpace(space) {
+        console.log('Joining space:', space);
+        this.currentSpace = space;
+        this.showSpaceModal = true;
+    },
+    
+    leaveSpace() {
+        this.showSpaceModal = false;
+        this.currentSpace = null;
+        // Logic to notify backend about leaving
+    },
+
     handlePollUpdate(event) {
       // event: { postId, options }
       const updatePost = (post) => {
