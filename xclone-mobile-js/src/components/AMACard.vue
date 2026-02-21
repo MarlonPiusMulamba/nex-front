@@ -146,6 +146,7 @@ import {
 } from 'ionicons/icons';
 // import { formatDistanceToNow } from 'date-fns';
 import axios from 'axios';
+import config from '@/config/index.js';
 
 export default {
   name: 'AMACard',
@@ -166,7 +167,8 @@ export default {
       localQuestions: [],
       expanded: false,
       replyingTo: null,
-      replyText: ''
+      replyText: '',
+      API_URL: config.api.baseURL
     };
   },
   computed: {
@@ -190,7 +192,7 @@ export default {
     getAvatarUrl(path) {
       if (!path) return 'assets/default-avatar.png';
       if (path.startsWith('http')) return path;
-      return `${this.$store.state.apiUrl || 'http://localhost:5000'}/uploads/avatars/${path}`;
+      return `${this.API_URL}/uploads/avatars/${path}`;
     },
     timeAgo(dateString) {
       if (!dateString) return '';
@@ -238,7 +240,7 @@ export default {
       this.isSubmitting = true;
       
       try {
-        const response = await axios.post(`${this.$store.state.apiUrl}/api/amas/${this.ama.id}/ask`, {
+        const response = await axios.post(`${this.API_URL}/api/amas/${this.ama.id}/ask`, {
           user_id: this.currentUser.id,
           question: this.newQuestion,
           is_anonymous: this.isAnonymous
@@ -276,7 +278,7 @@ export default {
       // User can see the number change.
       
       try {
-        await axios.post(`${this.$store.state.apiUrl}/api/amas/questions/${q.id}/upvote`, {
+        await axios.post(`${this.API_URL}/api/amas/questions/${q.id}/upvote`, {
           user_id: this.currentUser.id
         });
       } catch (e) {
@@ -289,7 +291,7 @@ export default {
       if (!this.replyText.trim()) return;
       
       try {
-        const response = await axios.post(`${this.$store.state.apiUrl}/api/amas/questions/${q.id}/reply`, {
+        const response = await axios.post(`${this.API_URL}/api/amas/questions/${q.id}/reply`, {
           user_id: this.currentUser.id,
           reply: this.replyText
         });

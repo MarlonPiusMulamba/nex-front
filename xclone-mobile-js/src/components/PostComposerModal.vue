@@ -202,25 +202,37 @@
               ref="fileInput"
               style="display: none;"
             />
-            <ion-button fill="clear" size="small" class="icon-btn icon-media" @click="$refs.fileInput.click()">
-              <ion-icon :icon="image" style="font-size: 24px;"></ion-icon>
-            </ion-button>
-            <ion-button fill="clear" size="small" class="icon-btn icon-poll" @click="togglePollCreator" :color="showPollCreator ? 'primary' : ''">
-              <ion-icon :icon="barChart" style="font-size: 24px;"></ion-icon>
-            </ion-button>
-            <ion-button fill="clear" size="small" class="icon-btn icon-ama" @click="toggleAMACreator" :class="{ active: showAMACreator }">
-              <ion-icon :icon="mic" style="font-size: 24px;"></ion-icon>
-            </ion-button>
-            <ion-button fill="clear" size="small" class="icon-btn icon-space" @click="toggleAudioSpaceCreator" :class="{ active: showAudioSpaceCreator }">
-              <ion-icon :icon="radio" style="font-size: 24px;"></ion-icon>
-            </ion-button>
+            
+            <div class="toolbar-actions">
+              <div class="emoji-wrapper">
+                <button type="button" class="toolbar-btn btn-emoji" @click="toggleEmojiPicker" title="Add Emoji">
+                  <ion-icon :icon="happy"></ion-icon>
+                  <span>Emoji</span>
+                </button>
+                <EmojiPicker v-if="showEmojiPicker" @select="addEmoji" class="composer-emoji-picker" />
+              </div>
 
-            <div class="emoji-wrapper">
-              <ion-button fill="clear" size="small" class="icon-btn icon-emoji" @click="toggleEmojiPicker">
-                <ion-icon :icon="happy" style="font-size: 24px;"></ion-icon>
-              </ion-button>
-              <EmojiPicker v-if="showEmojiPicker" @select="addEmoji" class="composer-emoji-picker" />
+              <button type="button" class="toolbar-btn btn-media" @click="$refs.fileInput.click()" title="Add Media">
+                <ion-icon :icon="image"></ion-icon>
+                <span>Media</span>
+              </button>
+
+              <button type="button" class="toolbar-btn btn-poll" @click="togglePollCreator" :class="{ active: showPollCreator }" title="Create Poll">
+                <ion-icon :icon="barChart"></ion-icon>
+                <span>Poll</span>
+              </button>
+
+              <button type="button" class="toolbar-btn btn-ama" @click="toggleAMACreator" :class="{ active: showAMACreator }" title="Host AMA">
+                <ion-icon :icon="mic"></ion-icon>
+                <span>AMA</span>
+              </button>
+
+              <button type="button" class="toolbar-btn btn-space" @click="toggleAudioSpaceCreator" :class="{ active: showAudioSpaceCreator }" title="Start Talk">
+                <ion-icon :icon="radio"></ion-icon>
+                <span>Talk</span>
+              </button>
             </div>
+
             <span class="char-count" :class="{ 'over-limit': postContent.length > 1000 }">
               {{ postContent.length }}/1000
             </span>
@@ -812,47 +824,86 @@ export default {
 
 .compose-toolbar {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   border-top: 1px solid var(--ion-border-color, #eff3f4);
   padding-top: 12px;
   margin-top: 8px;
-  gap: 8px;
+  gap: 12px;
 }
 
-.icon-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  transition: background-color 0.2s;
-  --padding-start: 0;
-  --padding-end: 0;
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 
-.icon-btn:hover {
-  background-color: rgba(var(--ion-color-primary-rgb), 0.05);
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0f2f5;
+  border: 1px solid transparent;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  color: #536471;
 }
 
-.icon-media {
-  color: #1d9bf0; /* Twitter/Modern Blue */
+.toolbar-btn ion-icon {
+  font-size: 18px;
 }
 
-.icon-poll {
-  color: #f91880; /* Modern Pink/Red or #e67e22 for Orange */
+.toolbar-btn:hover {
+  background: #e8e9eb;
+  transform: translateY(-1px);
 }
 
-.icon-ama {
-  color: #ffd700; /* Gold */
-}
-.icon-ama.active {
-    background-color: rgba(255, 215, 0, 0.1);
+.toolbar-btn.active {
+  background: rgba(var(--ion-color-primary-rgb), 0.1);
+  color: var(--ion-color-primary);
+  border-color: rgba(var(--ion-color-primary-rgb), 0.2);
 }
 
-.icon-space {
-  color: #8a2be2; /* Purple */
+.btn-emoji {
+  color: #ffb000;
 }
-.icon-space.active {
-    background-color: rgba(138, 43, 226, 0.1);
+.btn-emoji:hover {
+  background-color: rgba(255, 176, 0, 0.1);
 }
+
+.btn-media {
+  color: #1d9bf0;
+}
+.btn-media:hover {
+  background-color: rgba(29, 155, 240, 0.1);
+}
+
+.btn-poll {
+  color: #f91880;
+}
+.btn-poll:hover {
+  background-color: rgba(249, 24, 128, 0.1);
+}
+
+.btn-ama {
+  color: #ffd700;
+}
+.btn-ama:hover {
+  background-color: rgba(255, 215, 0, 0.1);
+}
+
+.btn-space {
+  color: #8a2be2;
+}
+.btn-space:hover {
+  background-color: rgba(138, 43, 226, 0.1);
+}
+
+
 
 .audio-space-creator {
   background: #f8f9fa;
@@ -893,9 +944,7 @@ export default {
   font-weight: 600;
 }
 
-.icon-emoji {
-  color: #ffd400; /* Bright Yellow */
-}
+
 
 .emoji-wrapper {
   position: relative;

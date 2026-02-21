@@ -70,6 +70,9 @@
 import { ref, computed } from 'vue';
 import { IonIcon, IonAvatar, IonButton } from '@ionic/vue';
 import { mic, peopleOutline } from 'ionicons/icons';
+import config from '@/config/index.js';
+
+const API_URL = config.api.baseURL;
 
 const props = defineProps({
   space: {
@@ -85,7 +88,7 @@ const localSpace = computed(() => props.space);
 const getAvatarUrl = (path) => {
   if (!path) return 'https://ionicframework.com/docs/img/demos/avatar.svg';
   if (path.startsWith('http')) return path;
-  return `https://nexback.pythonanywhere.com${path}`;
+  return `${API_URL}${path.startsWith('/') ? '' : '/'}${path}`;
 };
 
 const joinSpace = () => {

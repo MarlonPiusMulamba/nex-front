@@ -83,6 +83,32 @@ class SocketService {
             console.log('📞 Call ended:', data);
             window.dispatchEvent(new CustomEvent('call:ended', { detail: data }));
         });
+
+        // Listen for Space (Meeting) events
+        this.socket.on('space:ended', (data) => {
+            console.log('🏢 Space ended:', data);
+            window.dispatchEvent(new CustomEvent('space:ended', { detail: data }));
+        });
+
+        this.socket.on('space:participant_joined', (data) => {
+            console.log('🏢 Participant joined space:', data);
+            window.dispatchEvent(new CustomEvent('space:participant_joined', { detail: data }));
+        });
+
+        this.socket.on('space:participant_left', (data) => {
+            console.log('🏢 Participant left space:', data);
+            window.dispatchEvent(new CustomEvent('space:participant_left', { detail: data }));
+        });
+
+        this.socket.on('space:state_updated', (data) => {
+            console.log('🏢 Space state updated:', data);
+            window.dispatchEvent(new CustomEvent('space:state_updated', { detail: data }));
+        });
+
+        this.socket.on('space:signal', (data) => {
+            console.log('🏢 Space signaling message:', data.type);
+            window.dispatchEvent(new CustomEvent('space:signal', { detail: data }));
+        });
     }
 
     disconnect() {
