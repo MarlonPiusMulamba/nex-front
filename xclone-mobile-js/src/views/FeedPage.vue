@@ -550,7 +550,14 @@
         <ion-content class="media-modal" color="dark">
           <div class="media-lightbox">
             <div class="zoom-container" :style="{ transform: `scale(${mediaZoom})` }">
-              <img v-if="mediaSrc" :src="mediaSrc" alt="Media" @click="closeMediaModal" />
+              <template v-if="mediaSrc">
+                <VideoPlayer 
+                  v-if="isVideo(mediaSrc)" 
+                  :src="mediaSrc" 
+                  style="width: 100%; max-height: 90vh;" 
+                />
+                <img v-else :src="mediaSrc" alt="Media" @click="closeMediaModal" />
+              </template>
             </div>
           </div>
         </ion-content>
@@ -961,6 +968,13 @@ export default {
   methods: {
     handleJoinSpace(space) {
         console.log('Joining space:', space);
+        if (space.status !== 'live' && space.recording_url) {
+          // Open recording player
+          this.mediaSrc = this.getImageUrl(space.recording_url);
+          this.showMediaModal = true;
+          this.mediaZoom = 1;
+          return;
+        }
         this.currentSpace = space;
         this.showSpaceModal = true;
     },

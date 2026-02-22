@@ -175,10 +175,9 @@
           </div>
           <!-- /AMA Creator -->
 
-          <!-- Audio Space Creator -->
           <div v-if="showAudioSpaceCreator" class="audio-space-creator">
             <div class="space-creator-header">
-              <span class="space-creator-icon">🟣</span>
+              <span class="space-creator-icon">📻</span>
               <span class="space-creator-title">Start a NexFi Talk</span>
             </div>
             
@@ -189,6 +188,14 @@
                 class="space-title-input"
               ></ion-input>
             </ion-item>
+
+            <div class="locked-toggle-item">
+              <ion-label>Locked Talk (Request to join)</ion-label>
+              <ion-toggle v-model="audioSpaceIsLocked" color="warning"></ion-toggle>
+            </div>
+            <p class="locked-hint" v-if="audioSpaceIsLocked">
+              Only people you approve can join. Recording will be private to you.
+            </p>
           </div>
           <!-- /Audio Space Creator -->
 
@@ -262,9 +269,9 @@
 <script>
 import {
   IonModal, IonHeader, IonToolbar, IonButtons, IonButton, IonTitle, IonContent,
-  IonTextarea, IonIcon, IonSpinner, IonItem, IonInput
+  IonTextarea, IonIcon, IonSpinner, IonItem, IonInput, IonToggle, IonLabel
 } from '@ionic/vue';
-import { image, happy, close, skull, barChart, add, mic, radio } from 'ionicons/icons';
+import { image, happy, close, skull, barChart, add, mic, radio, lockClosed } from 'ionicons/icons';
 import VideoPlayer from '@/components/VideoPlayer.vue';
 import EmojiPicker from '@/components/EmojiPicker.vue';
 import axios from 'axios';
@@ -275,7 +282,7 @@ export default {
   components: {
     IonModal, IonHeader, IonToolbar, IonButtons, IonButton, IonTitle, IonContent,
     IonTextarea, IonIcon, IonSpinner, VideoPlayer, EmojiPicker,
-    IonItem, IonInput
+    IonItem, IonInput, IonToggle, IonLabel
   },
   props: {
     isOpen: {
@@ -310,6 +317,7 @@ export default {
       // Audio Space
       showAudioSpaceCreator: false,
       audioSpaceTitle: '',
+      audioSpaceIsLocked: false,
 
       // AMA Data
       showAMACreator: false,
@@ -625,6 +633,7 @@ export default {
             payload.ama_duration = this.amaDuration;
         } else if (this.showAudioSpaceCreator) {
             payload.audio_space_title = this.audioSpaceTitle;
+            payload.is_locked = this.audioSpaceIsLocked ? 1 : 0;
         }
         
         const res = await axios.post(
@@ -745,6 +754,7 @@ export default {
       this.resetAMACreator();
       this.showAudioSpaceCreator = false;
       this.audioSpaceTitle = '';
+      this.audioSpaceIsLocked = false;
       if (this.$refs.fileInput) {
         this.$refs.fileInput.value = '';
       }
@@ -897,20 +907,20 @@ export default {
 }
 
 .btn-space {
-  color: #8a2be2;
+  color: #FFD700;
 }
 .btn-space:hover {
-  background-color: rgba(138, 43, 226, 0.1);
+  background-color: rgba(255, 215, 0, 0.1);
 }
 
 
 
 .audio-space-creator {
-  background: #f8f9fa;
+  background: #111;
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 20px;
-  border: 1px solid #e1e8ed;
+  border: 1px solid #FFD700;
 }
 
 .space-creator-header {
@@ -927,7 +937,7 @@ export default {
 .space-creator-title {
   font-weight: 700;
   font-size: 16px;
-  color: #8a2be2;
+  color: #FFD700;
 }
 
 .space-input-item {
@@ -1018,8 +1028,8 @@ export default {
   border-radius: 16px;
   margin: 12px 0;
   overflow: hidden;
-  background: linear-gradient(160deg, rgba(120,86,255,0.06), rgba(29,155,240,0.06));
-  border: 1.5px solid rgba(120,86,255,0.2);
+  background: rgba(255, 215, 0, 0.05);
+  border: 1.5px solid rgba(255, 215, 0, 0.3);
 }
 
 .poll-creator-header {
@@ -1027,7 +1037,7 @@ export default {
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  background: linear-gradient(135deg, #7856ff, #1d9bf0);
+  background: linear-gradient(135deg, #daa520, #FFD700);
 }
 
 .poll-creator-icon {
@@ -1055,8 +1065,8 @@ export default {
 
 .type-chip.active,
 .type-chip:active {
-  background: #fff;
-  color: #7856ff;
+  background: #000;
+  color: #FFD700;
 }
 
 .battle-chip.active {
@@ -1102,7 +1112,7 @@ export default {
   border-radius: 50%;
   flex-shrink: 0;
 }
-.opt-color-0 { background: linear-gradient(135deg, #7856ff, #b04bff); }
+.opt-color-0 { background: linear-gradient(135deg, #FFD700, #daa520); }
 .opt-color-1 { background: linear-gradient(135deg, #1d9bf0, #00cfff); }
 .opt-color-2 { background: linear-gradient(135deg, #f91880, #ff7043); }
 .opt-color-3 { background: linear-gradient(135deg, #00ba7c, #00e5a0); }
@@ -1130,7 +1140,7 @@ body.dark .poll-option-input {
 }
 
 .add-option-btn {
-  --color: #7856ff;
+  --color: #FFD700;
   font-weight: 700;
   font-size: 13px;
 }
@@ -1155,7 +1165,7 @@ body.dark .poll-option-input {
 }
 
 .duration-chip.active {
-  background: linear-gradient(135deg, #1d9bf0, #7856ff);
+  background: linear-gradient(135deg, #daa520, #FFD700);
   border-color: transparent;
   color: #fff;
   box-shadow: 0 2px 8px rgba(29,155,240,0.35);
@@ -1229,5 +1239,63 @@ body.dark .poll-option-input {
     background: #ffd700;
     color: #000;
     font-weight: 700;
+}
+.duration-chip.active {
+    background: #ffd700;
+    color: #000;
+    font-weight: 700;
+}
+
+/* Audio Space Creator */
+.audio-space-creator {
+  border-radius: 16px;
+  margin: 12px 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
+  border: 1px solid #ffd700;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
+  padding: 16px;
+}
+
+.space-creator-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.space-creator-icon { font-size: 24px; }
+.space-creator-title {
+  color: #ffd700;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.space-input-item {
+  --background: rgba(255, 255, 255, 0.05);
+  --border-radius: 12px;
+  --padding-start: 12px;
+  margin-bottom: 16px;
+}
+
+.space-title-input {
+  --color: #fff;
+  font-size: 16px;
+}
+
+.locked-toggle-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  color: #fff;
+  font-size: 14px;
+}
+
+.locked-hint {
+  font-size: 11px;
+  color: #888;
+  margin: 4px 0 0 0;
+  font-style: italic;
 }
 </style>

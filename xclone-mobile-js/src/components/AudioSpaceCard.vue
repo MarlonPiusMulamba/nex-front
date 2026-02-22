@@ -13,7 +13,8 @@
       </div>
       
       <div class="listener-count" v-if="localSpace.status === 'live'">
-        <ion-icon :icon="peopleOutline"></ion-icon>
+        <ion-icon :icon="lockClosed" v-if="localSpace.is_locked" class="locked-icon"></ion-icon>
+        <ion-icon :icon="peopleOutline" v-else></ion-icon>
         {{ localSpace.participant_count || 0 }} listening
       </div>
     </div>
@@ -57,19 +58,36 @@
       <ion-button 
         expand="block" 
         class="join-btn"
-        :class="{ 'btn-live': localSpace.status === 'live', 'btn-ended': localSpace.status !== 'live' }"
-        @click="joinSpace"
+        :disabled="isPendingApproval"
+        :class="{ 
+          'btn-live': localSpace.status === 'live', 
+          'btn-ended': localSpace.status !== 'live',
+          'btn-pending': isPendingApproval
+        }"
+        @click="handleAction"
       >
-        {{ localSpace.status === 'live' ? 'Join Space' : 'View Recording' }}
+        <template v-if="localSpace.status === 'live'">
+          <template v-if="isHost">Join Space</template>
+          <template v-else-if="localSpace.is_locked">
+            <template v-if="requestStatus === 'approved'">Join Space</template>
+            <template v-else-if="requestStatus === 'pending'">Pending Approval</template>
+            <template v-else-if="requestStatus === 'denied'">Access Denied</template>
+            <template v-else>Request Access</template>
+          </template>
+          <template v-else>Join Space</template>
+        </template>
+        <template v-else-if="localSpace.recording_url">View Recording</template>
+        <template v-else>Space Ended</template>
       </ion-button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { IonIcon, IonAvatar, IonButton } from '@ionic/vue';
-import { mic, peopleOutline } from 'ionicons/icons';
+import { mic, peopleOutline, lockClosed } from 'ionicons/icons';
+import axios from 'axios';
 import config from '@/config/index.js';
 
 const API_URL = config.api.baseURL;
@@ -84,22 +102,80 @@ const props = defineProps({
 const emit = defineEmits(['join-space']);
 
 const localSpace = computed(() => props.space);
+const userId = localStorage.getItem('userId');
+const requestStatus = ref(null); // 'pending', 'approved', 'denied'
+
+const isHost = computed(() => {
+  return userId && String(userId) === String(localSpace.value.host_user_id);
+});
+
+const isPendingApproval = computed(() => {
+  return !isHost.value && localSpace.value.is_locked && requestStatus.value === 'pending';
+});
+
+onMounted(() => {
+  if (localSpace.value.is_locked && !isHost.value && userId) {
+    checkRequestStatus();
+  }
+});
+
+const checkRequestStatus = async () => {
+    try {
+        const res = await axios.get(`${API_URL}/api/audio-spaces/${localSpace.value.id}/request_status`, {
+            params: { user_id: userId }
+        });
+        if (res.data.success) {
+            requestStatus.value = res.data.status;
+        }
+    } catch (err) {
+        console.error('Check request status error:', err);
+    }
+};
+
+const handleAction = async () => {
+    if (localSpace.value.status !== 'live') {
+        emit('join-space', localSpace.value);
+        return;
+    }
+
+    if (!isHost.value && localSpace.value.is_locked) {
+        if (!requestStatus.value) {
+            // Submit request
+            try {
+                const res = await axios.post(`${API_URL}/api/audio-spaces/${localSpace.value.id}/request`, {
+                    user_id: userId,
+                    username: localStorage.getItem('username') || 'Someone'
+                });
+                if (res.data.success) {
+                    requestStatus.value = 'pending';
+                }
+            } catch (err) {
+                alert('Failed to request access: ' + (err.response?.data?.message || err.message));
+            }
+            return;
+        } else if (requestStatus.value === 'pending') {
+            return; // Already pending
+        } else if (requestStatus.value === 'denied') {
+            alert('Host has denied your request.');
+            return;
+        }
+    }
+
+    // Default join
+    emit('join-space', localSpace.value);
+};
 
 const getAvatarUrl = (path) => {
   if (!path) return 'https://ionicframework.com/docs/img/demos/avatar.svg';
   if (path.startsWith('http')) return path;
   return `${API_URL}${path.startsWith('/') ? '' : '/'}${path}`;
 };
-
-const joinSpace = () => {
-    emit('join-space', localSpace.value);
-};
 </script>
 
 <style scoped>
 .audio-space-card {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  border: 1px solid rgba(138, 43, 226, 0.3); /* Purple border */
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+  border: 1px solid rgba(255, 215, 0, 0.3); /* Gold border */
   border-radius: 16px;
   padding: 16px;
   margin-top: 10px;
@@ -116,7 +192,7 @@ const joinSpace = () => {
   right: -50px;
   width: 150px;
   height: 150px;
-  background: radial-gradient(circle, rgba(138, 43, 226, 0.4) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.1) 0%, transparent 70%);
   filter: blur(20px);
   z-index: 0;
 }
@@ -133,15 +209,15 @@ const joinSpace = () => {
 .live-badge {
   display: flex;
   align-items: center;
-  background: rgba(138, 43, 226, 0.2);
-  color: #c471ed; /* Bright pastel purple */
+  background: rgba(255, 215, 0, 0.15);
+  color: #FFD700; /* Gold */
   padding: 4px 10px;
   border-radius: 20px;
   font-weight: 700;
   font-size: 0.75rem;
   letter-spacing: 0.5px;
-  border: 1px solid rgba(138, 43, 226, 0.5);
-  box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
 }
 
 .equalizer {
@@ -154,7 +230,7 @@ const joinSpace = () => {
 
 .equalizer span {
   width: 2px;
-  background: #c471ed;
+  background: #FFD700;
   animation: equalize 1s infinite ease-in-out;
 }
 
@@ -210,14 +286,14 @@ const joinSpace = () => {
   height: 40px;
   margin-right: 10px;
   position: relative;
-  border: 2px solid #8a2be2;
+  border: 2px solid #FFD700;
 }
 
 .mic-badge {
   position: absolute;
   bottom: -2px;
   right: -2px;
-  background: #8a2be2;
+  background: #FFD700;
   border-radius: 50%;
   width: 16px;
   height: 16px;
@@ -225,8 +301,8 @@ const joinSpace = () => {
   align-items: center;
   justify-content: center;
   font-size: 10px;
-  color: white;
-  border: 1px solid #1a1a2e;
+  color: #000;
+  border: 1px solid #000;
 }
 
 .host-info {
@@ -277,11 +353,12 @@ const joinSpace = () => {
 }
 
 .join-btn {
-  --background: #8a2be2;
-  --background-hover: #7b27cc;
-  --background-activated: #6a22b0;
+  --background: #FFD700;
+  --color: #000;
+  --background-hover: #e6c200;
+  --background-activated: #ccad00;
   --border-radius: 8px;
-  --box-shadow: 0 4px 12px rgba(138, 43, 226, 0.3);
+  --box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
   font-weight: 600;
   letter-spacing: 0.5px;
   margin: 0;
@@ -291,5 +368,16 @@ const joinSpace = () => {
   --background: rgba(255, 255, 255, 0.1);
   --color: #aaa;
   --box-shadow: none;
+}
+
+.btn-pending {
+  --background: rgba(255, 215, 0, 0.2);
+  --color: #ffd700;
+  --box-shadow: none;
+}
+
+.locked-icon {
+  color: #ffd700;
+  margin-right: 4px;
 }
 </style>

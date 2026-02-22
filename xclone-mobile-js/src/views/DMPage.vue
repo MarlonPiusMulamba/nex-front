@@ -1,4 +1,4 @@
-
+﻿
 <template>
   <ion-page>
     <!-- Main Conversations List View -->
@@ -109,8 +109,15 @@
 
       <!-- Chat Messages View -->
       <div v-else class="chat-container" ref="chatContainer">
-        <div v-if="loadingMessages" class="loading-container">
-          <ion-spinner></ion-spinner>
+        <!-- Animated ambient background -->
+        <div class="chat-ambient">
+          <div class="ambient-orb orb-1"></div>
+          <div class="ambient-orb orb-2"></div>
+          <div class="ambient-orb orb-3"></div>
+        </div>
+
+        <div v-if="loadingMessages" class="loading-container nexfi-loading">
+          <div class="loading-ring"></div>
         </div>
         
         <div v-else class="chat-messages">
@@ -123,60 +130,150 @@
           <div 
             v-for="msg in messages" 
             :key="msg.id"
-            :class="['message-bubble', msg.sent_by_me ? 'sent' : 'received']">
-            <div class="message-content">
+            :class="['msg-row', msg.sent_by_me ? 'sent' : 'received']">
+
+            <!-- Mood badge -->
+            <div v-if="msg.mood" class="mood-label" :class="'mood-' + msg.mood">
+              {{ moodMap[msg.mood]?.icon }} {{ moodMap[msg.mood]?.label }}
+            </div>
+
+            <div class="msg-card" :class="[
+              msg.sent_by_me ? 'sent-card' : 'received-card',
+              msg.mood ? 'mood-card mood-card--' + msg.mood : ''
+            ]">
               <img v-if="msg.image" :src="getImageUrl(msg.image)" class="message-image" alt="Image" />
-              <div v-if="msg.text" class="message-text" v-html="formatPostContent(msg.text)" @click="onPostTextClick($event)"></div>
-              <div class="message-meta">
-                <span class="message-time">{{ formatMessageTime(msg.timestamp) }}</span>
-                <ion-icon 
-                  v-if="msg.sent_by_me"
-                  :icon="msg.read ? checkmarkDone : checkmark"
-                  :class="['message-status', { 'read': msg.read }]">
-                </ion-icon>
+              
+              <!-- Voice Note Player -->
+              <div v-if="msg.voice" class="voice-player">
+                <button class="voice-play-btn" @click="toggleVoicePlayback(msg)">
+                  <span v-if="playingAudioId === msg.id">â¸</span>
+                  <span v-else>â–¶</span>
+                </button>
+                <div class="voice-waveform">
+                  <div 
+                    v-for="n in 18" 
+                    :key="n"
+                    class="wave-bar"
+                    :class="{ 'active': playingAudioId === msg.id && (n / 18) * 100 < getAudioProgress(msg.id) }"
+                    :style="{ height: (Math.sin(n * 0.8) * 10 + 14) + 'px' }">
+                  </div>
+                </div>
+                <span class="voice-duration">{{ formatDuration(getAudioDuration(msg.id)) }}</span>
+              </div>
+
+              <div v-if="msg.text" class="msg-text" v-html="formatPostContent(msg.text)" @click="onPostTextClick($event)"></div>
+              <div class="msg-meta">
+                <span class="msg-time">{{ formatMessageTime(msg.timestamp) }}</span>
+                
+                <!-- LAN/Sync Status -->
+                <span v-if="msg.sent_by_me" class="msg-status-icon" :title="msg.status">
+                  <span v-if="msg.status === 'local'" class="status-local">âŒ§</span>
+                  <span v-else-if="msg.status === 'delivered'" class="status-delivered">ðŸ¤</span>
+                  <span v-else class="msg-read" :class="{ 'seen': msg.read }">{{ msg.read ? 'âœ“âœ“' : 'âœ“' }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Typing indicator -->
+          <div v-if="partnerTyping" class="typing-row">
+            <div class="typing-card">
+              <span class="typing-label">crafting a thought</span>
+              <div class="typing-dots">
+                <span></span><span></span><span></span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Message Input (Fixed at bottom when chat is open) -->
-      <div v-if="selectedChat" class="message-input-container">
-        <ion-button fill="clear" size="small" @click="attachImage">
-          <ion-icon :icon="add" color="medium"></ion-icon>
-        </ion-button>
-        
-        <div class="input-wrapper">
-          <ion-textarea
-            v-model="messageText"
-            placeholder="Type a message"
-            :auto-grow="true"
-            :rows="1"
-            class="message-textarea"
-            @keyup.enter.exact="sendMessage">
-          </ion-textarea>
-
-          <div class="emoji-wrapper">
-            <ion-button fill="clear" size="small" @click="toggleEmojiPicker" class="emoji-trigger">
-              <ion-icon :icon="happy" color="medium"></ion-icon>
-            </ion-button>
-            <EmojiPicker v-if="showEmojiPicker" @select="addEmoji" class="dm-emoji-picker" />
+      <!-- Message Input -->
+      <div v-if="selectedChat" class="nexfi-input-area">
+        <!-- Mood Picker -->
+        <transition name="mood-fade">
+          <div v-if="showMoodPicker" class="mood-picker">
+            <button 
+              v-for="(mood, key) in moodMap" 
+              :key="key"
+              class="mood-option"
+              :class="{ 'selected': selectedMood === key }"
+              @click="selectMood(key)">
+              {{ mood.icon }}
+              <span>{{ mood.label }}</span>
+            </button>
           </div>
-          
-          <ion-button 
-            v-if="messageText.trim() || imagePreview"
-            fill="clear" 
-            size="small"
-            @click="sendMessage"
-            :disabled="isSending"
-            class="send-btn">
-            <ion-spinner v-if="isSending" name="crescent"></ion-spinner>
-            <ion-icon v-else :icon="send" color="primary"></ion-icon>
-          </ion-button>
-          <ion-button v-else fill="clear" size="small">
-            <ion-icon :icon="mic" color="medium"></ion-icon>
-          </ion-button>
+        </transition>
+
+        <!-- Image preview strip -->
+        <div v-if="imagePreview" class="image-preview-strip">
+          <img :src="imagePreview" class="preview-thumb" />
+          <button class="remove-preview" @click="imagePreview = null">âœ•</button>
         </div>
+
+        <div class="input-bar">
+          <button class="input-action-btn" @click="attachImage">
+            <ion-icon :icon="add"></ion-icon>
+          </button>
+
+          <button 
+            class="input-action-btn mood-trigger"
+            :class="{ 'mood-active': selectedMood }"
+            @click="showMoodPicker = !showMoodPicker"
+            :title="selectedMood ? moodMap[selectedMood]?.label : 'Set mood'">
+            <span v-if="selectedMood">{{ moodMap[selectedMood]?.icon }}</span>
+            <span v-else>ðŸŽ­</span>
+          </button>
+
+          <div class="textarea-wrap">
+            <ion-textarea
+              v-model="messageText"
+              :placeholder="inputPlaceholder"
+              :auto-grow="true"
+              :rows="1"
+              class="nexfi-textarea"
+              @ionInput="onTyping">
+            </ion-textarea>
+          </div>
+
+          <button class="input-action-btn emoji-btn" @click="toggleEmojiPicker">
+            <ion-icon :icon="happy"></ion-icon>
+          </button>
+          <EmojiPicker v-if="showEmojiPicker" @select="addEmoji" class="dm-emoji-picker" />
+
+          <button 
+            v-if="messageText.trim() || imagePreview"
+            class="send-fab"
+            @click="sendMessage"
+            :disabled="isSending">
+            <ion-spinner v-if="isSending" name="crescent"></ion-spinner>
+            <ion-icon v-else :icon="send"></ion-icon>
+          </button>
+          <button 
+            v-else
+            class="mic-fab"
+            :class="{ 'recording': isRecording }"
+            @touchstart.prevent="startRecording"
+            @touchend.prevent="stopRecording"
+            @mousedown="startRecording"
+            @mouseup="stopRecording">
+            <ion-icon :icon="mic"></ion-icon>
+            <div v-if="isRecording" class="mic-pulse"></div>
+          </button>
+        </div>
+
+        <!-- Recording Bar -->
+        <transition name="slide-up">
+          <div v-if="isRecording" class="recording-bar">
+            <button class="rec-cancel" @click.stop="cancelRecording">âœ• Cancel</button>
+            <div class="rec-status">
+              <span class="rec-dot"></span>
+              <span class="rec-timer">{{ formatDuration(recordingDuration) }}</span>
+            </div>
+            <div class="rec-wave">
+              <span v-for="n in 8" :key="n" class="rec-wave-bar" :style="{ animationDelay: (n * 0.1) + 's' }"></span>
+            </div>
+          </div>
+        </transition>
       </div>
     </ion-content>
 
@@ -248,8 +345,15 @@ import api from '@/utils/api.js';
 import EmojiPicker from '@/components/EmojiPicker.vue';
 import { 
   saveConversationsOffline, getOfflineConversations, 
-  saveMessagesOffline, getOfflineMessages, isNetworkOffline 
+  saveMessagesOffline, getOfflineMessages, isNetworkOffline,
+  saveLocalMessage
 } from '@/utils/offlineDb.js';
+import { 
+  stop, trash, play, pause
+} from 'ionicons/icons';
+import lanService from '@/utils/lanService.js';
+import { startSyncWatcher } from '@/utils/syncService.js';
+import { v4 as uuidv4 } from 'uuid';
 
 export default {
   name: 'DMPage',
@@ -280,8 +384,39 @@ export default {
       search, arrowBack, send, mic, add, call, videocam, chatbubbles,
       checkmark, checkmarkDone, happy,
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
-      _socketNewMessageHandler: null
+      _socketNewMessageHandler: null,
+      // Voice Recording State
+      isRecording: false,
+      mediaRecorder: null,
+      audioChunks: [],
+      recordingDuration: 0,
+      recordingTimer: null,
+      stop, trash, play, pause,
+      playingAudioId: null,
+      audioElements: {},
+      // Mood System
+      selectedMood: null,
+      showMoodPicker: false,
+      moodMap: {
+        bold:    { icon: 'ðŸ”¥', label: 'Bold',    glow: '#ff6b35' },
+        deep:    { icon: 'ðŸ§ ', label: 'Deep',    glow: '#6c63ff' },
+        casual:  { icon: 'ðŸ’¬', label: 'Casual',  glow: '#00c9a7' },
+        serious: { icon: 'ðŸŽ¯', label: 'Serious', glow: '#daa520' },
+      },
+      // Typing indicator
+      partnerTyping: false,
+      typingTimeout: null,
+      typingEmitTimeout: null,
     };
+  },
+  computed: {
+    inputPlaceholder() {
+      if (this.selectedMood) {
+        const m = this.moodMap[this.selectedMood];
+        return `${m.icon}  Drop a ${m.label.toLowerCase()} thought...`;
+      }
+      return 'Speak freely...';
+    }
   },
   methods: {
     getImageUrl(imageData) {
@@ -356,7 +491,7 @@ export default {
 
       try {
         this.searchingUsers = true;
-        console.log('📡 Searching users with query:', rawQuery);
+        console.log('ðŸ“¡ Searching users with query:', rawQuery);
         const res = await api.get('/api/search/users', {
           params: { 
             q: rawQuery,
@@ -370,9 +505,9 @@ export default {
         const users = res.users || res.data?.users || res?.data || [];
         this.searchResults = Array.isArray(users) ? users : [];
         
-        console.log(`✅ Search results: ${this.searchResults.length} users`, res);
+        console.log(`âœ… Search results: ${this.searchResults.length} users`, res);
       } catch (err) {
-        console.error('❌ Search error:', err);
+        console.error('âŒ Search error:', err);
         console.error('Error response:', err.response?.data);
         this.searchResults = [];
       } finally {
@@ -413,6 +548,11 @@ export default {
       this.loadMessages(conversation.user_id);
       this.checkUserOnlineStatus(conversation.user_id);
       
+      // Connect to peer via LAN/WebRTC
+      if (this.userId && conversation.user_id) {
+        lanService.connectToPeer(conversation.user_id);
+      }
+
       // Mark as read
       if (conversation.unread_count > 0) {
         this.markAsRead(conversation.user_id);
@@ -444,11 +584,11 @@ export default {
     async loadMessages(otherUserId) {
       try {
         this.loadingMessages = true;
-        console.log(`📡 Loading messages with user ${otherUserId}`);
+        console.log(`ðŸ“¡ Loading messages with user ${otherUserId}`);
         
         // Handle offline
         if (isNetworkOffline()) {
-          console.log('📡 OFFLINE: Loading messages from IndexedDB');
+          console.log('ðŸ“¡ OFFLINE: Loading messages from IndexedDB');
           const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
           if (cachedMessages) {
             this.messages = cachedMessages;
@@ -462,10 +602,15 @@ export default {
         });
         
         this.messages = res.messages || [];
-        console.log(`✅ Loaded ${this.messages.length} messages`);
+        console.log(`âœ… Loaded ${this.messages.length} messages`);
         
         // Save to offline DB
         if (this.messages.length > 0) {
+          // Normalize messages for display if they don't have a status
+          this.messages = this.messages.map(m => ({
+            ...m,
+            status: m.status || 'synced'
+          }));
           await saveMessagesOffline(this.messages);
         }
 
@@ -475,7 +620,7 @@ export default {
           this.scrollToBottom();
         });
       } catch (err) {
-        console.error('❌ Load messages error:', err);
+        console.error('âŒ Load messages error:', err);
         // Fallback to offline on error
         const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
         if (cachedMessages) {
@@ -493,52 +638,275 @@ export default {
 
       const messageTextToSend = this.messageText.trim();
       const imageToSend = this.imagePreview;
+      const moodToSend = this.selectedMood;
+      const localId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const timestamp = new Date().toISOString();
 
       try {
         this.isSending = true;
-        console.log('Sending message to:', this.selectedChat.username);
-        console.log('Payload:', {
+        
+        // Construct the local message object
+        const newMessage = {
+          id: localId,
           from_user_id: this.userId,
           to_user_id: this.selectedChat.user_id,
-          text: messageTextToSend
-        });
+          text: messageTextToSend,
+          image: imageToSend || '',
+          mood: moodToSend || null,
+          timestamp: timestamp,
+          read: false,
+          sent_by_me: true,
+          status: 'local'
+        };
+
+        // 1. Optimistic UI update
+        this.messages.push(newMessage);
+        this.messageText = '';
+        this.imagePreview = null;
+        this.selectedMood = null;
+        this.$nextTick(() => this.scrollToBottom());
+
+        // 2. Persistent Local Storage
+        await saveLocalMessage(newMessage);
+
+        // 3. P2P LAN Dispatch (Primary)
+        let sentViaLan = false;
+        if (lanService.isPeerReachable(this.selectedChat.user_id)) {
+          console.log('[LAN] Dispatching P2P to', this.selectedChat.user_id);
+          sentViaLan = lanService.sendMessage(this.selectedChat.user_id, {
+            local_id: localId,
+            from_user_id: this.userId,
+            to_user_id: this.selectedChat.user_id,
+            text: messageTextToSend,
+            image: imageToSend,
+            mood: moodToSend,
+            timestamp: timestamp
+          });
+          
+          if (sentViaLan) {
+            // Update local state to 'delivered'
+            newMessage.status = 'delivered';
+            await saveLocalMessage(newMessage); // Update in IndexedDB
+          }
+        }
+
+        // 4. API Dispatch (Fallback or Parallel)
+        // If we are online, we always send to API too (for broad persistence)
+        // If offline, the syncService will handle it later.
+        if (!isNetworkOffline()) {
+          try {
+            const res = await api.post('/api/messages/send', {
+              from_user_id: this.userId,
+              to_user_id: this.selectedChat.user_id,
+              text: messageTextToSend,
+              image: imageToSend || null,
+              mood: moodToSend || null,
+              local_id: localId // Backend uses this to avoid duplicates
+            });
+
+            if (res.success) {
+              newMessage.status = 'synced';
+              newMessage.server_id = res.message_id;
+              await saveLocalMessage(newMessage);
+            }
+          } catch (apiErr) {
+            console.warn('[DM] API send failed, relying on LAN/Sync', apiErr);
+          }
+        }
+
+        window.dispatchEvent(new Event('dm-refresh'));
+        
+        // Update conversation preview
+        const conv = this.conversations.find(c => String(c.user_id) === String(this.selectedChat.user_id));
+        if (conv) {
+          conv.last_message = messageTextToSend || 'ðŸ“· Photo';
+          conv.last_message_time = timestamp;
+          conv.last_message_sent_by_me = true;
+          conv.last_message_read = false;
+        }
+
+      } catch (err) {
+        console.error('Send message error:', err);
+      } finally {
+        this.isSending = false;
+      }
+    },
+
+    async startRecording() {
+      if (this.isRecording) return;
+      
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.mediaRecorder = new MediaRecorder(stream);
+        this.audioChunks = [];
+        
+        this.mediaRecorder.ondataavailable = (event) => {
+          this.audioChunks.push(event.data);
+        };
+        
+        this.mediaRecorder.onstop = async () => {
+          if (this.audioChunks.length === 0) return;
+          
+          const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64Audio = reader.result;
+            this.sendVoiceNote(base64Audio);
+          };
+          reader.readAsDataURL(audioBlob);
+          
+          // Stop all tracks in the stream
+          stream.getTracks().forEach(track => track.stop());
+        };
+        
+        this.mediaRecorder.start();
+        this.isRecording = true;
+        this.recordingDuration = 0;
+        this.recordingTimer = setInterval(() => {
+          this.recordingDuration++;
+        }, 1000);
+        
+        console.log('ðŸŽ™ï¸ Recording started');
+      } catch (err) {
+        console.error('âŒ Error starting recording:', err);
+        alert('Could not access microphone. Please ensure permissions are granted.');
+      }
+    },
+
+    stopRecording() {
+      if (!this.isRecording) return;
+      
+      this.isRecording = false;
+      clearInterval(this.recordingTimer);
+      
+      if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+        this.mediaRecorder.stop();
+      }
+      
+      console.log('ðŸŽ™ï¸ Recording stopped');
+    },
+
+    cancelRecording() {
+      if (!this.isRecording) return;
+      
+      this.isRecording = false;
+      clearInterval(this.recordingTimer);
+      
+      if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+        this.mediaRecorder.onstop = null; // Prevent sending on cancel
+        this.mediaRecorder.stop();
+        // Stop tracks
+        this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      }
+      
+      this.audioChunks = [];
+      console.log('ðŸŽ™ï¸ Recording cancelled');
+    },
+
+    async sendVoiceNote(base64Audio) {
+      if (this.isSending) return;
+      
+      try {
+        this.isSending = true;
+        console.log('ðŸ“¤ Sending voice note...');
         
         const res = await api.post('/api/messages/send', {
           from_user_id: this.userId,
           to_user_id: this.selectedChat.user_id,
-          text: messageTextToSend,
-          image: imageToSend || null
+          text: '',
+          voice: base64Audio
         });
 
         if (res.success) {
-          console.log('Message sent successfully');
-          
-          // Clear input immediately
-          this.messageText = '';
-          this.imagePreview = null;
-          
-          // Reload messages to get the actual saved message
+          console.log('âœ… Voice note sent');
           await this.loadMessages(this.selectedChat.user_id);
           window.dispatchEvent(new Event('dm-refresh'));
           
-          // Update conversation preview
           const conv = this.conversations.find(c => c.user_id === this.selectedChat.user_id);
           if (conv) {
-            conv.last_message = messageTextToSend || '📷 Photo';
+            conv.last_message = 'ðŸŽ¤ Voice note';
             conv.last_message_time = new Date().toISOString();
             conv.last_message_sent_by_me = true;
             conv.last_message_read = false;
           }
-        } else {
-          console.error('Failed to send:', res.data.message);
-          alert('Failed to send message: ' + res.data.message);
         }
       } catch (err) {
-        console.error('Send message error:', err);
-        alert('Failed to send message. Please try again.');
+        console.error('âŒ Error sending voice note:', err);
       } finally {
         this.isSending = false;
       }
+    },
+
+    formatDuration(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    },
+
+    toggleVoicePlayback(msg) {
+      if (this.playingAudioId === msg.id) {
+        this.audioElements[msg.id].pause();
+        this.playingAudioId = null;
+        return;
+      }
+      
+      // Stop currently playing
+      if (this.playingAudioId && this.audioElements[this.playingAudioId]) {
+        this.audioElements[this.playingAudioId].pause();
+      }
+      
+      if (!this.audioElements[msg.id]) {
+        const audio = new Audio(this.getImageUrl(msg.voice));
+        audio.onended = () => {
+          this.playingAudioId = null;
+        };
+        audio.ontimeupdate = () => {
+          this.$forceUpdate();
+        };
+        this.audioElements[msg.id] = audio;
+      }
+      
+      this.playingAudioId = msg.id;
+      this.audioElements[msg.id].play();
+    },
+
+    getAudioProgress(msgId) {
+      const audio = this.audioElements[msgId];
+      if (!audio || !audio.duration) return 0;
+      return (audio.currentTime / audio.duration) * 100;
+    },
+
+    getAudioDuration(msgId) {
+      const audio = this.audioElements[msgId];
+      if (!audio || isNaN(audio.duration)) return 0;
+      return Math.ceil(audio.duration);
+    },
+
+    selectMood(key) {
+      this.selectedMood = this.selectedMood === key ? null : key;
+      this.showMoodPicker = false;
+    },
+
+    onTyping() {
+      // Emit typing event via socket
+      if (!this.selectedChat) return;
+      try {
+        const socket = this.$socket;
+        if (socket) {
+          if (this.typingEmitTimeout) clearTimeout(this.typingEmitTimeout);
+          socket.emit('dm:typing', {
+            from_user_id: this.userId,
+            to_user_id: this.selectedChat.user_id
+          });
+          // Stop typing after 3s of silence
+          this.typingEmitTimeout = setTimeout(() => {
+            socket.emit('dm:stop_typing', {
+              from_user_id: this.userId,
+              to_user_id: this.selectedChat.user_id
+            });
+          }, 3000);
+        }
+      } catch (_) {}
     },
 
     async markAsRead(otherUserId) {
@@ -547,10 +915,10 @@ export default {
           user_id: this.userId,
           other_user_id: otherUserId
         });
-        console.log('✅ Messages marked as read');
+        console.log('âœ… Messages marked as read');
         window.dispatchEvent(new Event('dm-refresh'));
       } catch (err) {
-        console.error('❌ Mark read error:', err);
+        console.error('âŒ Mark read error:', err);
       }
     },
 
@@ -586,11 +954,11 @@ export default {
     async loadConversations() {
       try {
         this.isLoading = true;
-        console.log('📡 Loading conversations for user:', this.userId);
+        console.log('ðŸ“¡ Loading conversations for user:', this.userId);
         
         // Handle offline
         if (isNetworkOffline()) {
-           console.log('📡 OFFLINE: Loading conversations from IndexedDB');
+           console.log('ðŸ“¡ OFFLINE: Loading conversations from IndexedDB');
            const cachedConv = await getOfflineConversations();
            if (cachedConv && cachedConv.length > 0) {
              this.conversations = cachedConv;
@@ -605,7 +973,7 @@ export default {
         
         this.conversations = res.conversations || [];
         this.filteredConversations = [...this.conversations];
-        console.log(`✅ Loaded ${this.conversations.length} conversations`);
+        console.log(`âœ… Loaded ${this.conversations.length} conversations`);
 
         // Save to offline DB
         if (this.conversations.length > 0) {
@@ -614,7 +982,7 @@ export default {
 
         window.dispatchEvent(new Event('dm-refresh'));
       } catch (err) {
-        console.error('❌ Load conversations error:', err);
+        console.error('âŒ Load conversations error:', err);
         // Fallback to offline on error
         const cachedConv = await getOfflineConversations();
         if (cachedConv) {
@@ -771,12 +1139,12 @@ export default {
 
   mounted() {
     if (!this.userId) {
-      console.error('❌ No userId found in localStorage!');
+      console.error('âŒ No userId found in localStorage!');
       this.$router.push('/login');
       return;
     }
-    console.log('✅ DMPage mounted, userId:', this.userId);
-    console.log('✅ User type:', typeof this.userId);
+    console.log('âœ… DMPage mounted, userId:', this.userId);
+    console.log('âœ… User type:', typeof this.userId);
 
     // Realtime DM updates via Socket.IO (fallback remains manual refresh/polling)
     try {
@@ -813,6 +1181,24 @@ export default {
         socket.on('user:offline', (data) => {
           if (data && data.user_id) this.updateUserStatus(data.user_id, false);
         });
+
+        // Typing indicators
+        socket.on('dm:typing', (data) => {
+          if (!data) return;
+          const fromId = String(data.from_user_id);
+          if (this.selectedChat && String(this.selectedChat.user_id) === fromId) {
+            this.partnerTyping = true;
+            if (this.typingTimeout) clearTimeout(this.typingTimeout);
+            this.typingTimeout = setTimeout(() => { this.partnerTyping = false; }, 4000);
+          }
+        });
+        socket.on('dm:stop_typing', (data) => {
+          if (!data) return;
+          const fromId = String(data.from_user_id);
+          if (this.selectedChat && String(this.selectedChat.user_id) === fromId) {
+            this.partnerTyping = false;
+          }
+        });
       }
     } catch (e) {
       console.error('Socket setup failed:', e);
@@ -821,16 +1207,41 @@ export default {
     this.loadConversations().then(() => {
       this.autoOpenFromQuery();
     });
+
+    // Initialise P2P LAN Service
+    if (this.userId && this.$socket) {
+      lanService.init(this.$socket, this.userId);
+      lanService.onMessage((msg) => {
+        // If currently in chat with sender, push message
+        if (this.selectedChat && String(this.selectedChat.user_id) === String(msg.from_user_id)) {
+          this.messages.push(msg);
+          this.$nextTick(() => this.scrollToBottom());
+        } else {
+          // Otherwise update conversation list
+          this.loadConversations();
+        }
+      });
+    }
+
+    // Start Internet Sync Watcher
+    startSyncWatcher((syncedCount) => {
+      console.log(`[Sync] Triggered refresh after ${syncedCount} items.`);
+      if (this.selectedChat) {
+        this.loadMessages(this.selectedChat.user_id);
+      } else {
+        this.loadConversations();
+      }
+    });
   },
   ionViewDidEnter() {
-    console.log('✅ DMPage ionViewDidEnter');
+    console.log('âœ… DMPage ionViewDidEnter');
     this.autoOpenFromQuery();
   },
   watch: {
     '$route.query': {
       handler(newQuery) {
         if (newQuery && (newQuery.userId || newQuery.username)) {
-          console.log('📡 Route query changed, auto-opening chat...', newQuery);
+          console.log('ðŸ“¡ Route query changed, auto-opening chat...', newQuery);
           this.autoOpenFromQuery();
         }
       },
@@ -852,376 +1263,437 @@ export default {
 </script>
 
 <style scoped>
+/* ================================================
+   NEXFI DM â€” Premium Chat Design System
+   Deep black Â· Gold Â· Floating cards Â· Mood glow
+   ================================================ */
+
+/* â”€â”€ Conversation List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .gold-btn {
   --background: linear-gradient(135deg, #daa520 0%, #ffd700 100%);
   --background-activated: #b8860b;
-  --background-hover: #ffd700;
   --color: #000;
-  --box-shadow: 0 4px 12px rgba(218, 165, 32, 0.4);
+  --box-shadow: 0 4px 14px rgba(218,165,32,0.4);
   font-weight: 700;
 }
 
-/* Conversations List */
-.conversations-list {
-  max-width: 600px;
-  margin: 0 auto;
-}
+.conversations-list { max-width: 600px; margin: 0 auto; }
 
 .conversation-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--ion-border-color, #e5e7eb);
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background 0.18s;
 }
+.conversation-item:hover { background: rgba(218,165,32,0.06); }
 
-.conversation-item:hover {
-  background-color: var(--ion-color-light, #f3f4f6);
-}
-
-.conv-avatar-container {
-  position: relative;
-  margin-right: 12px;
-  flex-shrink: 0;
-}
-
-.conv-avatar {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
+.conv-avatar-container { position: relative; margin-right: 12px; flex-shrink: 0; }
+.conv-avatar { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 1.5px solid rgba(218,165,32,0.3); }
 .online-indicator {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
-  background: #10b981;
-  border: 2px solid var(--ion-background-color, #fff);
-  border-radius: 50%;
+  position: absolute; bottom: 2px; right: 2px;
+  width: 11px; height: 11px;
+  background: #10b981; border: 2px solid var(--ion-background-color,#111); border-radius: 50%;
 }
 
-.conv-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.conv-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.conv-username {
-  font-weight: 600;
-  color: var(--ion-text-color, #111827);
-  font-size: 16px;
-}
-
-.conv-time {
-  font-size: 12px;
-  color: var(--ion-color-medium, #6b7280);
-}
-
+.conv-content { flex: 1; min-width: 0; }
+.conv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+.conv-username { font-weight: 600; font-size: 15px; }
+.conv-time { font-size: 11px; color: var(--ion-color-medium, #6b7280); }
 .conv-preview {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 14px;
-  color: var(--ion-color-medium, #6b7280);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: flex; align-items: center; gap: 4px;
+  font-size: 13px; color: var(--ion-color-medium, #6b7280);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-
-.read-receipt {
-  font-size: 16px;
-  color: var(--ion-color-medium, #9ca3af);
-  flex-shrink: 0;
-}
-
-.read-receipt.read {
-  color: #daa520;
-}
-
-.unread-text {
-  font-weight: 600;
-  color: var(--ion-text-color, #111827);
-}
-
+.read-receipt { font-size: 14px; color: #6b7280; flex-shrink: 0; }
+.read-receipt.read { color: #daa520; }
+.unread-text { font-weight: 700; color: var(--ion-text-color,#fff); }
 .unread-badge {
-  background: #10b981;
-  color: white;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 12px;
-  min-width: 20px;
-  text-align: center;
+  background: linear-gradient(135deg,#daa520,#ffd700);
+  color: #000; font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 12px; min-width: 20px; text-align: center;
 }
 
-/* Chat View */
-.chat-header-content {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.header-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.header-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.header-username {
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.header-status {
-  font-size: 12px;
-  color: var(--ion-color-medium, #6b7280);
-  line-height: 1.2;
-}
+/* â”€â”€ Chat Area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.chat-header-content { display: flex; align-items: center; gap: 10px; }
+.header-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1.5px solid rgba(218,165,32,0.4); }
+.header-info { display: flex; flex-direction: column; }
+.header-username { font-size: 15px; font-weight: 700; line-height: 1.2; }
+.header-status { font-size: 11px; color: #10b981; line-height: 1.3; }
 
 .chat-container {
+  position: relative;
   height: calc(100vh - 180px);
   overflow-y: auto;
-  padding-bottom: 20px;
+  padding-bottom: 12px;
 }
 
+/* â”€â”€ Ambient Orbs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.chat-ambient {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+}
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.12;
+  animation: orbFloat 12s ease-in-out infinite;
+}
+.orb-1 { width: 260px; height: 260px; background: #daa520; top: 10%; left: -60px; animation-delay: 0s; }
+.orb-2 { width: 200px; height: 200px; background: #6c63ff; bottom: 15%; right: -40px; animation-delay: 4s; }
+.orb-3 { width: 180px; height: 180px; background: #00c9a7; top: 50%; left: 30%; animation-delay: 8s; }
+
+@keyframes orbFloat {
+  0%,100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-30px) scale(1.08); }
+}
+
+/* â”€â”€ Messages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .chat-messages {
-  padding: 16px;
-  max-width: 600px;
-  margin: 0 auto;
+  position: relative; z-index: 1;
+  padding: 12px 16px 16px;
+  max-width: 600px; margin: 0 auto;
 }
 
-.date-separator {
-  text-align: center;
-  margin: 16px 0;
-}
-
+.date-separator { text-align: center; margin: 14px 0; }
 .date-separator span {
-  background: var(--ion-color-light, #e5e7eb);
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  color: var(--ion-color-medium, #6b7280);
+  background: rgba(218,165,32,0.12);
+  border: 1px solid rgba(218,165,32,0.2);
+  padding: 3px 12px; border-radius: 20px;
+  font-size: 11px; color: rgba(218,165,32,0.8); letter-spacing: 0.05em;
 }
 
-.message-bubble {
+/* â”€â”€ Floating Message Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.msg-row {
   display: flex;
-  margin-bottom: 8px;
+  flex-direction: column;
+  margin-bottom: 10px;
 }
+.msg-row.sent  { align-items: flex-end; }
+.msg-row.received { align-items: flex-start; }
 
-.message-bubble.sent {
-  justify-content: flex-end;
+.mood-label {
+  font-size: 10px; letter-spacing: 0.06em;
+  font-weight: 700; text-transform: uppercase;
+  margin-bottom: 3px; padding: 0 6px; opacity: 0.75;
 }
+.mood-bold    .mood-label, .mood-label.mood-bold    { color: #ff6b35; }
+.mood-deep    .mood-label, .mood-label.mood-deep    { color: #a78bfa; }
+.mood-casual  .mood-label, .mood-label.mood-casual  { color: #00c9a7; }
+.mood-serious .mood-label, .mood-label.mood-serious { color: #daa520; }
 
-.message-bubble.received {
-  justify-content: flex-start;
-}
+.msg-row.sent  .mood-label { text-align: right; }
+.msg-row.received .mood-label { text-align: left; }
 
-.message-content {
-  max-width: 75%;
-  padding: 8px 12px;
+.msg-card {
+  max-width: 78%;
+  padding: 10px 14px;
   border-radius: 18px;
   word-wrap: break-word;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
 }
+.msg-card:active { transform: scale(0.98); }
 
-.sent .message-content {
-  background: #daa520;
-  color: black;
+.sent-card {
+  background: linear-gradient(135deg, #daa520 0%, #f0c040 100%);
+  color: #1a1000;
   border-bottom-right-radius: 4px;
 }
-
-.received .message-content {
-  background: var(--ion-color-light, #e5e7eb);
-  color: var(--ion-text-color, #111827);
+.received-card {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--ion-text-color, #f0f0f0);
   border-bottom-left-radius: 4px;
 }
 
+/* Mood-specific card glows */
+.mood-card--bold    { box-shadow: 0 4px 24px rgba(255,107,53,0.3); border: 1px solid rgba(255,107,53,0.25); }
+.mood-card--deep    { box-shadow: 0 4px 24px rgba(108,99,255,0.35); border: 1px solid rgba(108,99,255,0.25); }
+.mood-card--casual  { box-shadow: 0 4px 24px rgba(0,201,167,0.3); border: 1px solid rgba(0,201,167,0.2); }
+.mood-card--serious { box-shadow: 0 4px 24px rgba(218,165,32,0.35); border: 1px solid rgba(218,165,32,0.25); }
+
 .message-image {
-  width: 100%;
-  max-width: 300px;
-  border-radius: 12px;
-  margin-bottom: 4px;
-  display: block;
+  width: 100%; max-width: 280px; border-radius: 12px; margin-bottom: 6px; display: block;
 }
 
-.message-text {
-  font-size: 15px;
-  line-height: 1.4;
-  word-wrap: break-word;
+.msg-text { font-size: 15px; line-height: 1.5; word-wrap: break-word; }
+.msg-text :deep(.post-link)  { color: #1a1000; text-decoration: underline dotted; }
+.received-card .msg-text :deep(.post-link) { color: #daa520; }
+.msg-text :deep(.hashtag),
+.msg-text :deep(.mention)    { color: inherit; font-weight: 700; cursor: pointer; opacity: 0.85; }
+
+.msg-meta {
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 5px; justify-content: flex-end;
+}
+.msg-time  { font-size: 10px; opacity: 0.55; }
+.msg-read  { font-size: 11px; opacity: 0.5; }
+.msg-read.seen { opacity: 1; color: #1a1000; }
+.received-card .msg-read.seen { color: #daa520; }
+
+/* â”€â”€ Voice Player â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.voice-player {
+  display: flex; align-items: center; gap: 10px;
+  min-width: 180px; padding: 4px 0; margin-bottom: 6px;
+}
+.voice-play-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(0,0,0,0.25);
+  border: none; cursor: pointer; color: inherit;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0;
+  transition: background 0.2s;
+}
+.voice-play-btn:hover { background: rgba(0,0,0,0.45); }
+.voice-waveform {
+  flex: 1; display: flex; align-items: center; gap: 2px;
+}
+.wave-bar {
+  width: 3px; border-radius: 2px;
+  background: rgba(255,255,255,0.25);
+  transition: background 0.2s;
+}
+.sent-card .wave-bar { background: rgba(0,0,0,0.2); }
+.wave-bar.active { background: rgba(0,0,0,0.7); }
+.received-card .wave-bar.active { background: #daa520; }
+.voice-duration { font-size: 11px; opacity: 0.6; flex-shrink: 0; }
+
+/* â”€â”€ Typing Indicator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.typing-row { display: flex; align-items: flex-start; margin-top: 6px; }
+.typing-card {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px; border-bottom-left-radius: 4px;
+  backdrop-filter: blur(8px);
+}
+.typing-label {
+  font-size: 11px; color: rgba(255,255,255,0.45);
+  font-style: italic; letter-spacing: 0.03em;
+}
+.typing-dots { display: flex; gap: 4px; }
+.typing-dots span {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #daa520;
+  animation: dotBounce 1.2s ease-in-out infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes dotBounce {
+  0%,80%,100% { transform: translateY(0); opacity: 0.5; }
+  40%          { transform: translateY(-5px); opacity: 1; }
 }
 
-.message-text .post-link {
-  color: #daa520;
-  text-decoration: none;
+/* â”€â”€ Loading Ring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.nexfi-loading { display: flex; justify-content: center; padding: 60px; }
+.loading-ring {
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 3px solid rgba(218,165,32,0.15);
+  border-top-color: #daa520;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* â”€â”€ Input Area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.nexfi-input-area {
+  position: sticky; bottom: 0; z-index: 100;
+  padding: 8px 12px 10px;
+  background: rgba(10,10,10,0.9);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(218,165,32,0.15);
 }
 
-.message-text .post-link:hover {
-  text-decoration: underline;
+/* Image preview */
+.image-preview-strip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 4px 8px;
+}
+.preview-thumb {
+  width: 56px; height: 56px; object-fit: cover; border-radius: 10px;
+  border: 1.5px solid rgba(218,165,32,0.4);
+}
+.remove-preview {
+  background: rgba(255,255,255,0.1); border: none; color: #fff;
+  width: 22px; height: 22px; border-radius: 50%;
+  cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center;
 }
 
-.message-text .hashtag,
-.message-text .mention {
-  color: #daa520;
-  cursor: pointer;
-}
-.message-meta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-  justify-content: flex-end;
+/* Main input row */
+.input-bar {
+  display: flex; align-items: center; gap: 8px;
+  position: relative;
 }
 
-.message-time {
-  font-size: 11px;
-  color: var(--ion-color-medium, #6b7280);
+.input-action-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.6);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 18px; flex-shrink: 0;
+  transition: background 0.2s, color 0.2s;
+}
+.input-action-btn:hover { background: rgba(218,165,32,0.15); color: #daa520; }
+.mood-trigger.mood-active { background: rgba(218,165,32,0.2); border-color: rgba(218,165,32,0.4); }
+.emoji-btn { position: relative; }
+
+.dm-emoji-picker {
+  position: absolute; bottom: 52px; right: 0;
+  z-index: 2000;
 }
 
-.message-status {
-  font-size: 14px;
-  color: var(--ion-color-medium, #6b7280);
-}
-
-.sent .message-status.read {
-  color: #000;
-}
-
-/* Message Input */
-.message-input-container {
-  position: sticky;
-  bottom: 0;
-  background: var(--ion-background-color, #fff);
-  border-top: 1px solid var(--ion-border-color, #e5e7eb);
-  padding: 8px 12px;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  max-width: 600px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.input-wrapper {
+.textarea-wrap {
   flex: 1;
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  background: var(--ion-color-light, #f3f4f6);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: 20px;
-  padding: 4px 8px;
+  padding: 2px 12px;
+  min-height: 40px;
+  display: flex; align-items: center;
+  transition: border-color 0.2s;
 }
+.textarea-wrap:focus-within { border-color: rgba(218,165,32,0.45); }
 
-.message-textarea {
-  --padding-start: 8px;
-  --padding-end: 8px;
-  --padding-top: 6px;
-  --padding-bottom: 6px;
-  font-size: 15px;
+.nexfi-textarea {
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 4px;
+  --padding-bottom: 4px;
+  --color: var(--ion-text-color,#f0f0f0);
+  --placeholder-color: rgba(255,255,255,0.3);
+  font-size: 14.5px;
   max-height: 100px;
 }
 
-.send-btn {
-  margin: 0;
+.send-fab, .mic-fab {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg,#daa520,#f0c040);
+  border: none; cursor: pointer; color: #1a1000;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+  box-shadow: 0 3px 12px rgba(218,165,32,0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+.send-fab:hover, .mic-fab:hover { transform: scale(1.08); box-shadow: 0 5px 18px rgba(218,165,32,0.55); }
+.mic-fab.recording { background: linear-gradient(135deg,#eb445a,#ff6b6b); box-shadow: 0 3px 14px rgba(235,68,90,0.5); }
+.mic-pulse {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: rgba(235,68,90,0.35);
+  animation: micPulse 1.4s ease-out infinite;
+}
+@keyframes micPulse {
+  0% { transform: scale(1); opacity: 0.7; }
+  100%{ transform: scale(1.8); opacity: 0; }
 }
 
-/* Search Modal */
+/* â”€â”€ Mood Picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.mood-picker {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  padding: 10px 4px 6px;
+}
+.mood-option {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 12px; border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  cursor: pointer; color: rgba(255,255,255,0.65);
+  font-size: 18px; transition: all 0.18s;
+}
+.mood-option span { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; }
+.mood-option:hover  { background: rgba(218,165,32,0.15); border-color: rgba(218,165,32,0.35); color: #daa520; }
+.mood-option.selected { background: rgba(218,165,32,0.2); border-color: #daa520; color: #daa520; }
+
+/* mood transitions */
+.mood-fade-enter-active, .mood-fade-leave-active { transition: all 0.22s ease; }
+.mood-fade-enter-from, .mood-fade-leave-to { opacity: 0; transform: translateY(8px); }
+
+/* â”€â”€ Recording Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€  */
+.recording-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  background: rgba(235,68,90,0.1);
+  border: 1px solid rgba(235,68,90,0.25);
+  border-radius: 16px;
+  margin-top: 8px;
+}
+.rec-cancel {
+  background: none; border: none; color: rgba(255,255,255,0.55);
+  cursor: pointer; font-size: 12px; white-space: nowrap;
+  padding: 0;
+}
+.rec-status { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: center; }
+.rec-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #eb445a;
+  animation: blink 1s infinite;
+}
+.rec-timer { font-size: 14px; font-weight: 700; color: #eb445a; }
+.rec-wave { display: flex; align-items: center; gap: 3px; }
+.rec-wave-bar {
+  width: 3px; border-radius: 2px;
+  background: rgba(235,68,90,0.65);
+  animation: waveAnim 0.7s ease-in-out infinite alternate;
+}
+.rec-wave-bar:nth-child(odd)  { height: 8px; }
+.rec-wave-bar:nth-child(even) { height: 16px; }
+@keyframes waveAnim {
+  from { transform: scaleY(0.5); }
+  to   { transform: scaleY(1.4); }
+}
+
+/* slide-up transition */
+.slide-up-enter-active, .slide-up-leave-active { transition: all 0.22s ease; }
+.slide-up-enter-from, .slide-up-leave-to { opacity: 0; transform: translateY(10px); }
+
+/* â”€â”€ Search Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .search-result-item {
+  display: flex; align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;
+  transition: background 0.15s;
+}
+.search-result-item:hover { background: rgba(218,165,32,0.06); }
+.result-avatar { width: 46px; height: 46px; border-radius: 50%; margin-right: 12px; object-fit: cover; border: 1.5px solid rgba(218,165,32,0.2); }
+.result-info { flex: 1; }
+.result-username { font-weight: 700; font-size: 15px; }
+.result-handle { font-size: 13px; color: var(--ion-color-medium,#6b7280); }
+
+/* â”€â”€ Empty States â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.empty-state { text-align: center; padding: 70px 20px; }
+.empty-icon { font-size: 60px; color: rgba(218,165,32,0.4); margin-bottom: 14px; }
+.empty-state h3 { font-size: 20px; font-weight: 700; margin: 10px 0; }
+.empty-state p { color: var(--ion-color-medium,#6b7280); margin-bottom: 20px; }
+.empty-search { padding: 40px 20px; text-align: center; color: var(--ion-color-medium,#6b7280); }
+.loading-container { display: flex; justify-content: center; padding: 40px; }
+
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+/* msg status icons */
+.msg-status-icon {
+  font-size: 11px;
   display: flex;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--ion-border-color, #e5e7eb);
-  cursor: pointer;
-}
-
-.search-result-item:hover {
-  background-color: var(--ion-color-light, #f3f4f6);
-}
-
-.result-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  margin-right: 12px;
-  object-fit: cover;
-}
-
-.result-info {
-  flex: 1;
-}
-
-.result-username {
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--ion-text-color, #111827);
-}
-
-.result-handle {
-  font-size: 14px;
-  color: var(--ion-color-medium, #6b7280);
-}
-
-/* Empty States */
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-}
-
-.empty-icon {
-  font-size: 64px;
-  color: var(--ion-color-medium, #9ca3af);
-  margin-bottom: 16px;
-}
-
-.empty-state h3 {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 12px 0;
-  color: var(--ion-text-color, #111827);
-}
-
-.empty-state p {
-  color: var(--ion-color-medium, #6b7280);
-  margin-bottom: 20px;
-}
-
-.empty-search {
-  padding: 40px 20px;
-  text-align: center;
-  color: var(--ion-color-medium, #6b7280);
-}
-
-.loading-container {
-  display: flex;
   justify-content: center;
-  padding: 40px;
+  margin-left: 2px;
 }
-
-.emoji-wrapper {
-  position: relative;
-  display: inline-block;
+.status-local {
+  color: #eb445a; /* Red for not synced */
+  font-weight: bold;
 }
-
-.dm-emoji-picker {
-  position: absolute;
-  bottom: 100%;
-  right: 0;
-  margin-bottom: 8px;
-  z-index: 2000;
+.status-delivered {
+  color: #10b981; /* Green for delivered via LAN */
+  animation: subtlePulse 2s infinite;
+}
+@keyframes subtlePulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
 }
 </style>

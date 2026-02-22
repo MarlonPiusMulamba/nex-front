@@ -11,12 +11,60 @@
           <h2 class="meeting-title">{{ space?.title || 'NexFi Meeting' }}</h2>
         </div>
         <div class="header-right">
+          <!-- Request Badge for Host -->
+          <ion-button v-if="isHost && pendingRequests.length > 0" fill="clear" @click="showRequests = true" class="requests-badge-btn">
+             <ion-icon :icon="notificationsOutline"></ion-icon>
+             <span class="badge-count">{{ pendingRequests.length }}</span>
+          </ion-button>
+          
           <ion-button fill="clear" @click="minimize" class="icon-only-btn">
             <ion-icon :icon="chevronDownOutline"></ion-icon>
           </ion-button>
           <ion-button fill="clear" @click="confirmLeave" class="icon-only-btn danger">
             <ion-icon :icon="closeOutline"></ion-icon>
           </ion-button>
+        </div>
+      </div>
+
+      <!-- Requests Panel Overlay -->
+      <div v-if="showRequests" class="requests-overlay" @click="showRequests = false">
+        <div class="requests-panel" @click.stop>
+          <div class="panel-header">
+            <h3>Join Requests</h3>
+            <ion-button fill="clear" @click="showRequests = false">
+              <ion-icon :icon="close"></ion-icon>
+            </ion-button>
+          </div>
+          <div class="requests-list">
+            <div v-for="req in pendingRequests" :key="req.id" class="request-item">
+              <div class="user-info">
+                <ion-avatar class="req-avatar">
+                  <img :src="getAvatarUrl(req.profile_pic)" />
+                </ion-avatar>
+                <div class="user-names">
+                  <span class="full-name">{{ req.first_name }} {{ req.last_name }}</span>
+                  <span class="username">@{{ req.username }}</span>
+                </div>
+              </div>
+              <div class="req-actions">
+                <ion-button fill="clear" color="success" size="small" @click="handleRequest(req.id, 'approved')">Approve</ion-button>
+                <ion-button fill="clear" color="danger" size="small" @click="handleRequest(req.id, 'denied')">Deny</ion-button>
+              </div>
+            </div>
+            <div v-if="pendingRequests.length === 0" class="no-requests">
+              No pending requests
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Waiting for Approval Guest State -->
+      <div v-if="!isHost && props.space?.is_locked && !isApproved" class="waiting-overlay">
+        <div class="waiting-content">
+          <ion-spinner name="crescent" color="warning"></ion-spinner>
+          <h3>Access Restricted</h3>
+          <p>Waiting for the host to approve your join request…</p>
+          <ion-button fill="outline" color="light" @click="confirmLeave">Cancel</ion-button>
         </div>
       </div>
 
@@ -98,7 +146,7 @@ import {
   chevronDownOutline, powerOutline, mic, micOff, 
   micOutline, micOffOutline, handLeftOutline, heartOutline,
   videocamOutline, videocamOffOutline, desktopOutline, logOutOutline, closeOutline,
-  handLeft
+  handLeft, notificationsOutline, close
 } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config/index.js';
@@ -124,6 +172,16 @@ const isSpeaking = ref(false); // Can bind to volume analysis
 const localStream = ref(null);
 const localVideo = ref(null);
 const remoteParticipants = ref([]); // Unified list
+
+// Recording State
+const mediaRecorder = ref(null);
+const recordedChunks = [];
+const isRecording = ref(false);
+
+// Locked Talk State
+const pendingRequests = ref([]);
+const showRequests = ref(false);
+const isApproved = ref(false);
 
 const gridClass = computed(() => {
   const count = 1 + remoteParticipants.value.length;
@@ -161,6 +219,66 @@ const syncState = async () => {
   }
 };
 
+const handleJoinRequest = (e) => {
+    if (String(e.detail.space_id) === String(props.space?.id)) {
+        fetchPendingRequests();
+    }
+};
+
+const handleJoinRequestStatus = (e) => {
+    if (String(e.detail.space_id) === String(props.space?.id)) {
+        if (e.detail.status === 'approved') {
+            isApproved.value = true;
+            syncState();
+        } else if (e.detail.status === 'denied') {
+            alert('Your request to join was denied.');
+            emit('leave');
+        }
+    }
+};
+
+const fetchPendingRequests = async () => {
+    if (!isHost.value || !props.space) return;
+    try {
+        const res = await axios.get(`${API_URL}/api/audio-spaces/${props.space.id}/requests`, {
+            params: { host_id: props.currentUser.id }
+        });
+        if (res.data.success) {
+            pendingRequests.value = res.data.requests;
+        }
+    } catch (err) {
+        console.error('Fetch requests error:', err);
+    }
+};
+
+const handleRequest = async (requestId, status) => {
+    try {
+        const res = await axios.post(`${API_URL}/api/audio-spaces/${props.space.id}/requests/${requestId}/approve`, {
+            host_id: props.currentUser.id,
+            status: status
+        });
+        if (res.data.success) {
+            pendingRequests.value = pendingRequests.value.filter(r => r.id !== requestId);
+        }
+    } catch (err) {
+        console.error('Handle request error:', err);
+    }
+};
+
+const checkMyApproval = async () => {
+    if (isHost.value || !props.space || !props.currentUser) return;
+    try {
+        const res = await axios.get(`${API_URL}/api/audio-spaces/${props.space.id}/request_status`, {
+            params: { user_id: props.currentUser.id }
+        });
+        if (res.data.success && res.data.status === 'approved') {
+            isApproved.value = true;
+        }
+    } catch (err) {
+        console.error('Check approval error:', err);
+    }
+};
+
 // Real-time Event Handlers
 const handleSpaceEnded = (e) => {
   if (String(e.detail.space_id) === String(props.space?.id)) {
@@ -194,24 +312,95 @@ const handleStateUpdated = (e) => {
 
 onMounted(() => {
   if (props.isOpen) {
-    // Initial sync
-    syncState();
     // Join socket room
     if (props.space) {
         socketService.joinRoom(`space_${props.space.id}`);
+        // Also join personal room for notifications
+        if (props.currentUser) {
+            socketService.joinRoom(`user_${props.currentUser.id}`);
+        }
     }
+
+    if (props.space?.is_locked) {
+        if (isHost.value) {
+            fetchPendingRequests();
+        } else {
+            checkMyApproval();
+        }
+    }
+
+    // Initial sync
+    syncState();
     
     window.addEventListener('space:ended', handleSpaceEnded);
     window.addEventListener('space:participant_joined', handleParticipantJoined);
     window.addEventListener('space:state_updated', handleStateUpdated);
+    window.addEventListener('join_request', handleJoinRequest);
+    window.addEventListener('join_request_status', handleJoinRequestStatus);
+
+    // Initial recording start if host
+    if (props.space?.host_user_id === props.currentUser?.id) {
+       startRecording();
+    }
   }
 });
 
+const startRecording = () => {
+  if (!localStream.value) {
+     // Wait for stream if not ready (e.g. camera not yet toggled, but recording should capture what's there)
+     // Actually, we should probably only record if there's a stream, or record a placeholder.
+     // For now, let's start recording as soon as we have a stream.
+     return;
+  }
+  try {
+    recordedChunks.value = [];
+    const options = { mimeType: 'video/webm; codecs=vp9' };
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+       options.mimeType = 'video/webm';
+    }
+    
+    mediaRecorder.value = new MediaRecorder(localStream.value, options);
+    mediaRecorder.value.ondataavailable = (e) => {
+      if (e.data.size > 0) recordedChunks.push(e.data);
+    };
+    
+    mediaRecorder.value.onstop = uploadRecording;
+    mediaRecorder.value.start();
+    isRecording.value = true;
+    console.log('⏺️ Recording started');
+  } catch (err) {
+    console.error('Failed to start recording:', err);
+  }
+};
+
+const uploadRecording = async () => {
+    if (recordedChunks.length === 0) return;
+    
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const formData = new FormData();
+    formData.append('file', blob, 'meeting_recording.webm');
+    
+    try {
+        console.log('📤 Uploading recording...');
+        const res = await axios.post(`${API_URL}/api/audio-spaces/${props.space.id}/recording`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        console.log('✅ Recording uploaded:', res.data.recording_url);
+    } catch (err) {
+        console.error('Failed to upload recording:', err);
+    }
+};
+
 onUnmounted(() => {
+  if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
+    mediaRecorder.value.stop();
+  }
   stopTracks();
   window.removeEventListener('space:ended', handleSpaceEnded);
   window.removeEventListener('space:participant_joined', handleParticipantJoined);
   window.removeEventListener('space:state_updated', handleStateUpdated);
+  window.removeEventListener('join_request', handleJoinRequest);
+  window.removeEventListener('join_request_status', handleJoinRequestStatus);
 });
 
 const stopTracks = () => {
@@ -223,29 +412,8 @@ const stopTracks = () => {
 
 watch(() => props.space, (newSpace) => {
   if (newSpace) {
-    // Determine if current user is host
-    // Mocking remote participants for UI design (replace with actual WebRTC/Socket logic later)
-    remoteParticipants.value = [
-      {
-        id: 999,
-        username: 'UserA',
-        first_name: 'Alice',
-        profile_pic: '',
-        isMuted: false,
-        isVideoOn: false,
-        handRaised: true,
-        isSpeaking: true
-      },
-      {
-        id: 888,
-        username: 'UserB',
-        profile_pic: '',
-        isMuted: true,
-        isVideoOn: false,
-        handRaised: false,
-        isSpeaking: false
-      }
-    ];
+    // Initializing remote participants as empty for real-time join events
+    remoteParticipants.value = [];
   }
 }, { immediate: true });
 
@@ -294,6 +462,11 @@ const toggleCamera = async () => {
           localVideo.value.srcObject = localStream.value;
         }
         isVideoOn.value = true;
+
+        // Auto-start recording if host and not already recording
+        if (props.space?.host_user_id === props.currentUser?.id && !isRecording.value) {
+            startRecording();
+        }
       } else {
         localStream.value.getVideoTracks().forEach(t => t.stop());
         isVideoOn.value = false;
@@ -333,6 +506,11 @@ const toggleHand = () => {
 
 const endSpace = async () => {
     if (!confirm('Are you sure you want to end this space for everyone?')) return;
+    
+    // Stop recording before ending
+    if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
+        mediaRecorder.value.stop();
+    }
     
     try {
         const res = await axios.post(`${API_URL}/api/audio-spaces/${props.space.id}/end`, {
@@ -390,20 +568,21 @@ const confirmEnd = () => {
 .live-indicator {
   display: flex;
   align-items: center;
-  background: rgba(255, 73, 97, 0.2);
+  background: rgba(255, 215, 0, 0.15); /* Gold background */
   padding: 4px 8px;
   border-radius: 4px;
   gap: 6px;
   margin-bottom: 4px;
   width: fit-content;
+  border: 1px solid rgba(255, 215, 0, 0.3);
 }
 
 .live-indicator .dot {
   width: 6px;
   height: 6px;
-  background: #ff4961;
+  background: #FFD700; /* Gold dot */
   border-radius: 50%;
-  box-shadow: 0 0 10px #ff4961;
+  box-shadow: 0 0 10px #FFD700;
   animation: pulse 1.5s infinite;
 }
 
@@ -416,7 +595,7 @@ const confirmEnd = () => {
 .live-indicator span {
   font-size: 10px;
   font-weight: 800;
-  color: #ff4961;
+  color: #FFD700; /* Gold text */
 }
 
 .meeting-title {
@@ -434,7 +613,7 @@ const confirmEnd = () => {
 }
 
 .icon-only-btn.danger {
-  --color: #ff4961;
+  --color: #FFD700; /* Use Gold instead of Red for consistency */
 }
 
 /* Viewport / Grid */
@@ -467,8 +646,8 @@ const confirmEnd = () => {
 }
 
 .participant-tile.is-speaking {
-  border-color: #8a2be2;
-  box-shadow: 0 0 15px rgba(138, 43, 226, 0.3);
+  border-color: #FFD700;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
 }
 
 .video-wrapper {
@@ -533,8 +712,8 @@ const confirmEnd = () => {
   font-size: 14px;
 }
 
-.hand-badge { color: #ffeb3b; }
-.mute-badge { color: #ff4961; }
+.hand-badge { color: #FFD700; }
+.mute-badge { color: #FFD700; }
 
 /* Controls */
 .meeting-controls {
@@ -545,9 +724,9 @@ const confirmEnd = () => {
   display: flex;
   gap: 12px;
   padding: 12px;
-  background: rgba(26, 26, 26, 0.8);
+  background: rgba(18, 18, 18, 0.9);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255, 215, 0, 0.2);
   border-radius: 40px;
   z-index: 100;
 }
@@ -570,26 +749,34 @@ const confirmEnd = () => {
 .ctrl-btn:active { transform: scale(0.9); }
 
 .ctrl-btn.off {
-  background: #ff4961;
-  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  color: #555;
+  border: 1px solid rgba(255, 215, 0, 0.1);
 }
 
 .ctrl-btn.sharing {
-  background: #00e676;
+  background: #FFD700;
   color: #000;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
 }
 
 .ctrl-btn.active {
-  background: #ffeb3b;
+  background: #FFD700;
   color: #000;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
 }
 
 .ctrl-btn.end-btn, .ctrl-btn.leave-btn {
-  background: #ff4961;
+  background: rgba(255, 215, 0, 0.1);
+  color: #FFD700;
+  border: 1px solid #FFD700;
   margin-left: 8px;
 }
 
-.ctrl-btn.end-btn:hover { background: #d32f2f; }
+.ctrl-btn.end-btn:hover { 
+  background: #FFD700; 
+  color: #000;
+}
 
 @media (max-width: 480px) {
   .meeting-viewport {
@@ -604,5 +791,142 @@ const confirmEnd = () => {
      height: 42px;
      font-size: 18px;
   }
+}
+
+/* Locked Talk Styles */
+.requests-badge-btn {
+  position: relative;
+  --color: #ffd700;
+}
+
+.badge-count {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: #ff4444;
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  font-weight: 800;
+  border: 1px solid #000;
+}
+
+.requests-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.requests-panel {
+  background: #1a1a1a;
+  border: 1px solid #ffd700;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 400px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+.panel-header {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+}
+
+.panel-header h3 {
+  margin: 0;
+  color: #ffd700;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.requests-list {
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.request-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.req-avatar {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #ffd700;
+}
+
+.user-names {
+  display: flex;
+  flex-direction: column;
+}
+
+.full-name { font-weight: 600; font-size: 14px; }
+.username { font-size: 12px; color: #888; }
+
+.req-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.no-requests {
+  text-align: center;
+  padding: 40px;
+  color: #888;
+  font-style: italic;
+}
+
+/* Waiting Overlay */
+.waiting-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #000;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 30px;
+}
+
+.waiting-content h3 {
+  color: #ffd700;
+  font-size: 24px;
+  margin: 20px 0 10px;
+}
+
+.waiting-content p {
+  color: #aaa;
+  margin-bottom: 30px;
 }
 </style>

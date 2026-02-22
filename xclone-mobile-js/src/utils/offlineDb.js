@@ -2,8 +2,9 @@ import Dexie from 'dexie';
 
 export const db = new Dexie('NexFiOfflineDB');
 
-// Define database schema
-// Increased version to 10 to ensure upgrade from any previous states
+// Schema version 11:
+//   messages: added 'status' index (local | delivered | synced)
+//   peerInfo: new store caching LAN peer connection data
 db.version(10).stores({
     posts: 'post_id, timestamp, username',
     profiles: 'user_id, username',
@@ -12,7 +13,19 @@ db.version(10).stores({
     notifications: 'id, created_at',
     trending: 'topic, type',
     suggestedUsers: 'user_id, username',
-    appState: 'key' // For storing simple flags like 'isOffline'
+    appState: 'key'
+});
+
+db.version(11).stores({
+    posts: 'post_id, timestamp, username',
+    profiles: 'user_id, username',
+    conversations: 'user_id, username',
+    messages: 'id, [from_user_id+to_user_id], timestamp, status',
+    notifications: 'id, created_at',
+    trending: 'topic, type',
+    suggestedUsers: 'user_id, username',
+    appState: 'key',
+    peerInfo: 'user_id' // LAN peer cache
 });
 
 /**
@@ -212,6 +225,97 @@ export async function getOfflineNotifications() {
  */
 export function isNetworkOffline() {
     return !navigator.onLine;
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  LAN-First: Message status helpers
+//  Status lifecycle: local → delivered → synced
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Save a locally-composed message (not yet sent or delivered).
+ * status defaults to 'local' if not specified.
+ */
+export async function saveLocalMessage(msg) {
+    if (!msg || !msg.id) return;
+    try {
+        await db.messages.put({
+            ...msg,
+            status: msg.status || 'local',
+        });
+    } catch (err) {
+        console.error('Error saving local message:', err);
+    }
+}
+
+/**
+ * Mark a message as 'delivered' (received by peer over LAN DataChannel).
+ */
+export async function markMessageDelivered(localId) {
+    try {
+        await db.messages.update(localId, { status: 'delivered' });
+    } catch (err) {
+        console.error('Error marking message delivered:', err);
+    }
+}
+
+/**
+ * Mark a message as 'synced' and attach the backend-assigned ID.
+ */
+export async function markMessageSynced(localId, serverId) {
+    try {
+        await db.messages.update(localId, {
+            status: 'synced',
+            server_id: serverId || null,
+        });
+    } catch (err) {
+        console.error('Error marking message synced:', err);
+    }
+}
+
+/**
+ * Get all messages that haven't been synced to the backend yet.
+ * Only return messages sent BY this user (we don't re-upload received msgs).
+ */
+export async function getUnsyncedMessages(myUserId) {
+    try {
+        return await db.messages
+            .filter(m =>
+                (m.status === 'local' || m.status === 'delivered') &&
+                (!myUserId || String(m.from_user_id) === String(myUserId))
+            )
+            .sortBy('timestamp');
+    } catch (err) {
+        console.error('Error getting unsynced messages:', err);
+        return [];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  LAN Peer Info Cache
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Cache peer connection metadata for LAN reconnection.
+ */
+export async function savePeerInfo(userId, peerId) {
+    try {
+        await db.peerInfo.put({ user_id: String(userId), peer_id: peerId, saved_at: new Date().toISOString() });
+    } catch (err) {
+        console.error('Error saving peer info:', err);
+    }
+}
+
+/**
+ * Retrieve cached peer info for a user.
+ */
+export async function getPeerInfo(userId) {
+    try {
+        return await db.peerInfo.get(String(userId));
+    } catch (err) {
+        console.error('Error getting peer info:', err);
+        return null;
+    }
 }
 
 export default db;

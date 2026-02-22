@@ -109,6 +109,17 @@ class SocketService {
             console.log('🏢 Space signaling message:', data.type);
             window.dispatchEvent(new CustomEvent('space:signal', { detail: data }));
         });
+
+        // Listen for Join Requests (Locked Talks)
+        this.socket.on('join_request', (data) => {
+            console.log('🔒 New join request:', data);
+            window.dispatchEvent(new CustomEvent('join_request', { detail: data }));
+        });
+
+        this.socket.on('join_request_status', (data) => {
+            console.log('🔒 Join request status update:', data);
+            window.dispatchEvent(new CustomEvent('join_request_status', { detail: data }));
+        });
     }
 
     disconnect() {
