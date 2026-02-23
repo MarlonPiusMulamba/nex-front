@@ -4,7 +4,7 @@
     @did-dismiss="close"
     class="type-selector-modal"
     :initial-breakpoint="breakpoint"
-    :breakpoints="[0, 0.5, 0.75]"
+    :breakpoints="[0, 0.4, 0.7, 0.9]"
     @ionBreakpointDidChange="onBreakpointChange"
   >
     <div class="selector-container">
@@ -14,19 +14,21 @@
         <p class="selector-subtitle">Choose how you want to connect with the NexFi community.</p>
       </div>
 
-      <div class="options-grid">
-        <div 
-          v-for="option in options" 
-          :key="option.id" 
-          class="option-card"
-          @click="select(option.id)"
-        >
-          <div class="option-icon-wrap" :style="{ background: option.color }">
-            <ion-icon :icon="option.icon"></ion-icon>
-          </div>
-          <div class="option-content">
-            <h3 class="option-name">{{ option.name }}</h3>
-            <p class="option-desc">{{ option.desc }}</p>
+      <div class="options-scroller">
+        <div class="options-grid">
+          <div 
+            v-for="option in options" 
+            :key="option.id" 
+            class="option-card"
+            @click="select(option.id)"
+          >
+            <div class="option-icon-wrap" :style="{ background: option.color }">
+              <ion-icon :icon="option.icon"></ion-icon>
+            </div>
+            <div class="option-content">
+              <h3 class="option-name">{{ option.name }}</h3>
+              <p class="option-desc">{{ option.desc }}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -44,8 +46,7 @@ import {
   chatbubblesOutline, 
   radioOutline, 
   barChartOutline, 
-  micOutline,
-  chevronForward 
+  micOutline
 } from 'ionicons/icons';
 
 export default {
@@ -60,8 +61,7 @@ export default {
   emits: ['update:isOpen', 'select'],
   data() {
     return {
-      breakpoint: 0.5,
-      chevronForward,
+      breakpoint: 0.7,
       options: [
         {
           id: 'post',
@@ -111,18 +111,18 @@ export default {
 
 <style scoped>
 .type-selector-modal {
-  --height: auto;
   --border-radius: 32px 32px 0 0;
-  --background: rgba(18, 18, 24, 0.9);
+  --background: rgba(18, 18, 24, 0.95);
   backdrop-filter: blur(25px);
 }
 
 .selector-container {
-  padding: 12px 20px 40px;
+  padding: 12px 20px 20px;
   background: transparent;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  height: 100%;
+  color: #fff;
 }
 
 .drag-handle {
@@ -135,6 +135,7 @@ export default {
 
 .selector-header {
   text-align: center;
+  padding-bottom: 24px;
 }
 
 .selector-title {
@@ -143,6 +144,7 @@ export default {
   margin: 0 0 8px;
   background: linear-gradient(to right, #fff, #daa520);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -153,11 +155,18 @@ export default {
   line-height: 1.5;
 }
 
+.options-scroller {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 4px 24px;
+  min-height: 250px; /* Ensure content area doesn't collapse */
+}
+
 .options-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  padding: 8px 0;
+  padding-bottom: 20px;
 }
 
 .option-card {
@@ -166,39 +175,39 @@ export default {
   align-items: center;
   text-align: center;
   gap: 12px;
-  padding: 24px 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 20px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 24px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
-  aspect-ratio: 1/1.1;
+  aspect-ratio: 1/1;
   justify-content: center;
 }
 
 .option-card:hover {
-  background: rgba(218, 165, 32, 0.1);
-  border-color: rgba(218, 165, 32, 0.3);
+  background: rgba(218, 165, 32, 0.12);
+  border-color: rgba(218, 165, 32, 0.4);
   transform: translateY(-4px);
 }
 
 .option-card:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
 .option-icon-wrap {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.3);
 }
 
 .option-icon-wrap ion-icon {
-  font-size: 28px;
+  font-size: 24px;
   color: #fff;
 }
 
@@ -207,40 +216,38 @@ export default {
 }
 
 .option-name {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   color: #fff;
 }
 
 .option-desc {
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.4);
   margin: 0;
   line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.chevron {
-  display: none;
-}
-
 .selector-footer {
-  margin-top: 8px;
+  padding-top: 10px;
 }
 
 .selector-cancel {
   width: 100%;
-  padding: 16px;
+  padding: 12px;
   background: transparent;
   border: none;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.4);
   text-decoration: underline;
   cursor: pointer;
 }
 </style>
+
