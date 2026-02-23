@@ -210,11 +210,11 @@
           <button class="remove-preview" @click="imagePreview = null">âœ•</button>
         </div>
 
-        <div class="input-bar">
+        <div class="input-bar" v-if="!pendingVoiceNote">
           <button class="input-action-btn" @click="attachImage">
             <ion-icon :icon="add"></ion-icon>
           </button>
-
+          
           <button 
             class="input-action-btn mood-trigger"
             :class="{ 'mood-active': selectedMood }"
@@ -260,6 +260,36 @@
             <div v-if="isRecording" class="mic-pulse"></div>
           </button>
         </div>
+
+        <!-- Pending Voice Note Preview Area -->
+        <transition name="slide-up">
+          <div v-if="pendingVoiceNote" class="pending-voice-bar">
+            <button class="voice-ctrl-btn delete" @click="deletePendingVoice">
+              <ion-icon :icon="trash"></ion-icon>
+            </button>
+            <div class="voice-preview-bubble">
+              <button class="preview-play-btn" @click="togglePendingPlayback">
+                <ion-icon :icon="isPlayingPending ? pause : play"></ion-icon>
+              </button>
+              <div class="preview-wave">
+                <div 
+                  v-for="n in 30" 
+                  :key="n" 
+                  class="preview-wave-bar"
+                  :class="{ 'active': (n/30)*100 < playbackProgress }"
+                  :style="{ height: (Math.sin(n * 0.5) * 5 + 12) + 'px' }">
+                </div>
+              </div>
+              <span class="preview-duration">{{ formatDuration(pendingVoiceNote.duration) }}</span>
+            </div>
+            
+            <!-- Send button for pending voice -->
+            <button class="send-fab send-pending" @click="sendVoiceNote" :disabled="isSending">
+              <ion-spinner v-if="isSending" name="crescent"></ion-spinner>
+              <ion-icon v-else :icon="send"></ion-icon>
+            </button>
+          </div>
+        </transition>
 
         <!-- Recording Bar -->
         <transition name="slide-up">
@@ -407,6 +437,10 @@ export default {
       partnerTyping: false,
       typingTimeout: null,
       typingEmitTimeout: null,
+      // Pending Voice Note Flow
+      pendingVoiceNote: null, // { base64: string, blob: Blob, duration: number }
+      playbackProgress: 0,
+      isPlayingPending: false,
     };
   },
   computed: {
@@ -582,52 +616,46 @@ export default {
     },
 
     async loadMessages(otherUserId) {
+      if (!otherUserId || this.loadingMessages) return;
+      
       try {
         this.loadingMessages = true;
-        console.log(`ðŸ“¡ Loading messages with user ${otherUserId}`);
+        console.log('ðŸ“¡ Loading messages for chat:', otherUserId);
         
-        // Handle offline
+        // Handle offline: Fetch from IndexedDB
         if (isNetworkOffline()) {
-          console.log('ðŸ“¡ OFFLINE: Loading messages from IndexedDB');
+          console.log('ðŸ“¡ OFFLINE: Fetching messages from IndexedDB');
           const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
-          if (cachedMessages) {
-            this.messages = cachedMessages;
-            this.$nextTick(() => this.scrollToBottom());
-            return;
-          }
+          this.messages = cachedMessages || [];
+          this.$nextTick(() => this.scrollToBottom());
+          return;
         }
 
         const res = await api.get(`/api/messages/${otherUserId}`, {
           params: { user_id: this.userId }
         });
         
-        this.messages = res.messages || [];
+        // Normalize statuses: when fetching from server, any message NOT already in local DB 
+        // with a different status should probably be marked 'synced'.
+        const serverMessages = (res.messages || []).map(m => ({
+          ...m,
+          status: m.status || 'synced' // server-fetched are by definition synced
+        }));
+
+        this.messages = serverMessages;
         console.log(`âœ… Loaded ${this.messages.length} messages`);
-        
+
         // Save to offline DB
         if (this.messages.length > 0) {
-          // Normalize messages for display if they don't have a status
-          this.messages = this.messages.map(m => ({
-            ...m,
-            status: m.status || 'synced'
-          }));
           await saveMessagesOffline(this.messages);
         }
 
-        window.dispatchEvent(new Event('dm-refresh'));
-        
-        this.$nextTick(() => {
-          this.scrollToBottom();
-        });
+        this.$nextTick(() => this.scrollToBottom());
       } catch (err) {
-        console.error('âŒ Load messages error:', err);
+        console.error('â Œ Load messages error:', err);
         // Fallback to offline on error
         const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
-        if (cachedMessages) {
-          this.messages = cachedMessages;
-        } else {
-          this.messages = [];
-        }
+        if (cachedMessages) this.messages = cachedMessages;
       } finally {
         this.loadingMessages = false;
       }
@@ -733,7 +761,7 @@ export default {
     },
 
     async startRecording() {
-      if (this.isRecording) return;
+      if (this.isRecording || this.pendingVoiceNote) return;
       
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -748,10 +776,15 @@ export default {
           if (this.audioChunks.length === 0) return;
           
           const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+          const duration = this.recordingDuration;
+          
           const reader = new FileReader();
           reader.onloadend = () => {
-            const base64Audio = reader.result;
-            this.sendVoiceNote(base64Audio);
+            this.pendingVoiceNote = {
+              base64: reader.result,
+              blob: audioBlob,
+              duration: duration
+            };
           };
           reader.readAsDataURL(audioBlob);
           
@@ -766,9 +799,9 @@ export default {
           this.recordingDuration++;
         }, 1000);
         
-        console.log('ðŸŽ™ï¸ Recording started');
+        console.log('ðŸŽ™ï¸  Recording started');
       } catch (err) {
-        console.error('âŒ Error starting recording:', err);
+        console.error('â Œ Error starting recording:', err);
         alert('Could not access microphone. Please ensure permissions are granted.');
       }
     },
@@ -803,38 +836,87 @@ export default {
       console.log('ðŸŽ™ï¸ Recording cancelled');
     },
 
-    async sendVoiceNote(base64Audio) {
-      if (this.isSending) return;
+    async sendVoiceNote() {
+      if (!this.pendingVoiceNote || this.isSending) return;
       
+      const base64Audio = this.pendingVoiceNote.base64;
+      const moodToSend = this.selectedMood;
+      const localId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const timestamp = new Date().toISOString();
+
       try {
         this.isSending = true;
-        console.log('ðŸ“¤ Sending voice note...');
         
-        const res = await api.post('/api/messages/send', {
+        const newMessage = {
+          id: localId,
           from_user_id: this.userId,
           to_user_id: this.selectedChat.user_id,
           text: '',
-          voice: base64Audio
-        });
+          voice: base64Audio,
+          mood: moodToSend,
+          timestamp: timestamp,
+          read: false,
+          sent_by_me: true,
+          status: 'local'
+        };
 
-        if (res.success) {
-          console.log('âœ… Voice note sent');
-          await this.loadMessages(this.selectedChat.user_id);
-          window.dispatchEvent(new Event('dm-refresh'));
-          
-          const conv = this.conversations.find(c => c.user_id === this.selectedChat.user_id);
-          if (conv) {
-            conv.last_message = 'ðŸŽ¤ Voice note';
-            conv.last_message_time = new Date().toISOString();
-            conv.last_message_sent_by_me = true;
-            conv.last_message_read = false;
+        this.messages.push(newMessage);
+        this.pendingVoiceNote = null;
+        this.selectedMood = null;
+        this.$nextTick(() => this.scrollToBottom());
+
+        await saveLocalMessage(newMessage);
+
+        // LAN Dispatch
+        if (lanService.isPeerReachable(this.selectedChat.user_id)) {
+          console.log('[LAN] Dispatching Voice P2P');
+          const ok = lanService.sendMessage(this.selectedChat.user_id, {
+            local_id: localId,
+            from_user_id: this.userId,
+            to_user_id: this.selectedChat.user_id,
+            text: '',
+            voice: base64Audio,
+            mood: moodToSend,
+            timestamp: timestamp
+          });
+          if (ok) {
+            newMessage.status = 'delivered';
+            await saveLocalMessage(newMessage);
           }
         }
+
+        // API Dispatch
+        if (!isNetworkOffline()) {
+          try {
+            const res = await api.post('/api/messages/send', {
+              from_user_id: this.userId,
+              to_user_id: this.selectedChat.user_id,
+              text: '',
+              voice: base64Audio,
+              mood: moodToSend,
+              local_id: localId
+            });
+            if (res.success) {
+              newMessage.status = 'synced';
+              newMessage.server_id = res.message_id;
+              await saveLocalMessage(newMessage);
+            }
+          } catch (e) {
+            console.warn('[Sync] Voice API failed, relying on LAN/Sync');
+          }
+        }
+
+        window.dispatchEvent(new Event('dm-refresh'));
       } catch (err) {
-        console.error('âŒ Error sending voice note:', err);
+        console.error('â Œ Error sending voice note:', err);
       } finally {
         this.isSending = false;
       }
+    },
+
+    deletePendingVoice() {
+      this.pendingVoiceNote = null;
+      this.isPlayingPending = false;
     },
 
     formatDuration(seconds) {
@@ -850,24 +932,55 @@ export default {
         return;
       }
       
-      // Stop currently playing
+      // Stop current playback if any
       if (this.playingAudioId && this.audioElements[this.playingAudioId]) {
         this.audioElements[this.playingAudioId].pause();
       }
-      
+      if (this.isPlayingPending && this.pendingAudio) {
+        this.pendingAudio.pause();
+        this.isPlayingPending = false;
+      }
+
       if (!this.audioElements[msg.id]) {
-        const audio = new Audio(this.getImageUrl(msg.voice));
-        audio.onended = () => {
+        this.audioElements[msg.id] = new Audio(this.getImageUrl(msg.voice));
+        this.audioElements[msg.id].onended = () => {
           this.playingAudioId = null;
         };
-        audio.ontimeupdate = () => {
+        this.audioElements[msg.id].ontimeupdate = () => {
           this.$forceUpdate();
         };
-        this.audioElements[msg.id] = audio;
       }
       
       this.playingAudioId = msg.id;
       this.audioElements[msg.id].play();
+    },
+
+    togglePendingPlayback() {
+      if (this.isPlayingPending && this.pendingAudio) {
+        this.pendingAudio.pause();
+        this.isPlayingPending = false;
+        return;
+      }
+      
+      // Stop others
+      if (this.playingAudioId && this.audioElements[this.playingAudioId]) {
+        this.audioElements[this.playingAudioId].pause();
+        this.playingAudioId = null;
+      }
+
+      if (!this.pendingAudio) {
+        this.pendingAudio = new Audio(this.pendingVoiceNote.base64);
+        this.pendingAudio.onended = () => {
+          this.isPlayingPending = false;
+          this.playbackProgress = 0;
+        };
+        this.pendingAudio.ontimeupdate = () => {
+          this.playbackProgress = (this.pendingAudio.currentTime / this.pendingAudio.duration) * 100;
+        };
+      }
+      
+      this.isPlayingPending = true;
+      this.pendingAudio.play();
     },
 
     getAudioProgress(msgId) {
@@ -974,6 +1087,18 @@ export default {
         this.conversations = res.conversations || [];
         this.filteredConversations = [...this.conversations];
         console.log(`âœ… Loaded ${this.conversations.length} conversations`);
+
+        // Update online status for all
+        const allIds = this.conversations.map(c => c.user_id);
+        if (allIds.length > 0) {
+          const statusRes = await api.post('/api/users/online-status', { user_ids: allIds });
+          if (statusRes.success && statusRes.statuses) {
+            this.conversations.forEach(c => {
+              const s = statusRes.statuses[String(c.user_id)];
+              if (s) c.online = s.online;
+            });
+          }
+        }
 
         // Save to offline DB
         if (this.conversations.length > 0) {
@@ -1146,12 +1271,13 @@ export default {
     console.log('âœ… DMPage mounted, userId:', this.userId);
     console.log('âœ… User type:', typeof this.userId);
 
-    // Realtime DM updates via Socket.IO (fallback remains manual refresh/polling)
+    // Realtime DM updates via Socket.IO
     try {
-      const socket = this.$socket;
-      if (socket && typeof socket.on === 'function') {
-        // Ensure we're joined (main.js also does this on connect)
-        try { socket.emit('join', { user_id: this.userId }); } catch (_) {}
+      const socket = this.$socketService?.socket;
+      if (socket) {
+        // Explicitly register for presence and join personal room
+        socket.emit('user:register', { user_id: this.userId });
+        socket.emit('join', { user_id: this.userId });
 
         this._socketNewMessageHandler = async (payload) => {
           try {
@@ -1695,5 +1821,96 @@ export default {
   0% { opacity: 0.6; }
   50% { opacity: 1; }
   100% { opacity: 0.6; }
+}
+/* Pending Voice Note UI */
+.pending-voice-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--ion-color-light, #f4f5f8);
+  border-top: 1px solid var(--ion-border-color, #eff3f4);
+  animation: slideUp 0.3s ease-out;
+}
+
+.voice-preview-bubble {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.preview-play-btn {
+  background: var(--ion-color-primary, #daa520);
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.preview-wave {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+}
+
+.preview-wave-bar {
+  flex: 1;
+  background: #e0e0e0;
+  border-radius: 1px;
+  transition: all 0.2s;
+}
+
+.preview-wave-bar.active {
+  background: var(--ion-color-primary, #daa520);
+}
+
+.preview-duration {
+  font-size: 13px;
+  color: var(--ion-color-medium, #666);
+  font-family: monospace;
+}
+
+.voice-ctrl-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+}
+
+.voice-ctrl-btn:active {
+  transform: scale(0.9);
+}
+
+.voice-ctrl-btn.delete {
+  background: #fee;
+  color: #eb445a;
+}
+
+.voice-ctrl-btn.send {
+  background: var(--ion-color-primary, #daa520);
+  color: white;
+}
+
+.send-pending {
+  margin: 0;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 </style>

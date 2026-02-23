@@ -80,15 +80,14 @@ export default {
     async loadSuggestedUsers() {
       try {
         this.loading = true;
-        const res = await api.get('/api/search/users', {
-          params: { q: '', limit: 10, viewer_id: this.userId }
+        const res = await api.get('/api/users/suggested', {
+          params: { limit: 10, user_id: this.userId }
         });
         
         this.users = (res.users || [])
-          .filter(u => u.user_id !== this.userId)
-          .slice(0, 5)
           .map(u => ({ 
             ...u, 
+            user_id: u.id, // backend mapping
             following: !!u.is_following,
             followLoading: false
           }));
