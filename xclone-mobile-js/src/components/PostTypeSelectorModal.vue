@@ -28,7 +28,6 @@
             <h3 class="option-name">{{ option.name }}</h3>
             <p class="option-desc">{{ option.desc }}</p>
           </div>
-          <ion-icon :icon="chevronForward" class="chevron"></ion-icon>
         </div>
       </div>
 
@@ -155,69 +154,78 @@ export default {
 }
 
 .options-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 8px 0;
 }
 
 .option-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
+  text-align: center;
+  gap: 12px;
+  padding: 24px 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 20px;
+  border-radius: 24px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
+  aspect-ratio: 1/1.1;
+  justify-content: center;
 }
 
 .option-card:hover {
   background: rgba(218, 165, 32, 0.1);
   border-color: rgba(218, 165, 32, 0.3);
-  transform: translateY(-2px);
+  transform: translateY(-4px);
 }
 
 .option-card:active {
-  transform: scale(0.98);
+  transform: scale(0.95);
 }
 
 .option-icon-wrap {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
 }
 
 .option-icon-wrap ion-icon {
-  font-size: 24px;
+  font-size: 28px;
   color: #fff;
 }
 
 .option-content {
-  flex: 1;
+  width: 100%;
 }
 
 .option-name {
-  font-size: 16px;
-  font-weight: 700;
-  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 800;
+  margin: 0 0 6px;
   color: #fff;
 }
 
 .option-desc {
-  font-size: 13px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.4);
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .chevron {
-  color: rgba(255, 255, 255, 0.2);
-  font-size: 20px;
+  display: none;
 }
 
 .selector-footer {
