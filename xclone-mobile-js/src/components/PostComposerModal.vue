@@ -5,11 +5,11 @@
         <ion-buttons slot="start">
           <ion-button @click="closeModal" color="medium">Cancel</ion-button>
         </ion-buttons>
-        <ion-title>New Post</ion-title>
+        <ion-title>{{ modalTitle }}</ion-title>
         <ion-buttons slot="end">
           <ion-button 
             @click="submitPost" 
-          :disabled="!canSubmit || isPosting"
+            :disabled="!canSubmit || isPosting"
             :strong="true"
             color="primary">
             {{ isPosting ? 'Posting...' : 'Post' }}
@@ -19,43 +19,46 @@
     </ion-header>
     <ion-content class="ion-padding">
       <div class="compose-container">
-        <!-- Avatar removed for more space -->
         <div class="compose-input full-width">
-            <ion-textarea 
-              v-model="postContent" 
-              placeholder="What's happening?" 
-              class="composer-textarea"
-              :auto-grow="true"
-              rows="4"
-              maxlength="1000"
-              @input="handlePostInput">
-            </ion-textarea>
+            <!-- Standard Post Inputs (Hidden in specialized modes) -->
+            <template v-if="!showPollCreator && !showAMACreator && !showAudioSpaceCreator">
+              <ion-textarea 
+                v-model="postContent" 
+                placeholder="What's happening?" 
+                class="composer-textarea"
+                :auto-grow="true"
+                rows="4"
+                maxlength="1000"
+                @input="handlePostInput"
+                @focus="lastFocusedField = 'postContent'">
+              </ion-textarea>
 
-            <div v-if="isAnonymous" class="anonymous-indicator">
-              <ion-icon :icon="skull"></ion-icon>
-              <span>Posting as {{ ghostName || 'Anonymous Ghost' }}</span>
-            </div>
+              <div v-if="isAnonymous" class="anonymous-indicator">
+                <ion-icon :icon="skull"></ion-icon>
+                <span>Posting as {{ ghostName || 'Anonymous Ghost' }}</span>
+              </div>
+            </template>
           
-          <div v-if="mediaPreviews.length" class="preview-grid">
-            <div 
-              v-for="(preview, index) in mediaPreviews" 
-              :key="index"
-              class="preview-item"
-              :class="`count-${mediaPreviews.length}`">
-              <img v-if="preview.type === 'image'" :src="preview.src" class="preview-img" alt="Preview"/>
-              <VideoPlayer
-                v-else-if="preview.type === 'video'"
-                :src="preview.src"
-                :poster="preview.thumbnail || ''"
-              />
-              <ion-button 
-                fill="clear" 
-                size="small" 
-                class="remove-img-btn"
-                @click.stop="removeMedia(index)">
-                <ion-icon :icon="close"></ion-icon>
-              </ion-button>
-            </div>
+            <!-- Media Previews (Visible in standard post mode) -->
+            <div v-if="mediaPreviews.length && !showPollCreator && !showAMACreator && !showAudioSpaceCreator" class="preview-grid" :class="`count-${mediaPreviews.length}`">
+              <div 
+                v-for="(preview, index) in mediaPreviews" 
+                :key="index"
+                class="preview-item">
+                <img v-if="preview.type === 'image'" :src="preview.src" class="preview-img" alt="Preview"/>
+                <VideoPlayer
+                  v-else-if="preview.type === 'video'"
+                  :src="preview.src"
+                  :poster="preview.thumbnail || ''"
+                />
+                <ion-button 
+                  fill="clear" 
+                  size="small" 
+                  class="remove-img-btn"
+                  @click.stop="removeMedia(index)">
+                  <ion-icon :icon="close"></ion-icon>
+                </ion-button>
+              </div>
             </div>
           
           <!-- Poll Creator -->
@@ -86,6 +89,7 @@
                 v-model="pollQuestion"
                 placeholder="Ask a question..."
                 class="poll-question-input"
+                @focus="lastFocusedField = 'pollQuestion'"
               ></ion-input>
             </ion-item>
 
@@ -103,6 +107,7 @@
                   v-model="pollOptions[index]"
                   :placeholder="'Choice ' + (index + 1) + '…'"
                   class="poll-option-input"
+                  @focus="lastFocusedField = 'pollOption' + index"
                 ></ion-input>
                 <ion-button
                   v-if="pollOptions.length > 2 && pollType !== 'battle'"
@@ -156,6 +161,7 @@
                 class="ama-desc-input"
                 rows="2"
                 auto-grow
+                @focus="lastFocusedField = 'amaDescription'"
               ></ion-textarea>
             </ion-item>
 
@@ -186,6 +192,7 @@
                 v-model="audioSpaceTitle"
                 placeholder="What do you want to talk about?"
                 class="space-title-input"
+                @focus="lastFocusedField = 'audioSpaceTitle'"
               ></ion-input>
             </ion-item>
 
@@ -219,28 +226,28 @@
                 <EmojiPicker v-if="showEmojiPicker" @select="addEmoji" class="composer-emoji-picker" />
               </div>
 
-              <button type="button" class="toolbar-btn btn-media" @click="$refs.fileInput.click()" title="Add Media">
+              <button v-if="canAddMoreMedia && !showPollCreator && !showAMACreator && !showAudioSpaceCreator" type="button" class="toolbar-btn btn-media" @click="$refs.fileInput.click()" title="Add Media">
                 <ion-icon :icon="image"></ion-icon>
                 <span>Media</span>
               </button>
 
-              <button type="button" class="toolbar-btn btn-poll" @click="togglePollCreator" :class="{ active: showPollCreator }" title="Create Poll">
+              <button v-if="!initialType || initialType === 'post'" type="button" class="toolbar-btn btn-poll" @click="togglePollCreator" :class="{ active: showPollCreator }" title="Create Poll">
                 <ion-icon :icon="barChart"></ion-icon>
                 <span>Poll</span>
               </button>
 
-              <button type="button" class="toolbar-btn btn-ama" @click="toggleAMACreator" :class="{ active: showAMACreator }" title="Host AMA">
+              <button v-if="!initialType || initialType === 'post'" type="button" class="toolbar-btn btn-ama" @click="toggleAMACreator" :class="{ active: showAMACreator }" title="Host AMA">
                 <ion-icon :icon="mic"></ion-icon>
                 <span>AMA</span>
               </button>
 
-              <button type="button" class="toolbar-btn btn-space" @click="toggleAudioSpaceCreator" :class="{ active: showAudioSpaceCreator }" title="Start Talk">
+              <button v-if="!initialType || initialType === 'post'" type="button" class="toolbar-btn btn-space" @click="toggleAudioSpaceCreator" :class="{ active: showAudioSpaceCreator }" title="Start Talk">
                 <ion-icon :icon="radio"></ion-icon>
                 <span>Talk</span>
               </button>
             </div>
 
-            <span class="char-count" :class="{ 'over-limit': postContent.length > 1000 }">
+            <span class="char-count" :class="{ 'over-limit': postContent.length > 1000 }" v-if="!showAudioSpaceCreator && !showPollCreator && !showAMACreator">
               {{ postContent.length }}/1000
             </span>
           </div>
@@ -296,6 +303,10 @@ export default {
     userAvatar: {
       type: String,
       default: ''
+    },
+    initialType: {
+      type: String,
+      default: 'post'
     }
   },
   emits: ['update:isOpen', 'post-created'],
@@ -341,17 +352,25 @@ export default {
         { label: '6h',  value: '360' },
         { label: '1d',  value: '1440' },
         { label: '1w',  value: '10080' }
-      ]
+      ],
+      lastFocusedField: 'postContent'
     };
   },
   watch: {
     isOpen(newVal) {
       if (newVal) {
         this.checkAnonymity();
+        this.applyInitialType();
       }
     }
   },
   computed: {
+    modalTitle() {
+      if (this.showPollCreator) return 'Create Poll';
+      if (this.showAMACreator) return 'Host AMA';
+      if (this.showAudioSpaceCreator) return 'Start NexFi Talk';
+      return 'New Post';
+    },
     canPost() {
       const hasContent = this.postContent.trim().length > 0 || this.postMedia.length > 0;
       const isContentValid = this.postContent.length <= 1000;
@@ -374,6 +393,9 @@ export default {
       }
 
       return (hasContent || hasValidPoll || hasValidAMA || hasValidSpace) && isContentValid;
+    },
+    canAddMoreMedia() {
+      return this.postMedia.length < 4;
     },
     canSubmit() {
       if (this.isPosting) return false;
@@ -432,6 +454,21 @@ export default {
     
 
 
+    applyInitialType() {
+      // Reset first
+      this.showPollCreator = false;
+      this.showAMACreator = false;
+      this.showAudioSpaceCreator = false;
+
+      if (this.initialType === 'poll') {
+        this.showPollCreator = true;
+      } else if (this.initialType === 'ama') {
+        this.showAMACreator = true;
+      } else if (this.initialType === 'talk') {
+        this.showAudioSpaceCreator = true;
+      }
+    },
+
     getImageUrl(path) {
       if (!path) return '/default-avatar.png';
       if (path.startsWith('http') || path.startsWith('data:')) return path;
@@ -477,7 +514,20 @@ export default {
     },
 
     addEmoji(emoji) {
-      this.postContent += emoji;
+      if (this.lastFocusedField === 'postContent') {
+        this.postContent += emoji;
+      } else if (this.lastFocusedField === 'pollQuestion') {
+        this.pollQuestion += emoji;
+      } else if (this.lastFocusedField.startsWith('pollOption')) {
+        const index = parseInt(this.lastFocusedField.replace('pollOption', ''));
+        this.pollOptions[index] += emoji;
+      } else if (this.lastFocusedField === 'amaDescription') {
+        this.amaDescription += emoji;
+      } else if (this.lastFocusedField === 'audioSpaceTitle') {
+        this.audioSpaceTitle += emoji;
+      } else {
+        this.postContent += emoji;
+      }
     },
 
     async onMediaChange(e) {
@@ -755,6 +805,7 @@ export default {
       this.showAudioSpaceCreator = false;
       this.audioSpaceTitle = '';
       this.audioSpaceIsLocked = false;
+      this.lastFocusedField = 'postContent';
       if (this.$refs.fileInput) {
         this.$refs.fileInput.value = '';
       }
@@ -965,8 +1016,48 @@ export default {
   top: 100%;
   left: 0;
   z-index: 1000;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
   border-radius: 12px;
+}
+
+/* Focused Mode Styles */
+.poll-creator, .ama-creator, .audio-space-creator {
+  animation: slideUpFade 0.3s ease-out;
+  border: 1px solid rgba(218, 165, 32, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 24px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.poll-creator-header, .ama-creator-header, .space-creator-header {
+  padding: 16px;
+  background: rgba(218, 165, 32, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.poll-creator-icon, .ama-creator-icon, .space-creator-icon {
+  font-size: 24px;
+}
+
+.ama-creator-title, .space-creator-title {
+  font-weight: 800;
+  font-size: 17px;
+  color: #fff;
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Narrow Toolbar when in focused mode */
+.compose-toolbar {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 12px;
 }
 
 .char-count {
