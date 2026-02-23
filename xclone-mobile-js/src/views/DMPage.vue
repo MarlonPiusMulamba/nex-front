@@ -127,10 +127,13 @@
           </div>
 
           <!-- Messages -->
-          <div 
-            v-for="msg in messages" 
+          <div
+            v-for="msg in messages"
             :key="msg.id"
-            :class="['msg-row', msg.sent_by_me ? 'sent' : 'received']">
+            :class="['msg-row', msg.sent_by_me ? 'sent' : 'received']"
+            @touchstart="onMsgTouchStart(msg, $event)"
+            @touchend="onMsgTouchEnd"
+            @contextmenu.prevent="replyToMessage(msg)">
 
             <!-- Mood badge -->
             <div v-if="msg.mood" class="mood-label" :class="'mood-' + msg.mood">
@@ -140,36 +143,32 @@
             <div class="msg-card" :class="[
               msg.sent_by_me ? 'sent-card' : 'received-card',
               msg.mood ? 'mood-card mood-card--' + msg.mood : ''
-            ]">
-              <img v-if="msg.image" :src="getImageUrl(msg.image)" class="message-image" alt="Image" />
-              
-              <!-- Voice Note Player -->
-              <div v-if="msg.voice" class="voice-player">
-                <button class="voice-play-btn" @click="toggleVoicePlayback(msg)">
-                  <span v-if="playingAudioId === msg.id">â¸</span>
-                  <span v-else>â–¶</span>
-                </button>
-                <div class="voice-waveform">
-                  <div 
-                    v-for="n in 18" 
-                    :key="n"
-                    class="wave-bar"
-                    :class="{ 'active': playingAudioId === msg.id && (n / 18) * 100 < getAudioProgress(msg.id) }"
-                    :style="{ height: (Math.sin(n * 0.8) * 10 + 14) + 'px' }">
-                  </div>
-                </div>
-                <span class="voice-duration">{{ formatDuration(getAudioDuration(msg.id)) }}</span>
+            ]"
+            :style="msg.mood && moodMap[msg.mood] ? { '--msg-glow': moodMap[msg.mood].glow } : {}"
+            >
+              <!-- Reply Quote -->
+              <div v-if="msg.reply_to_preview" class="msg-reply-quote" @click="scrollToMsg(msg.reply_to_id)">
+                <div class="reply-quote-bar"></div>
+                <span class="reply-quote-text">{{ msg.reply_to_preview }}</span>
               </div>
+
+              <img v-if="msg.image" :src="getImageUrl(msg.image)" class="message-image" alt="Image" />
+
+              <!-- Voice Drop Player -->
+              <VoiceDrop
+                v-if="msg.voice"
+                :msg="msg"
+                :isSent="msg.sent_by_me"
+                @reply-timestamp="onVoiceTimestampReply"
+              />
 
               <div v-if="msg.text" class="msg-text" v-html="formatPostContent(msg.text)" @click="onPostTextClick($event)"></div>
               <div class="msg-meta">
                 <span class="msg-time">{{ formatMessageTime(msg.timestamp) }}</span>
-                
-                <!-- LAN/Sync Status -->
                 <span v-if="msg.sent_by_me" class="msg-status-icon" :title="msg.status">
-                  <span v-if="msg.status === 'local'" class="status-local">âŒ§</span>
-                  <span v-else-if="msg.status === 'delivered'" class="status-delivered">ðŸ¤</span>
-                  <span v-else class="msg-read" :class="{ 'seen': msg.read }">{{ msg.read ? 'âœ“âœ“' : 'âœ“' }}</span>
+                  <span v-if="msg.status === 'local'" class="status-local">⌧</span>
+                  <span v-else-if="msg.status === 'delivered'" class="status-delivered">🤝</span>
+                  <span v-else class="msg-read" :class="{ 'seen': msg.read }">{{ msg.read ? '✔✔' : '✔' }}</span>
                 </span>
               </div>
             </div>
@@ -177,9 +176,19 @@
 
           <!-- Typing indicator -->
           <div v-if="partnerTyping" class="typing-row">
-            <div class="typing-card">
-              <span class="typing-label">crafting a thought</span>
-              <div class="typing-dots">
+            <div 
+              class="typing-card"
+              :class="partnerMood ? 'typing-mood typing-mood--' + partnerMood : ''"
+              :style="partnerMood && moodMap[partnerMood] ? { '--mood-glow': moodMap[partnerMood].glow } : {}"
+            >
+              <span class="typing-emoji" v-if="partnerMood && moodMap[partnerMood]">{{ moodMap[partnerMood].icon }}</span>
+              <span class="typing-label">
+                <template v-if="partnerMood && moodMap[partnerMood]">
+                  typing a <em>{{ moodMap[partnerMood].label.toLowerCase() }}</em> message
+                </template>
+                <template v-else>crafting a thought</template>
+              </span>
+              <div class="typing-dots" :class="partnerMood ? 'dots-mood-' + partnerMood : ''">
                 <span></span><span></span><span></span>
               </div>
             </div>
@@ -192,8 +201,8 @@
         <!-- Mood Picker -->
         <transition name="mood-fade">
           <div v-if="showMoodPicker" class="mood-picker">
-            <button 
-              v-for="(mood, key) in moodMap" 
+            <button
+              v-for="(mood, key) in moodMap"
               :key="key"
               class="mood-option"
               :class="{ 'selected': selectedMood === key }"
@@ -204,10 +213,22 @@
           </div>
         </transition>
 
+        <!-- Reply Bar -->
+        <transition name="slide-up">
+          <div v-if="replyingTo" class="vd-reply-bar">
+            <div class="reply-bar-accent"></div>
+            <div class="reply-bar-body">
+              <span class="reply-bar-label">{{ replyingTo.timestampSec != null ? `Replying to ${fmtRepSec(replyingTo.timestampSec)}` : 'Replying' }}</span>
+              <span class="reply-bar-preview">{{ replyingTo.preview }}</span>
+            </div>
+            <button class="reply-bar-close" @click="clearReply">✕</button>
+          </div>
+        </transition>
+
         <!-- Image preview strip -->
         <div v-if="imagePreview" class="image-preview-strip">
           <img :src="imagePreview" class="preview-thumb" />
-          <button class="remove-preview" @click="imagePreview = null">âœ•</button>
+          <button class="remove-preview" @click="imagePreview = null">✕</button>
         </div>
 
         <div class="input-bar" v-if="!pendingVoiceNote">
@@ -221,7 +242,7 @@
             @click="showMoodPicker = !showMoodPicker"
             :title="selectedMood ? moodMap[selectedMood]?.label : 'Set mood'">
             <span v-if="selectedMood">{{ moodMap[selectedMood]?.icon }}</span>
-            <span v-else>ðŸŽ­</span>
+            <span v-else>🎭</span>
           </button>
 
           <div class="textarea-wrap">
@@ -261,47 +282,73 @@
           </button>
         </div>
 
-        <!-- Pending Voice Note Preview Area -->
+        <!-- Pending Voice Drop Preview -->
         <transition name="slide-up">
-          <div v-if="pendingVoiceNote" class="pending-voice-bar">
-            <button class="voice-ctrl-btn delete" @click="deletePendingVoice">
-              <ion-icon :icon="trash"></ion-icon>
-            </button>
-            <div class="voice-preview-bubble">
-              <button class="preview-play-btn" @click="togglePendingPlayback">
-                <ion-icon :icon="isPlayingPending ? pause : play"></ion-icon>
-              </button>
-              <div class="preview-wave">
-                <div 
-                  v-for="n in 30" 
-                  :key="n" 
-                  class="preview-wave-bar"
-                  :class="{ 'active': (n/30)*100 < playbackProgress }"
-                  :style="{ height: (Math.sin(n * 0.5) * 5 + 12) + 'px' }">
-                </div>
-              </div>
-              <span class="preview-duration">{{ formatDuration(pendingVoiceNote.duration) }}</span>
+          <div v-if="pendingVoiceNote" class="vd-pending-bar">
+            <div class="vd-pending-header">
+              <span class="vd-pending-label">🎙 Voice Drop</span>
+              <span v-if="pendingVoiceNote.transcript" class="vd-pending-transcript">{{ pendingVoiceNote.transcript.slice(0, 60) }}{{ pendingVoiceNote.transcript.length > 60 ? '...' : '' }}</span>
+              <span v-if="pendingVoiceNote.mood" class="vd-pending-mood">
+                {{ voiceMoodConfig[pendingVoiceNote.mood]?.icon }} {{ voiceMoodConfig[pendingVoiceNote.mood]?.label }}
+              </span>
             </div>
-            
-            <!-- Send button for pending voice -->
-            <button class="send-fab send-pending" @click="sendVoiceNote" :disabled="isSending">
-              <ion-spinner v-if="isSending" name="crescent"></ion-spinner>
-              <ion-icon v-else :icon="send"></ion-icon>
-            </button>
+            <div class="vd-pending-controls">
+              <button class="voice-ctrl-btn delete" @click="deletePendingVoice">
+                <ion-icon :icon="trash"></ion-icon>
+              </button>
+              <div class="voice-preview-bubble">
+                <button class="preview-play-btn" @click="togglePendingPlayback">
+                  <ion-icon :icon="isPlayingPending ? pause : play"></ion-icon>
+                </button>
+                <div class="preview-wave">
+                  <div
+                    v-for="n in 30"
+                    :key="n"
+                    class="preview-wave-bar"
+                    :class="{ 'active': (n/30)*100 < playbackProgress }"
+                    :style="{ height: (Math.sin(n * 0.5) * 5 + 12) + 'px' }">
+                  </div>
+                </div>
+                <span class="preview-duration">{{ formatDuration(pendingVoiceNote.duration) }}</span>
+              </div>
+              <button class="send-fab send-pending" @click="sendVoiceNote" :disabled="isSending">
+                <ion-spinner v-if="isSending" name="crescent"></ion-spinner>
+                <ion-icon v-else :icon="send"></ion-icon>
+              </button>
+            </div>
           </div>
         </transition>
 
-        <!-- Recording Bar -->
-        <transition name="slide-up">
-          <div v-if="isRecording" class="recording-bar">
-            <button class="rec-cancel" @click.stop="cancelRecording">âœ• Cancel</button>
-            <div class="rec-status">
-              <span class="rec-dot"></span>
-              <span class="rec-timer">{{ formatDuration(recordingDuration) }}</span>
+        <!-- Energy Ring Recording Overlay -->
+        <transition name="ring-fade">
+          <div v-if="isRecording" class="vd-ring-overlay">
+            <div class="vd-ring-wrap">
+              <svg width="200" height="200" class="vd-ring-svg">
+                <circle cx="100" cy="100" r="80" fill="none" stroke="rgba(218,165,32,0.08)" stroke-width="2"/>
+                <circle
+                  cx="100" cy="100"
+                  :r="56 + recordingAmplitude * 24"
+                  fill="rgba(218,165,32,0.035)"
+                  :stroke="recordingAmplitude > 0.6 ? '#ef4444' : '#daa520'"
+                  stroke-width="2.5"
+                  style="transition:all 0.08s ease;"
+                />
+                <circle
+                  cx="100" cy="100"
+                  :r="72 + recordingAmplitude * 28"
+                  fill="none"
+                  :stroke="recordingAmplitude > 0.6 ? 'rgba(239,68,68,0.25)' : 'rgba(218,165,32,0.18)'"
+                  stroke-width="1"
+                  style="transition:all 0.12s ease;"
+                />
+              </svg>
+              <div class="vd-ring-center">
+                <span class="vd-ring-timer">{{ formatDuration(recordingDuration) }}</span>
+                <span class="vd-ring-dot">● REC</span>
+              </div>
             </div>
-            <div class="rec-wave">
-              <span v-for="n in 8" :key="n" class="rec-wave-bar" :style="{ animationDelay: (n * 0.1) + 's' }"></span>
-            </div>
+            <p v-if="voiceDropTranscript" class="vd-live-transcript">{{ voiceDropTranscript }}</p>
+            <button class="vd-rec-cancel" @click.stop="cancelRecording">✕ Cancel</button>
           </div>
         </transition>
       </div>
@@ -349,16 +396,36 @@
     </ion-modal>
 
     <!-- Hidden file input for images -->
-  <input 
-    type="file" 
+  <input
+    type="file"
     ref="fileInput"
     accept="image/*"
     style="display: none"
     @change="onImageSelect"
   />
 
+  <!-- Voice Reflection Toast -->
+  <transition name="slide-up">
+    <div v-if="showReflection" class="vd-reflection-toast">
+      <div class="reflection-prompt">
+        <span>🔮 Summarize your Voice Drop in one key idea?</span>
+        <div class="reflection-input-row">
+          <input
+            v-model="reflectionText"
+            class="reflection-input"
+            placeholder="Key idea..."
+            @keydown.enter="sendReflection"
+          />
+          <button class="reflection-send" @click="sendReflection">→</button>
+          <button class="reflection-skip" @click="showReflection = false">skip</button>
+        </div>
+      </div>
+    </div>
+  </transition>
+
   </ion-page>
 </template>
+
 
 <script>
 
@@ -373,12 +440,13 @@ import {
 } from 'ionicons/icons';
 import api from '@/utils/api.js';
 import EmojiPicker from '@/components/EmojiPicker.vue';
-import { 
-  saveConversationsOffline, getOfflineConversations, 
+import VoiceDrop from '@/components/VoiceDrop.vue';
+import {
+  saveConversationsOffline, getOfflineConversations,
   saveMessagesOffline, getOfflineMessages, isNetworkOffline,
   saveLocalMessage
 } from '@/utils/offlineDb.js';
-import { 
+import {
   stop, trash, play, pause
 } from 'ionicons/icons';
 import lanService from '@/utils/lanService.js';
@@ -388,6 +456,7 @@ import { v4 as uuidv4 } from 'uuid';
 export default {
   name: 'DMPage',
   components: {
+    VoiceDrop,
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
     IonButtons, IonIcon, IonSearchbar, IonModal, IonTextarea, IonSpinner,
     IonRefresher, IonRefresherContent,
@@ -428,19 +497,46 @@ export default {
       selectedMood: null,
       showMoodPicker: false,
       moodMap: {
-        bold:    { icon: 'ðŸ”¥', label: 'Bold',    glow: '#ff6b35' },
-        deep:    { icon: 'ðŸ§ ', label: 'Deep',    glow: '#6c63ff' },
-        casual:  { icon: 'ðŸ’¬', label: 'Casual',  glow: '#00c9a7' },
-        serious: { icon: 'ðŸŽ¯', label: 'Serious', glow: '#daa520' },
+        bold:       { icon: '🔥', label: 'Bold',       glow: '#ff6b35', text: '#ff6b35' },
+        deep:       { icon: '🧠', label: 'Deep',       glow: '#6c63ff', text: '#a78bfa' },
+        casual:     { icon: '💬', label: 'Casual',     glow: '#00c9a7', text: '#00c9a7' },
+        serious:    { icon: '🎯', label: 'Serious',    glow: '#daa520', text: '#daa520' },
+        pissed:     { icon: '😤', label: 'Pissed Off', glow: '#ef4444', text: '#f87171' },
+        playful:    { icon: '😜', label: 'Playful',    glow: '#ec4899', text: '#f472b6' },
+        romantic:   { icon: '💗', label: 'Romantic',   glow: '#fb7185', text: '#fda4af' },
+        mysterious: { icon: '🌙', label: 'Mysterious', glow: '#7c3aed', text: '#a78bfa' },
       },
+      // Voice Drop
+      voiceDropTranscript: '',
+      voiceDropMood: null,
+      recordingAmplitude: 0,
+      amplitudeSamples: [],
+      recAnalyserNode: null,
+      recAudioCtx: null,
+      recAnimFrameId: null,
+      speechRec: null,
+      voiceMoodConfig: {
+        passionate: { icon: '🔥', label: 'Passionate' },
+        calm:       { icon: '😌', label: 'Calm' },
+        thoughtful: { icon: '🧠', label: 'Thoughtful' },
+        urgent:     { icon: '⚡', label: 'Urgent' },
+      },
+      // Reply threading
+      replyingTo: null,
+      longPressTimer: null,
+      // Voice Reflection
+      showReflection: false,
+      reflectionText: '',
       // Typing indicator
       partnerTyping: false,
+      partnerMood: null,
       typingTimeout: null,
       typingEmitTimeout: null,
       // Pending Voice Note Flow
-      pendingVoiceNote: null, // { base64: string, blob: Blob, duration: number }
+      pendingVoiceNote: null, // { base64: string, blob: Blob, duration: number, transcript: string, mood: string }
       playbackProgress: 0,
       isPlayingPending: false,
+      pendingAudio: null, // Added for pending voice note playback
     };
   },
   computed: {
@@ -601,6 +697,7 @@ export default {
       this.messageText = '';
       this.imagePreview = null;
       this.showEmojiPicker = false;
+      this.clearReply();
       
       // Reload conversations to get updated list
       this.loadConversations();
@@ -669,10 +766,15 @@ export default {
       const moodToSend = this.selectedMood;
       const localId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const timestamp = new Date().toISOString();
+      const replyToId      = this.replyingTo?.msg?.id || null;
+      const replyToPreview = this.replyingTo?.preview || null;
+
+      // Clear reply state
+      this.clearReply();
 
       try {
         this.isSending = true;
-        
+
         // Construct the local message object
         const newMessage = {
           id: localId,
@@ -681,6 +783,8 @@ export default {
           text: messageTextToSend,
           image: imageToSend || '',
           mood: moodToSend || null,
+          reply_to_id: replyToId,
+          reply_to_preview: replyToPreview,
           timestamp: timestamp,
           read: false,
           sent_by_me: true,
@@ -708,6 +812,8 @@ export default {
             text: messageTextToSend,
             image: imageToSend,
             mood: moodToSend,
+            reply_to_id: replyToId,
+            reply_to_preview: replyToPreview,
             timestamp: timestamp
           });
           
@@ -729,7 +835,9 @@ export default {
               text: messageTextToSend,
               image: imageToSend || null,
               mood: moodToSend || null,
-              local_id: localId // Backend uses this to avoid duplicates
+              reply_to_id: replyToId,
+              reply_to_preview: replyToPreview,
+              local_id: localId
             });
 
             if (res.success) {
@@ -747,7 +855,7 @@ export default {
         // Update conversation preview
         const conv = this.conversations.find(c => String(c.user_id) === String(this.selectedChat.user_id));
         if (conv) {
-          conv.last_message = messageTextToSend || 'ðŸ“· Photo';
+          conv.last_message = messageTextToSend || '📸 Photo';
           conv.last_message_time = timestamp;
           conv.last_message_sent_by_me = true;
           conv.last_message_read = false;
@@ -762,61 +870,90 @@ export default {
 
     async startRecording() {
       if (this.isRecording || this.pendingVoiceNote) return;
-      
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         this.mediaRecorder = new MediaRecorder(stream);
-        this.audioChunks = [];
-        
+        this.audioChunks   = [];
+        this.amplitudeSamples = [];
+        this.voiceDropTranscript = '';
+        this.voiceDropMood = null;
+
+        // ── Web Audio Analyser (energy ring) ──────────────────
+        try {
+          const ACtx = window.AudioContext || window.webkitAudioContext;
+          if (ACtx) {
+            this.recAudioCtx  = new ACtx();
+            const src         = this.recAudioCtx.createMediaStreamSource(stream);
+            this.recAnalyserNode = this.recAudioCtx.createAnalyser();
+            this.recAnalyserNode.fftSize = 256;
+            src.connect(this.recAnalyserNode);
+            this._animateRing();
+          }
+        } catch (_) {}
+
+        // ── SpeechRecognition (transcription) ─────────────────
+        try {
+          const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+          if (SR) {
+            this.speechRec = new SR();
+            this.speechRec.continuous     = true;
+            this.speechRec.interimResults = true;
+            this.speechRec.onresult = (e) => {
+              this.voiceDropTranscript = Array.from(e.results)
+                .map(r => r[0].transcript).join(' ');
+            };
+            this.speechRec.start();
+          }
+        } catch (_) {}
+
         this.mediaRecorder.ondataavailable = (event) => {
           this.audioChunks.push(event.data);
         };
-        
+
         this.mediaRecorder.onstop = async () => {
           if (this.audioChunks.length === 0) return;
-          
           const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
-          const duration = this.recordingDuration;
-          
+          const duration  = this.recordingDuration;
+          const transcript = this.voiceDropTranscript || '';
+          const mood       = this.detectVoiceMood(this.amplitudeSamples);
+
           const reader = new FileReader();
           reader.onloadend = () => {
             this.pendingVoiceNote = {
-              base64: reader.result,
-              blob: audioBlob,
-              duration: duration
+              base64:     reader.result,
+              blob:       audioBlob,
+              duration,
+              transcript,
+              mood,
             };
           };
           reader.readAsDataURL(audioBlob);
-          
-          // Stop all tracks in the stream
-          stream.getTracks().forEach(track => track.stop());
+          stream.getTracks().forEach(t => t.stop());
         };
-        
+
         this.mediaRecorder.start();
         this.isRecording = true;
         this.recordingDuration = 0;
-        this.recordingTimer = setInterval(() => {
-          this.recordingDuration++;
-        }, 1000);
-        
-        console.log('ðŸŽ™ï¸  Recording started');
+        this.recordingTimer = setInterval(() => { this.recordingDuration++; }, 1000);
       } catch (err) {
-        console.error('â Œ Error starting recording:', err);
+        console.error('Error starting recording:', err);
         alert('Could not access microphone. Please ensure permissions are granted.');
       }
     },
 
     stopRecording() {
       if (!this.isRecording) return;
-      
       this.isRecording = false;
       clearInterval(this.recordingTimer);
-      
+      // Stop speech recognition
+      try { if (this.speechRec) { this.speechRec.stop(); this.speechRec = null; } } catch (_) {}
+      // Stop amplitude animation
+      if (this.recAnimFrameId) { cancelAnimationFrame(this.recAnimFrameId); this.recAnimFrameId = null; }
+      if (this.recAudioCtx)   { try { this.recAudioCtx.close(); } catch (_) {} this.recAudioCtx = null; }
+      this.recordingAmplitude = 0;
       if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
         this.mediaRecorder.stop();
       }
-      
-      console.log('ðŸŽ™ï¸ Recording stopped');
     },
 
     cancelRecording() {
@@ -832,29 +969,49 @@ export default {
         this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
       }
       
+      // Stop speech recognition
+      try { if (this.speechRec) { this.speechRec.stop(); this.speechRec = null; } } catch (_) {}
+      // Stop amplitude animation
+      if (this.recAnimFrameId) { cancelAnimationFrame(this.recAnimFrameId); this.recAnimFrameId = null; }
+      if (this.recAudioCtx)   { try { this.recAudioCtx.close(); } catch (_) {} this.recAudioCtx = null; }
+      this.recordingAmplitude = 0;
+
       this.audioChunks = [];
+      this.voiceDropTranscript = '';
+      this.voiceDropMood = null;
       console.log('ðŸŽ™ï¸ Recording cancelled');
     },
 
     async sendVoiceNote() {
       if (!this.pendingVoiceNote || this.isSending) return;
-      
-      const base64Audio = this.pendingVoiceNote.base64;
-      const moodToSend = this.selectedMood;
-      const localId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const timestamp = new Date().toISOString();
+
+      const base64Audio  = this.pendingVoiceNote.base64;
+      const transcript   = this.pendingVoiceNote.transcript || '';
+      const voiceMood    = this.pendingVoiceNote.mood || null;
+      const moodToSend   = this.selectedMood;
+      const replyToId    = this.replyingTo?.msg?.id || null;
+      const replyToPrev  = this.replyingTo?.preview || null;
+      const localId      = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const timestamp    = new Date().toISOString();
+
+      this.clearReply();
 
       try {
         this.isSending = true;
-        
+
         const newMessage = {
           id: localId,
           from_user_id: this.userId,
           to_user_id: this.selectedChat.user_id,
           text: '',
           voice: base64Audio,
+          voice_mood: voiceMood,
+          transcript,
           mood: moodToSend,
-          timestamp: timestamp,
+          reply_to_id: replyToId,
+          reply_to_preview: replyToPrev,
+          duration: this.pendingVoiceNote.duration,
+          timestamp,
           read: false,
           sent_by_me: true,
           status: 'local'
@@ -862,27 +1019,26 @@ export default {
 
         this.messages.push(newMessage);
         this.pendingVoiceNote = null;
-        this.selectedMood = null;
+        this.selectedMood     = null;
         this.$nextTick(() => this.scrollToBottom());
-
         await saveLocalMessage(newMessage);
 
         // LAN Dispatch
         if (lanService.isPeerReachable(this.selectedChat.user_id)) {
-          console.log('[LAN] Dispatching Voice P2P');
           const ok = lanService.sendMessage(this.selectedChat.user_id, {
             local_id: localId,
             from_user_id: this.userId,
             to_user_id: this.selectedChat.user_id,
             text: '',
             voice: base64Audio,
+            voice_mood: voiceMood,
+            transcript,
             mood: moodToSend,
-            timestamp: timestamp
+            reply_to_id: replyToId,
+            reply_to_preview: replyToPrev,
+            timestamp
           });
-          if (ok) {
-            newMessage.status = 'delivered';
-            await saveLocalMessage(newMessage);
-          }
+          if (ok) { newMessage.status = 'delivered'; await saveLocalMessage(newMessage); }
         }
 
         // API Dispatch
@@ -893,7 +1049,11 @@ export default {
               to_user_id: this.selectedChat.user_id,
               text: '',
               voice: base64Audio,
+              voice_mood: voiceMood,
+              transcript,
               mood: moodToSend,
+              reply_to_id: replyToId,
+              reply_to_preview: replyToPrev,
               local_id: localId
             });
             if (res.success) {
@@ -901,14 +1061,16 @@ export default {
               newMessage.server_id = res.message_id;
               await saveLocalMessage(newMessage);
             }
-          } catch (e) {
-            console.warn('[Sync] Voice API failed, relying on LAN/Sync');
-          }
+          } catch (e) { console.warn('[Sync] Voice API failed'); }
         }
 
         window.dispatchEvent(new Event('dm-refresh'));
+
+        // Voice Reflection Mode prompt
+        setTimeout(() => { this.showReflection = true; }, 800);
+
       } catch (err) {
-        console.error('â Œ Error sending voice note:', err);
+        console.error('Error sending voice drop:', err);
       } finally {
         this.isSending = false;
       }
@@ -995,13 +1157,102 @@ export default {
       return Math.ceil(audio.duration);
     },
 
+    // ── Voice Drop helpers ─────────────────────────────────────
+    _animateRing() {
+      if (!this.recAnalyserNode) return;
+      const d = new Uint8Array(this.recAnalyserNode.frequencyBinCount);
+      this.recAnalyserNode.getByteFrequencyData(d);
+      const avg = d.reduce((a, b) => a + b, 0) / d.length;
+      this.recordingAmplitude = avg / 255; // 0-1
+      this.amplitudeSamples.push(avg);
+      this.recAnimFrameId = requestAnimationFrame(() => this._animateRing());
+    },
+
+    detectVoiceMood(samples) {
+      if (!samples || !samples.length) return null;
+      const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
+      const variance = samples.reduce((s, n) => s + (n - avg) ** 2, 0) / samples.length;
+      if (avg > 170)                         return 'passionate';
+      if (avg > 120 && variance > 900)       return 'urgent';
+      if (avg < 90  && variance < 400)       return 'calm';
+      return 'thoughtful';
+    },
+
+    replyToMessage(msg) {
+      const preview = msg.voice
+        ? (msg.transcript ? msg.transcript.slice(0, 60) : '🎙 Voice Drop')
+        : (msg.text || '').slice(0, 80);
+      this.replyingTo = { msg, preview, timestampSec: null };
+    },
+
+    onVoiceTimestampReply({ msg, seconds, excerpt }) {
+      this.replyingTo = {
+        msg,
+        preview: excerpt || '🎙 Voice Drop',
+        timestampSec: seconds,
+      };
+    },
+
+    clearReply() {
+      this.replyingTo = null;
+    },
+
+    fmtRepSec(s) {
+      const m = Math.floor(s / 60);
+      return `${m}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
+    },
+
+    onMsgTouchStart(msg, e) {
+      this.longPressTimer = setTimeout(() => { this.replyToMessage(msg); }, 500);
+    },
+
+    onMsgTouchEnd() {
+      if (this.longPressTimer) { clearTimeout(this.longPressTimer); this.longPressTimer = null; }
+    },
+
+    scrollToMsg(id) {
+      if (!id) return;
+      const el = document.querySelector(`[data-msg-id="${id}"]`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    },
+
+    async sendReflection() {
+      const text = (this.reflectionText || '').trim();
+      if (!text) { this.showReflection = false; return; }
+      this.reflectionText  = '';
+      this.showReflection  = false;
+      this.messageText     = text;
+      await this.sendMessage();
+    },
+
+    // ── End Voice Drop helpers ─────────────────────────────────
+
     selectMood(key) {
       this.selectedMood = this.selectedMood === key ? null : key;
       this.showMoodPicker = false;
+      // Broadcast mood change immediately so partner sees the state
+      if (!this.selectedChat) return;
+      try {
+        const socket = this.$socket;
+        if (socket) {
+          socket.emit('dm:typing', {
+            from_user_id: this.userId,
+            to_user_id: this.selectedChat.user_id,
+            mood: this.selectedMood
+          });
+          if (this.typingEmitTimeout) clearTimeout(this.typingEmitTimeout);
+          this.typingEmitTimeout = setTimeout(() => {
+            socket.emit('dm:stop_typing', {
+              from_user_id: this.userId,
+              to_user_id: this.selectedChat.user_id
+            });
+          }, 8000); // give partner 8s to see mood state
+        }
+      } catch (_) {}
     },
 
     onTyping() {
-      // Emit typing event via socket
+      // Emit typing event via socket (include active mood)
       if (!this.selectedChat) return;
       try {
         const socket = this.$socket;
@@ -1009,7 +1260,8 @@ export default {
           if (this.typingEmitTimeout) clearTimeout(this.typingEmitTimeout);
           socket.emit('dm:typing', {
             from_user_id: this.userId,
-            to_user_id: this.selectedChat.user_id
+            to_user_id: this.selectedChat.user_id,
+            mood: this.selectedMood || null
           });
           // Stop typing after 3s of silence
           this.typingEmitTimeout = setTimeout(() => {
@@ -1314,8 +1566,12 @@ export default {
           const fromId = String(data.from_user_id);
           if (this.selectedChat && String(this.selectedChat.user_id) === fromId) {
             this.partnerTyping = true;
+            this.partnerMood = data.mood || null;
             if (this.typingTimeout) clearTimeout(this.typingTimeout);
-            this.typingTimeout = setTimeout(() => { this.partnerTyping = false; }, 4000);
+            this.typingTimeout = setTimeout(() => {
+              this.partnerTyping = false;
+              this.partnerMood = null;
+            }, 4000);
           }
         });
         socket.on('dm:stop_typing', (data) => {
@@ -1323,6 +1579,7 @@ export default {
           const fromId = String(data.from_user_id);
           if (this.selectedChat && String(this.selectedChat.user_id) === fromId) {
             this.partnerTyping = false;
+            this.partnerMood = null;
           }
         });
       }
@@ -1504,10 +1761,14 @@ export default {
   font-weight: 700; text-transform: uppercase;
   margin-bottom: 3px; padding: 0 6px; opacity: 0.75;
 }
-.mood-bold    .mood-label, .mood-label.mood-bold    { color: #ff6b35; }
-.mood-deep    .mood-label, .mood-label.mood-deep    { color: #a78bfa; }
-.mood-casual  .mood-label, .mood-label.mood-casual  { color: #00c9a7; }
-.mood-serious .mood-label, .mood-label.mood-serious { color: #daa520; }
+.mood-label.mood-bold       { color: #ff6b35; }
+.mood-label.mood-deep       { color: #a78bfa; }
+.mood-label.mood-casual     { color: #00c9a7; }
+.mood-label.mood-serious    { color: #daa520; }
+.mood-label.mood-pissed     { color: #f87171; }
+.mood-label.mood-playful    { color: #f472b6; }
+.mood-label.mood-romantic   { color: #fda4af; }
+.mood-label.mood-mysterious { color: #a78bfa; }
 
 .msg-row.sent  .mood-label { text-align: right; }
 .msg-row.received .mood-label { text-align: left; }
@@ -1536,11 +1797,24 @@ export default {
   border-bottom-left-radius: 4px;
 }
 
-/* Mood-specific card glows */
-.mood-card--bold    { box-shadow: 0 4px 24px rgba(255,107,53,0.3); border: 1px solid rgba(255,107,53,0.25); }
-.mood-card--deep    { box-shadow: 0 4px 24px rgba(108,99,255,0.35); border: 1px solid rgba(108,99,255,0.25); }
-.mood-card--casual  { box-shadow: 0 4px 24px rgba(0,201,167,0.3); border: 1px solid rgba(0,201,167,0.2); }
-.mood-card--serious { box-shadow: 0 4px 24px rgba(218,165,32,0.35); border: 1px solid rgba(218,165,32,0.25); }
+/* ── Mood card glows (animated) ───────────────────────── */
+@keyframes glowPulse-bold       { 0%,100%{box-shadow:0 0 10px 2px rgba(255,107,53,0.35),0 4px 20px rgba(255,107,53,0.2)} 50%{box-shadow:0 0 20px 6px rgba(255,107,53,0.6),0 6px 28px rgba(255,107,53,0.35)} }
+@keyframes glowPulse-deep       { 0%,100%{box-shadow:0 0 10px 2px rgba(108,99,255,0.35),0 4px 20px rgba(108,99,255,0.2)} 50%{box-shadow:0 0 22px 7px rgba(108,99,255,0.6),0 6px 28px rgba(108,99,255,0.4)} }
+@keyframes glowPulse-casual     { 0%,100%{box-shadow:0 0 10px 2px rgba(0,201,167,0.3),0 4px 20px rgba(0,201,167,0.15)} 50%{box-shadow:0 0 20px 6px rgba(0,201,167,0.55),0 6px 28px rgba(0,201,167,0.3)} }
+@keyframes glowPulse-serious    { 0%,100%{box-shadow:0 0 10px 2px rgba(218,165,32,0.35),0 4px 20px rgba(218,165,32,0.2)} 50%{box-shadow:0 0 22px 7px rgba(218,165,32,0.6),0 6px 28px rgba(218,165,32,0.35)} }
+@keyframes glowPulse-pissed     { 0%,100%{box-shadow:0 0 12px 3px rgba(239,68,68,0.4),0 4px 20px rgba(239,68,68,0.25)} 50%{box-shadow:0 0 26px 9px rgba(239,68,68,0.75),0 8px 32px rgba(239,68,68,0.5)} }
+@keyframes glowPulse-playful    { 0%,100%{box-shadow:0 0 10px 2px rgba(236,72,153,0.35),0 4px 20px rgba(236,72,153,0.2)} 50%{box-shadow:0 0 22px 7px rgba(236,72,153,0.65),0 6px 28px rgba(236,72,153,0.4)} }
+@keyframes glowPulse-romantic   { 0%,100%{box-shadow:0 0 12px 3px rgba(251,113,133,0.4),0 4px 20px rgba(251,113,133,0.2)} 50%{box-shadow:0 0 24px 8px rgba(251,113,133,0.7),0 7px 30px rgba(251,113,133,0.4)} }
+@keyframes glowPulse-mysterious { 0%,100%{box-shadow:0 0 12px 3px rgba(124,58,237,0.4),0 4px 20px rgba(124,58,237,0.2)} 50%{box-shadow:0 0 26px 9px rgba(124,58,237,0.7),0 8px 32px rgba(124,58,237,0.45)} }
+
+.mood-card--bold       { border:1px solid rgba(255,107,53,0.4); animation: glowPulse-bold       2.4s ease-in-out infinite; }
+.mood-card--deep       { border:1px solid rgba(108,99,255,0.4); animation: glowPulse-deep       2.6s ease-in-out infinite; }
+.mood-card--casual     { border:1px solid rgba(0,201,167,0.35); animation: glowPulse-casual     2.8s ease-in-out infinite; }
+.mood-card--serious    { border:1px solid rgba(218,165,32,0.4); animation: glowPulse-serious    2.5s ease-in-out infinite; }
+.mood-card--pissed     { border:1px solid rgba(239,68,68,0.5);  animation: glowPulse-pissed     1.8s ease-in-out infinite; }
+.mood-card--playful    { border:1px solid rgba(236,72,153,0.4); animation: glowPulse-playful    2.2s ease-in-out infinite; }
+.mood-card--romantic   { border:1px solid rgba(251,113,133,0.45);animation: glowPulse-romantic   2.4s ease-in-out infinite; }
+.mood-card--mysterious { border:1px solid rgba(124,58,237,0.45);animation: glowPulse-mysterious 3.0s ease-in-out infinite; }
 
 .message-image {
   width: 100%; max-width: 280px; border-radius: 12px; margin-bottom: 6px; display: block;
@@ -1588,7 +1862,7 @@ export default {
 .received-card .wave-bar.active { background: #daa520; }
 .voice-duration { font-size: 11px; opacity: 0.6; flex-shrink: 0; }
 
-/* â”€â”€ Typing Indicator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Typing Indicator ───────────────────────────────────── */
 .typing-row { display: flex; align-items: flex-start; margin-top: 6px; }
 .typing-card {
   display: flex; align-items: center; gap: 8px;
@@ -1597,11 +1871,26 @@ export default {
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 18px; border-bottom-left-radius: 4px;
   backdrop-filter: blur(8px);
+  transition: border-color 0.4s, box-shadow 0.4s;
 }
+/* Mood-tinted typing cards */
+.typing-mood { border-color: rgba(var(--mood-glow-rgb, 218,165,32), 0.4); }
+.typing-mood--pissed     { border-color:rgba(239,68,68,0.5);   box-shadow:0 0 14px rgba(239,68,68,0.3); }
+.typing-mood--playful    { border-color:rgba(236,72,153,0.45); box-shadow:0 0 14px rgba(236,72,153,0.25); }
+.typing-mood--romantic   { border-color:rgba(251,113,133,0.45);box-shadow:0 0 14px rgba(251,113,133,0.25); }
+.typing-mood--mysterious { border-color:rgba(124,58,237,0.45); box-shadow:0 0 14px rgba(124,58,237,0.3); }
+.typing-mood--bold       { border-color:rgba(255,107,53,0.45); box-shadow:0 0 14px rgba(255,107,53,0.25); }
+.typing-mood--deep       { border-color:rgba(108,99,255,0.45); box-shadow:0 0 14px rgba(108,99,255,0.25); }
+.typing-mood--casual     { border-color:rgba(0,201,167,0.4);   box-shadow:0 0 14px rgba(0,201,167,0.2); }
+.typing-mood--serious    { border-color:rgba(218,165,32,0.45); box-shadow:0 0 14px rgba(218,165,32,0.25); }
+
+.typing-emoji { font-size: 16px; line-height: 1; flex-shrink: 0; }
 .typing-label {
-  font-size: 11px; color: rgba(255,255,255,0.45);
+  font-size: 11px; color: rgba(255,255,255,0.5);
   font-style: italic; letter-spacing: 0.03em;
 }
+.typing-label em { font-style: normal; font-weight: 700; color: rgba(255,255,255,0.75); }
+
 .typing-dots { display: flex; gap: 4px; }
 .typing-dots span {
   width: 5px; height: 5px; border-radius: 50%;
@@ -1610,6 +1899,16 @@ export default {
 }
 .typing-dots span:nth-child(2) { animation-delay: 0.15s; }
 .typing-dots span:nth-child(3) { animation-delay: 0.3s; }
+/* Mood-tinted dots */
+.dots-mood-pissed     span { background: #f87171; }
+.dots-mood-playful    span { background: #f472b6; }
+.dots-mood-romantic   span { background: #fda4af; }
+.dots-mood-mysterious span { background: #a78bfa; }
+.dots-mood-bold       span { background: #ff6b35; }
+.dots-mood-deep       span { background: #818cf8; }
+.dots-mood-casual     span { background: #00c9a7; }
+.dots-mood-serious    span { background: #daa520; }
+
 @keyframes dotBounce {
   0%,80%,100% { transform: translateY(0); opacity: 0.5; }
   40%          { transform: translateY(-5px); opacity: 1; }
@@ -1912,5 +2211,182 @@ export default {
 @keyframes slideUp {
   from { transform: translateY(100%); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+/* ── Energy Ring Recording Overlay ──────────────────────────── */
+.vd-ring-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(10,10,14,0.96);
+  backdrop-filter: blur(20px);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 28px 20px 22px;
+  z-index: 50;
+  border-top: 1px solid rgba(218,165,32,0.12);
+}
+.vd-ring-wrap {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.vd-ring-svg { overflow: visible; }
+.vd-ring-center {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  pointer-events: none;
+}
+.vd-ring-timer {
+  font-size: 22px; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+  color: #fff;
+}
+.vd-ring-dot {
+  font-size: 10px; color: #ef4444;
+  animation: recBlink 1.2s ease-in-out infinite;
+  letter-spacing: 0.1em;
+}
+@keyframes recBlink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.vd-live-transcript {
+  font-size: 12px; font-style: italic;
+  color: rgba(255,255,255,0.45);
+  text-align: center; margin: 10px 0 0;
+  max-width: 280px; max-height: 40px;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.vd-rec-cancel {
+  margin-top: 16px;
+  background: none; border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.55); border-radius: 20px;
+  padding: 6px 22px; font-size: 13px; cursor: pointer;
+  transition: all 0.2s;
+}
+.vd-rec-cancel:hover { border-color: rgba(239,68,68,0.5); color: #f87171; }
+
+/* ── Ring fade transition ─────────────────────────────────── */
+.ring-fade-enter-active, .ring-fade-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
+.ring-fade-enter-from, .ring-fade-leave-to { opacity: 0; transform: translateY(20px); }
+
+/* ── Pending Voice Drop Bar ───────────────────────────────── */
+.vd-pending-bar {
+  background: rgba(218,165,32,0.06);
+  border: 1px solid rgba(218,165,32,0.18);
+  border-radius: 16px 16px 0 0;
+  padding: 10px 14px 8px;
+  margin: 0 8px;
+}
+.vd-pending-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+}
+.vd-pending-label {
+  font-size: 11px; font-weight: 700;
+  color: #daa520; letter-spacing: 0.05em;
+}
+.vd-pending-transcript {
+  font-size: 11px; font-style: italic;
+  color: rgba(255,255,255,0.45); flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vd-pending-mood {
+  font-size: 11px; color: rgba(255,255,255,0.6);
+}
+.vd-pending-controls {
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* ── Reply Bar (above input) ──────────────────────────────── */
+.vd-reply-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  background: rgba(218,165,32,0.06);
+  border-top: 1px solid rgba(218,165,32,0.15);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  animation: slideUp 0.18s ease;
+}
+.reply-bar-accent {
+  width: 3px; flex-shrink: 0;
+  height: 36px; border-radius: 2px;
+  background: #daa520;
+}
+.reply-bar-body {
+  flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.reply-bar-label {
+  font-size: 9px; font-weight: 700;
+  color: #daa520; text-transform: uppercase; letter-spacing: 0.07em;
+}
+.reply-bar-preview {
+  font-size: 12px; color: rgba(255,255,255,0.55);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.reply-bar-close {
+  background: none; border: none;
+  color: rgba(255,255,255,0.35); font-size: 15px;
+  cursor: pointer; padding: 4px 8px; flex-shrink: 0;
+  transition: color 0.2s;
+}
+.reply-bar-close:hover { color: #f87171; }
+
+/* ── Reply Quote (inside message card) ───────────────────── */
+.msg-reply-quote {
+  display: flex; align-items: stretch; gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.msg-reply-quote:hover { background: rgba(218,165,32,0.1); }
+.reply-quote-bar {
+  width: 2px; flex-shrink: 0;
+  border-radius: 2px;
+  background: #daa520;
+}
+.reply-quote-text {
+  font-size: 11px; color: rgba(255,255,255,0.45);
+  line-height: 1.4;
+  overflow: hidden; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+
+/* ── Voice Reflection Toast ───────────────────────────────── */
+.vd-reflection-toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: rgba(18,18,24,0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(218,165,32,0.25);
+  border-radius: 20px;
+  padding: 14px 18px;
+  min-width: 280px; max-width: 340px;
+  z-index: 200;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(218,165,32,0.1);
+  animation: slideUp 0.3s ease;
+}
+.reflection-prompt > span {
+  display: block; font-size: 13px; margin-bottom: 10px;
+  color: rgba(255,255,255,0.75);
+}
+.reflection-input-row {
+  display: flex; gap: 8px; align-items: center;
+}
+.reflection-input {
+  flex: 1; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(218,165,32,0.25); border-radius: 12px;
+  padding: 8px 12px; color: #fff; font-size: 13px;
+  outline: none;
+}
+.reflection-input::placeholder { color: rgba(255,255,255,0.3); }
+.reflection-send {
+  background: rgba(218,165,32,0.2); border: 1px solid rgba(218,165,32,0.4);
+  color: #daa520; border-radius: 50%; width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+}
+.reflection-send:hover { background: rgba(218,165,32,0.35); transform: scale(1.05); }
+.reflection-skip {
+  background: none; border: none; color: rgba(255,255,255,0.3);
+  font-size: 12px; cursor: pointer; padding: 0 4px;
+  text-decoration: underline;
 }
 </style>

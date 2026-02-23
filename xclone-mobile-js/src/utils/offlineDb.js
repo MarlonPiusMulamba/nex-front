@@ -28,6 +28,20 @@ db.version(11).stores({
     peerInfo: 'user_id' // LAN peer cache
 });
 
+// Schema version 12:
+//   messages: added 'voice_mood' index for mood-based filtering
+db.version(12).stores({
+    posts: 'post_id, timestamp, username',
+    profiles: 'user_id, username',
+    conversations: 'user_id, username',
+    messages: 'id, [from_user_id+to_user_id], timestamp, status, voice_mood',
+    notifications: 'id, created_at',
+    trending: 'topic, type',
+    suggestedUsers: 'user_id, username',
+    appState: 'key',
+    peerInfo: 'user_id'
+});
+
 /**
  * Utility to save posts to offline storage
  * @param {Array} posts 
