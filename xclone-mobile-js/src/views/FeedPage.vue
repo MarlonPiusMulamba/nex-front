@@ -2354,9 +2354,8 @@ export default {
       console.error('Feed socket setup failed:', e);
     }
 
-    this._newPostsInterval = setInterval(() => {
-      this.checkForNewPosts();
-    }, 5000);
+    // REMOVED: 5s polling for new posts to reduce backend load. 
+    // Relying on Socket.IO 'feed:new_post' instead.
     
     window.addEventListener('themeChanged', (e) => {
       this.theme = e.detail;

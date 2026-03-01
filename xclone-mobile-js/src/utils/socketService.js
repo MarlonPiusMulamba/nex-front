@@ -120,6 +120,15 @@ class SocketService {
             console.log('🔒 Join request status update:', data);
             window.dispatchEvent(new CustomEvent('join_request_status', { detail: data }));
         });
+
+        // Listen for unread count updates
+        this.socket.on('unread:update', (data) => {
+            console.log('💾 Unread counts updated:', data);
+            // Dispatch events for interested components
+            window.dispatchEvent(new CustomEvent('unread-update', { detail: data }));
+            window.dispatchEvent(new CustomEvent('dm-refresh', { detail: data }));
+            window.dispatchEvent(new CustomEvent('notifications-refresh', { detail: data }));
+        });
     }
 
     disconnect() {

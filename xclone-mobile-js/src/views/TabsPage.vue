@@ -279,18 +279,18 @@ export default {
     this.fetchUnreadCount();
     this.fetchUnreadNotifCount();
     
-    // Poll for updates every 5 seconds
-    this.pollInterval = setInterval(() => {
-      this.fetchUnreadCount();
-    }, 5000);
-
-    this.notifPollInterval = setInterval(() => {
-      this.fetchUnreadNotifCount();
-    }, 5000);
-    
     // Listen for custom events to refresh count
     window.addEventListener('dm-refresh', this.fetchUnreadCount);
     window.addEventListener('notifications-refresh', this.fetchUnreadNotifCount);
+
+    // Initial unread-update listener for more direct count updates
+    window.addEventListener('unread-update', (e) => {
+      const data = e.detail;
+      if (data) {
+        if (data.unread_messages !== undefined) this.unreadCount = data.unread_messages;
+        if (data.unread_notifications !== undefined) this.unreadNotifCount = data.unread_notifications;
+      }
+    });
 
     // Unlock audio on first user interaction (autoplay policies)
     this._unlockAudio = async () => {
