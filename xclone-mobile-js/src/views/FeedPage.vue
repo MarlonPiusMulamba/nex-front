@@ -2284,6 +2284,12 @@ export default {
            this.openPostDetail(targetPost);
         }
       }
+    },
+
+    onFeedScroll(e) {
+      if (e && e.detail) {
+        this._isNearTop = e.detail.scrollTop < 100;
+      }
     }
   },
   
@@ -2360,6 +2366,11 @@ export default {
       this.openPostModal();
     };
     window.addEventListener('open-post-modal', this._globalPostHandler);
+
+    this._feedRefreshHandler = () => {
+      this.refreshFeed(null, true);
+    };
+    window.addEventListener('feed-refresh', this._feedRefreshHandler);
   },
   
   beforeUnmount() {
@@ -2383,6 +2394,11 @@ export default {
     if (this._globalPostHandler) {
       window.removeEventListener('open-post-modal', this._globalPostHandler);
       this._globalPostHandler = null;
+    }
+
+    if (this._feedRefreshHandler) {
+      window.removeEventListener('feed-refresh', this._feedRefreshHandler);
+      this._feedRefreshHandler = null;
     }
   }
 }
