@@ -9,6 +9,8 @@ import DMPage from '../views/DMPage.vue';
 import ProfilePage from '../views/ProfilePage.vue';
 import NotificationsPage from '../views/NotificationsPage.vue';
 import UserFollowListPage from '../views/UserFollowListPage.vue';
+import FraternityDiscoverPage from '../views/FraternityDiscoverPage.vue';
+import FraternityPage from '../views/FraternityPage.vue';
 
 const routes = [
   {
@@ -68,6 +70,16 @@ const routes = [
         path: 'profile/:username/followers',
         component: UserFollowListPage,
         meta: { requiresAuth: true, type: 'followers' }
+      },
+      {
+        path: 'fraternity',
+        component: FraternityDiscoverPage,
+        meta: { requiresAuth: false }
+      },
+      {
+        path: 'fraternity/:slug',
+        component: FraternityPage,
+        meta: { requiresAuth: false }
       }
     ]
   }

@@ -19,6 +19,9 @@
     </ion-header>
     <ion-content class="ion-padding">
       <div class="compose-container">
+        <div v-if="targetFraternity" class="fraternity-target-badge">
+          🛡 Posting to {{ targetFraternity.name }}
+        </div>
         <div class="compose-input full-width">
             <!-- Standard Post Inputs (Hidden in specialized modes) -->
             <template v-if="!showPollCreator && !showAMACreator && !showAudioSpaceCreator">
@@ -306,7 +309,11 @@ export default {
     },
     initialType: {
       type: String,
-      default: 'post'
+      default: 'text'
+    },
+    targetFraternity: {
+      type: Object,
+      default: () => null
     }
   },
   emits: ['update:isOpen', 'post-created'],
@@ -671,7 +678,8 @@ export default {
           content: this.postContent || '',
           image: this.postMedia.find(m => m.type === 'image')?.data || null,
           media: this.postMedia,
-          is_anonymous: this.isAnonymous ? 1 : 0
+          is_anonymous: this.isAnonymous ? 1 : 0,
+          fraternity_id: this.targetFraternity ? this.targetFraternity.id : null
         };
 
         if (this.showPollCreator) {

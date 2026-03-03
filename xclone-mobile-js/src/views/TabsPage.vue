@@ -37,6 +37,11 @@
             <span class="nav-label">Profile</span>
           </router-link>
 
+          <router-link to="/tabs/fraternity" class="nav-item">
+            <ion-icon :icon="shieldOutline" class="nav-icon"></ion-icon>
+            <span class="nav-label">Fraternity</span>
+          </router-link>
+
           <!-- Logout Button (Desktop only) -->
           <div class="nav-item logout-item" @click="logout">
             <ion-icon :icon="logOutOutline" class="nav-icon"></ion-icon>
@@ -98,6 +103,11 @@
               <ion-icon :icon="person"></ion-icon>
               <ion-label>Profile</ion-label>
             </ion-tab-button>
+
+            <ion-tab-button tab="fraternity" href="/tabs/fraternity">
+              <ion-icon :icon="shieldOutline"></ion-icon>
+              <ion-label>Fraternity</ion-label>
+            </ion-tab-button>
           </ion-tab-bar>
         </ion-tabs>
       </main>
@@ -119,6 +129,7 @@
       :userId="userId || ''" 
       :userAvatar="userAvatar || ''"
       :initialType="selectedPostType"
+      :targetFraternity="targetFraternity"
       @post-created="handlePostCreated"
     />
   </ion-page>
@@ -130,7 +141,7 @@ import {
   IonPage, IonTabs, IonRouterOutlet, IonTabBar, IonTabButton, 
   IonIcon, IonLabel, IonBadge 
 } from '@ionic/vue';
-import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline, add } from 'ionicons/icons';
+import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline, add, shieldOutline } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config/index.js';
 import TrendingWidget from '@/components/TrendingWidget.vue';
@@ -159,6 +170,7 @@ export default {
       logoTwitter,
       logOutOutline,
       add,
+      shieldOutline,
       unreadCount: 0,
       prevUnreadCount: 0,
       unreadNotifCount: 0,
@@ -174,7 +186,8 @@ export default {
       _unlockAudio: null,
       showPostModal: false,
       showTypeSelector: false,
-      selectedPostType: 'post',
+      selectedPostType: 'text',
+      targetFraternity: null,
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E'
     };
   },
@@ -282,6 +295,18 @@ export default {
     // Listen for custom events to refresh count
     window.addEventListener('dm-refresh', this.fetchUnreadCount);
     window.addEventListener('notifications-refresh', this.fetchUnreadNotifCount);
+
+    window.addEventListener('open-post-composer', (e) => {
+      this.targetFraternity = null;
+      if (e.detail && e.detail.fraternity_id) {
+        this.targetFraternity = {
+          id: e.detail.fraternity_id,
+          name: e.detail.fraternity_name
+        };
+      }
+      this.selectedPostType = 'text';
+      this.showPostModal = true;
+    });
 
     // Initial unread-update listener for more direct count updates
     window.addEventListener('unread-update', (e) => {
