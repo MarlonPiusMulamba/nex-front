@@ -678,7 +678,11 @@ export default {
       if (imageData.startsWith('http')) return imageData;
       if (imageData.startsWith('data:image')) return imageData;
       if (imageData.startsWith('/static/')) return `${api.defaults.baseURL}${imageData}`;
-      return `data:image/png;base64,${imageData}`;
+      // Fix: Handle base64 images properly
+      if (imageData.length > 100 && !imageData.startsWith('http') && !imageData.startsWith('data:image') && !imageData.startsWith('/static/')) {
+        return `data:image/png;base64,${imageData}`;
+      }
+      return imageData;
     },
 
     formatTime(timestamp) {
