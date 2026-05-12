@@ -64,6 +64,7 @@ import {
 import { callOutline, closeOutline, videocamOutline } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config/index.js';
+import lanService from '@/utils/lanService';
 
 export default {
   name: 'CallOverlay',
@@ -79,6 +80,7 @@ export default {
       localStream: null,
       pc: null,
       otherUser: null,
+      isLanCall: false,
       API_URL: '',
       userId: null,
       incomingPollInterval: null,
@@ -127,6 +129,11 @@ export default {
 
     // Listen for global stop-ringtone event
     window.addEventListener('stop-ringtone',  this.stopRingtone);
+
+    // Listen for LAN-based call signals
+    lanService.onCallSignal((peerId, data) => {
+      this.handleLanSignal(peerId, data);
+    });
   },
   watch: {
     '$route.query': {
@@ -205,6 +212,34 @@ export default {
         if (this._socketCallIncomingHandler) socket.off('call:incoming', this._socketCallIncomingHandler);
         if (this._socketCallAnsweredHandler) socket.off('call:answered', this._socketCallAnsweredHandler);
         if (this._socketCallEndedHandler) socket.off('call:ended', this._socketCallEndedHandler);
+      }
+    },
+
+    handleLanSignal(peerId, data) {
+      console.log('[CallOverlay] Received LAN signal:', data.type, 'from', peerId);
+      
+      if (data.signalType === 'offer') {
+        if (this.callStatus !== 'idle') return;
+        this.isLanCall = true;
+        this.otherUser = { user_id: peerId, username: data.from_username || 'LAN Peer' };
+        this.incomingCall({
+          call_id: data.call_id || `lan-${Date.now()}`,
+          caller_id: peerId,
+          media: data.media || 'voice',
+          offer: data.sdp
+        });
+      } else if (data.signalType === 'answer') {
+        if (this.currentCallId === data.call_id) {
+          this.handleCallAnswered(data.sdp);
+        }
+      } else if (data.signalType === 'candidate') {
+        if (this.currentCallId === data.call_id && this.pc) {
+          this.pc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(() => {});
+        }
+      } else if (data.signalType === 'hangup') {
+        if (this.currentCallId === data.call_id) {
+          this.hangupCall(true); // true = remote hangup
+        }
       }
     },
 
@@ -290,6 +325,14 @@ export default {
       this.callStatus = 'ringing';
       this.otherUser = this.otherUser || { user_id: match.caller_id, username: 'Incoming Call' };
       
+      // If offer is provided (LAN call), set it immediately
+      if (match.offer && this.pc) {
+         this.pc.setRemoteDescription(new RTCSessionDescription(match.offer)).catch(e => console.error('Offer set error:', e));
+      } else if (match.offer) {
+         // Save for later if PC is not yet created
+         this._pendingOffer = match.offer;
+      }
+      
       // Play ringtone
       this.playRingtone();
       
@@ -337,27 +380,38 @@ export default {
 
         await this.attachLocalMedia(media);
         
-        const res = await axios.post(`${this.API_URL}/api/call/start`, {
-          caller_id: this.userId,
-          callee_id: otherUser.user_id,
-          media: media
-        });
-
-        if (res.data && res.data.call_id) {
-          this.currentCallId = res.data.call_id;
+        // Check if peer is reachable on LAN first
+        if (lanService.isPeerReachable(otherUser.user_id)) {
+          console.log('[CallOverlay] Peer reachable on LAN, using direct signaling.');
+          this.isLanCall = true;
+          this.currentCallId = `lan-${Date.now()}-${this.userId}`;
           await this.setupPeerConnection('caller');
-          this.callPollInterval = setInterval(() => this.pollCallState(), 2000);
-          
-          // Set a timeout for no-answer
-          this.callTimeout = setTimeout(() => {
-             if (this.callStatus === 'calling') {
-                alert('No answer.');
-                this.hangupCall();
-             }
-          }, 45000);
+          // No need for global polling in LAN mode, we rely on DataChannel
         } else {
-          throw new Error('Could not start call');
+          this.isLanCall = false;
+          const res = await axios.post(`${this.API_URL}/api/call/start`, {
+            caller_id: this.userId,
+            callee_id: otherUser.user_id,
+            media: media
+          });
+
+          if (res.data && res.data.call_id) {
+            this.currentCallId = res.data.call_id;
+            await this.setupPeerConnection('caller');
+            this.callPollInterval = setInterval(() => this.pollCallState(), 2000);
+          } else {
+            throw new Error('Could not start call');
+          }
         }
+        
+        // Set a timeout for no-answer
+        this.callTimeout = setTimeout(() => {
+           if (this.callStatus === 'calling') {
+              alert('No answer.');
+              this.hangupCall();
+           }
+        }, 45000);
+
       } catch (e) {
         alert('Call failed: ' + e.message);
         this.hangupCall();
@@ -376,8 +430,27 @@ export default {
         }
         await this.attachLocalMedia(this.callMedia);
         await this.setupPeerConnection('callee');
+        
+        // Apply the offer if it was a LAN call
+        if (this._pendingOffer && this.pc) {
+          await this.pc.setRemoteDescription(new RTCSessionDescription(this._pendingOffer));
+          this._pendingOffer = null;
+          
+          // Create answer immediately for LAN calls
+          const answer = await this.pc.createAnswer();
+          await this.pc.setLocalDescription(answer);
+          lanService.sendCallSignal(this.otherUser.user_id, {
+            signalType: 'answer',
+            call_id: this.currentCallId,
+            sdp: answer
+          });
+        }
+
         this.callStatus = 'in_call';
-        this.callPollInterval = setInterval(() => this.pollCallState(), 2000);
+
+        if (!this.isLanCall) {
+          this.callPollInterval = setInterval(() => this.pollCallState(), 2000);
+        }
       } catch (e) {
         alert('Could not accept call: ' + e.message);
         this.hangupCall();
@@ -404,10 +477,18 @@ export default {
       this.otherUser = null;
 
       if (callIdToHangup) {
-        console.log(`[CallOverlay] Sending hangup API for call ${callIdToHangup}`);
-        axios.post(`${this.API_URL}/api/call/hangup`, { call_id: callIdToHangup }).catch(err => {
-          console.error('[CallOverlay] Hangup API failed:', err);
-        });
+        console.log(`[CallOverlay] Sending hangup signal for call ${callIdToHangup}`);
+        if (this.isLanCall) {
+          lanService.sendCallSignal(this.otherUser.user_id, {
+            type: 'call:signal',
+            signalType: 'hangup',
+            call_id: callIdToHangup
+          });
+        } else {
+          axios.post(`${this.API_URL}/api/call/hangup`, { call_id: callIdToHangup }).catch(err => {
+            console.error('[CallOverlay] Hangup API failed:', err);
+          });
+        }
       }
 
       if (this.localStream) {
@@ -447,7 +528,7 @@ export default {
     },
 
     async pollCallState() {
-      if (!this.currentCallId) return;
+      if (!this.currentCallId || this.isLanCall) return; // Skip polling for LAN calls
       try {
         const res = await axios.get(`${this.API_URL}/api/call/state`, { params: { call_id: this.currentCallId } });
         const call = res.data && res.data.call;
@@ -502,25 +583,68 @@ export default {
 
       this.pc.onicecandidate = (event) => {
         if (event.candidate) {
-          axios.post(`${this.API_URL}/api/call/candidate`, {
-            call_id: this.currentCallId,
-            role: role,
-            candidate: event.candidate
-          }).catch(() => {});
+          if (this.isLanCall) {
+            lanService.sendCallSignal(this.otherUser.user_id, {
+              signalType: 'candidate',
+              call_id: this.currentCallId,
+              candidate: event.candidate
+            });
+          } else {
+            axios.post(`${this.API_URL}/api/call/candidate`, {
+              call_id: this.currentCallId,
+              role: role,
+              candidate: event.candidate
+            }).catch(() => {});
+          }
         }
       };
 
       if (role === 'caller') {
         const offer = await this.pc.createOffer();
         await this.pc.setLocalDescription(offer);
-        await axios.post(`${this.API_URL}/api/call/offer`, { call_id: this.currentCallId, sdp: offer });
+        
+        if (this.isLanCall) {
+          lanService.sendCallSignal(this.otherUser.user_id, {
+            signalType: 'offer',
+            call_id: this.currentCallId,
+            sdp: offer,
+            media: this.callMedia,
+            from_username: localStorage.getItem('username')
+          });
+        } else {
+          await axios.post(`${this.API_URL}/api/call/offer`, { call_id: this.currentCallId, sdp: offer });
+        }
       } else {
-        const res = await axios.get(`${this.API_URL}/api/call/state`, { params: { call_id: this.currentCallId } });
-        const call = res.data.call;
-        await this.pc.setRemoteDescription(new RTCSessionDescription(call.offer));
+        let offer;
+        if (this.isLanCall) {
+           // For LAN calls, the offer was passed in incomingCall(match)
+           // We need to store it or fetch it.
+           // In my handleLanSignal, I pass 'offer' to incomingCall.
+           // I should store it in a local variable.
+           // Actually, let's assume it's available in this.pc.remoteDescription if we set it in incomingCall
+           // But incomingCall only sets state.
+           // I'll modify incomingCall to accept an offer.
+        }
+        
+        if (!this.isLanCall) {
+          const res = await axios.get(`${this.API_URL}/api/call/state`, { params: { call_id: this.currentCallId } });
+          const call = res.data.call;
+          offer = call.offer;
+          await this.pc.setRemoteDescription(new RTCSessionDescription(offer));
+        }
+        
         const answer = await this.pc.createAnswer();
         await this.pc.setLocalDescription(answer);
-        await axios.post(`${this.API_URL}/api/call/answer`, { call_id: this.currentCallId, sdp: answer });
+        
+        if (this.isLanCall) {
+          lanService.sendCallSignal(this.otherUser.user_id, {
+            signalType: 'answer',
+            call_id: this.currentCallId,
+            sdp: answer
+          });
+        } else {
+          await axios.post(`${this.API_URL}/api/call/answer`, { call_id: this.currentCallId, sdp: answer });
+        }
       }
     },
 

@@ -149,6 +149,17 @@ router.isReady()
 
     app.mount('#app');
     console.log('✅ Step 7: App mounted successfully! 🎉');
+
+    // Register Service Worker for full offline PWA caching
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then((registration) => {
+          console.log('[SW] Registered, scope:', registration.scope);
+        })
+        .catch((error) => {
+          console.warn('[SW] Registration failed:', error);
+        });
+    }
   })
   .catch((error) => {
     console.error('❌ Router/Mount failed:', error);

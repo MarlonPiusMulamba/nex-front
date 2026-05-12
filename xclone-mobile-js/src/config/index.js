@@ -5,6 +5,9 @@ const config = {
       const pageHost = window.location.hostname;
       const pageProtocol = window.location?.protocol;
 
+      // Detect if running in Electron desktop app
+      const isElectron = typeof window !== 'undefined' && window.process && window.process.type;
+      
       // Detect if running in Capacitor/Ionic native app
       const isNative =
         pageProtocol === 'capacitor:' ||
@@ -14,6 +17,7 @@ const config = {
       // Detect if running on local development server
       const isPageLocal =
         !isNative &&
+        !isElectron &&
         (pageHost === 'localhost' ||
           pageHost === '127.0.0.1' ||
           pageHost.startsWith('10.') ||
@@ -27,7 +31,12 @@ const config = {
         apiUrl = envUrl;
         console.log('🔧 Using VITE_API_URL from environment:', envUrl);
       }
-      // Priority 2: For local development, use local backend if available (localhost:5000)
+      // Priority 2: For Electron apps, use production backend
+      else if (isElectron) {
+        apiUrl = 'https://nex-back-3-stoz.onrender.com';
+        console.log('🖥️ Electron app detected, using production backend');
+      }
+      // Priority 3: For local development, use local backend if available (localhost:5000)
       else if (isPageLocal) {
         apiUrl = ''; // Use relative path so Vite proxy handles it
         console.log('💻 Local development detected, using Vite Proxy');

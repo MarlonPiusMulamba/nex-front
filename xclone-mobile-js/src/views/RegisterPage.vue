@@ -104,6 +104,25 @@
               <span v-if="usernameError" class="error-text">{{ usernameError }}</span>
             </div>
 
+            <!-- Phone Number Input -->
+            <div class="input-group">
+              <div class="phone-input-wrapper">
+                <select v-model="countryCode" class="country-code-select">
+                  <option v-for="c in countries" :key="c.code" :value="c.dial_code">
+                    {{ c.flag }} {{ c.dial_code }}
+                  </option>
+                </select>
+                <ion-input
+                  v-model="phoneNumber"
+                  type="tel"
+                  placeholder="Phone number"
+                  class="custom-input phone-input"
+                  :clear-input="true"
+                ></ion-input>
+              </div>
+              <span v-if="phoneError" class="error-text">{{ phoneError }}</span>
+            </div>
+
             <!-- Email Input -->
             <div class="input-group">
               <div class="input-wrapper">
@@ -293,6 +312,8 @@ export default {
       lastName: '',
       username: '',
       email: '',
+      phoneNumber: '',
+      countryCode: '+256',
       password: '',
       confirmPassword: '',
       dob: '',
@@ -306,10 +327,21 @@ export default {
       isRegistering: false,
       usernameError: '',
       emailError: '',
+      phoneError: '',
       passwordError: '',
       confirmPasswordError: '',
       dobError: '',
       genderError: '',
+      countries: [
+        { code: 'UG', dial_code: '+256', flag: '🇺🇬', name: 'Uganda' },
+        { code: 'KE', dial_code: '+254', flag: '🇰🇪', name: 'Kenya' },
+        { code: 'TZ', dial_code: '+255', flag: '🇹🇿', name: 'Tanzania' },
+        { code: 'RW', dial_code: '+250', flag: '🇷🇼', name: 'Rwanda' },
+        { code: 'US', dial_code: '+1', flag: '🇺🇸', name: 'USA' },
+        { code: 'GB', dial_code: '+44', flag: '🇬🇧', name: 'UK' },
+        { code: 'NG', dial_code: '+234', flag: '🇳🇬', name: 'Nigeria' },
+        { code: 'ZA', dial_code: '+27', flag: '🇿🇦', name: 'South Africa' }
+      ],
       API_URL: config.api.baseURL,
       flash,
       personOutline,
@@ -433,6 +465,7 @@ export default {
           date_of_birth: this.dob,
           gender: this.gender,
           email: this.email,
+          phone_number: `${this.countryCode}${this.phoneNumber}`,
           profile_pic: this.profilePic,
           cover_photo: this.coverPhoto
         });
@@ -793,6 +826,38 @@ export default {
   background: #ffffff;
   border-color: #daa520;
   box-shadow: 0 0 0 4px rgba(218, 165, 32, 0.05);
+}
+
+.phone-input-wrapper {
+  display: flex;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 2px solid #e5e7eb;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.phone-input-wrapper:focus-within {
+  background: #ffffff;
+  border-color: #daa520;
+  box-shadow: 0 0 0 4px rgba(218, 165, 32, 0.05);
+}
+
+.country-code-select {
+  border: none;
+  background: transparent;
+  padding: 0 8px 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+  border-right: 1px solid #e5e7eb;
+  outline: none;
+  cursor: pointer;
+  max-width: 80px;
+}
+
+.phone-input {
+  --padding-start: 10px;
 }
 
 .input-icon {

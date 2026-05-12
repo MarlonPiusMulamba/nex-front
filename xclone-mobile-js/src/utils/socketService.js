@@ -141,6 +141,51 @@ class SocketService {
         }
     }
 
+    /**
+     * Connect to a specific backend URL (used for LAN offline mode).
+     * Disconnects from current server and reconnects to the local one.
+     */
+    connectToUrl(url, userId) {
+        if (this.socket) {
+            this.stopHeartbeat();
+            this.socket.disconnect();
+            this.socket = null;
+        }
+        this.isConnected = false;
+        this.userId = userId;
+
+        console.log('[Socket] Connecting to LAN backend at:', url);
+        this.socket = io(url, {
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionDelay: 2000,
+            reconnectionAttempts: 10,
+            timeout: 5000
+        });
+
+        this.socket.on('connect', () => {
+            console.log('[Socket] Connected to LAN backend:', url);
+            this.isConnected = true;
+            if (userId) {
+                this.socket.emit('user:register', { user_id: userId });
+                this.socket.emit('join', { user_id: userId });
+            }
+            this.startHeartbeat();
+        });
+
+        this.socket.on('disconnect', () => {
+            this.isConnected = false;
+            this.stopHeartbeat();
+        });
+
+        // Re-attach all existing listeners so DM/call flows still work
+        this.socket.on('user:online',  (d) => this.notifyOnlineStatusChange(d.user_id, true));
+        this.socket.on('user:offline', (d) => this.notifyOnlineStatusChange(d.user_id, false));
+        this.socket.on('unread:update', (d) => {
+            window.dispatchEvent(new CustomEvent('unread-update', { detail: d }));
+        });
+    }
+
     startHeartbeat() {
         // Send heartbeat every 30 seconds
         this.heartbeatInterval = setInterval(() => {

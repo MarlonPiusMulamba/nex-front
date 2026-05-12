@@ -14,5 +14,16 @@
   },
   "android": {
     "allowMixedContent": true
+  },
+  "ios": {
+    "contentInset": "always"
+  },
+  "electron": {
+    "customScheme": "capacitor-electron",
+    "nodeIntegration": true,
+    "standalone": true,
+    "browserWindow": {
+      "webSecurity": false
+    }
   }
 }

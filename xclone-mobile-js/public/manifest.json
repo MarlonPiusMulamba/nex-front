@@ -1,23 +1,36 @@
 {
-    "name": "NexFi",
+    "name": "NexFi — Connect Anywhere",
     "short_name": "NexFi",
+    "description": "Offline-first P2P messaging. Chat on LAN even without internet.",
     "id": "/",
-    "start_url": "./",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
     "orientation": "portrait",
-    "background_color": "#ffffff",
-    "theme_color": "#1d9bf0",
+    "background_color": "#0d0d0f",
+    "theme_color": "#daa520",
     "gcm_sender_id": "103953800507",
+    "prefer_related_applications": false,
+    "categories": ["social", "communication"],
     "icons": [
         {
             "src": "logo.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any maskable"
         },
         {
             "src": "logo.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Messages",
+            "url": "/tabs/dm",
+            "description": "Open your messages"
         }
     ]
 }

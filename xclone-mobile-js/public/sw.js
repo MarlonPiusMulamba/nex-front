@@ -125,26 +125,96 @@ self.addEventListener('notificationclick', function (event) {
     );
 });
 
-// Required for PWA installability
-self.addEventListener('fetch', function (event) {
-    // Only handle same-origin requests to avoid CORS issues
-    if (event.request.url.startsWith(self.location.origin)) {
-        event.respondWith(
-            fetch(event.request)
-                .catch(function (error) {
-                    console.log('[Service Worker] Fetch failed; returning offline page instead.', error);
-                    // Return a basic response instead of failing completely
-                    // This prevents the white screen issue
-                    return new Response('Network error occurred', {
-                        status: 408,
-                        statusText: 'Network error occurred',
-                        headers: new Headers({
-                            'Content-Type': 'text/plain'
-                        })
-                    });
+const CACHE_NAME = 'nexfi-v1';
+const ASSETS_TO_CACHE = [
+    '/',
+    '/index.html',
+    '/manifest.json',
+    '/favicon.png',
+    '/logo.png',
+    '/call-ton.mp3',
+    '/msg-ton.mp3',
+    '/notify.mp3'
+];
+
+// Install Event - Cache Core Assets
+self.addEventListener('install', (event) => {
+    console.log('[Service Worker] Installing Service Worker...', event);
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then((cache) => {
+                console.log('[Service Worker] Caching App Shell');
+                return cache.addAll(ASSETS_TO_CACHE);
+            })
+            .then(() => self.skipWaiting())
+    );
+});
+
+// Activate Event - Cleanup Old Caches
+self.addEventListener('activate', (event) => {
+    console.log('[Service Worker] Activating Service Worker...', event);
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    if (cacheName !== CACHE_NAME) {
+                        console.log('[Service Worker] Removing old cache', cacheName);
+                        return caches.delete(cacheName);
+                    }
                 })
-        );
+            );
+        })
+        .then(() => self.clients.claim())
+    );
+});
+
+// Fetch Event - Cache-First Strategy for Assets, Network-First for API
+self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url);
+
+    // Skip API calls and Socket.io requests (handled by offlineDb / Socket.io fallback)
+    if (url.pathname.startsWith('/api') || url.pathname.startsWith('/socket.io') || event.request.method !== 'GET') {
+        return;
     }
-    // For cross-origin requests, let the browser handle them normally
+
+    // Cache-first strategy for everything else (HTML, JS, CSS, Images)
+    event.respondWith(
+        caches.match(event.request)
+            .then((response) => {
+                // Return cached response if found
+                if (response) {
+                    return response;
+                }
+
+                // Otherwise fetch from network and cache dynamically
+                return fetch(event.request).then(
+                    (networkResponse) => {
+                        // Don't cache invalid responses or non-basic requests (like browser extensions)
+                        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+                            return networkResponse;
+                        }
+
+                        // Clone the response because it's a stream and can only be consumed once
+                        const responseToCache = networkResponse.clone();
+                        caches.open(CACHE_NAME)
+                            .then((cache) => {
+                                cache.put(event.request, responseToCache);
+                            });
+
+                        return networkResponse;
+                    }
+                ).catch(() => {
+                    // If network fails and we don't have it in cache, return the offline fallback
+                    console.log('[Service Worker] Fetch failed; offline and not cached.', event.request.url);
+                    // For document requests, we could return a specific offline page if we had one
+                    // return caches.match('/offline.html');
+                    return new Response('Network error occurred (Offline)', {
+                        status: 503,
+                        statusText: 'Service Unavailable',
+                        headers: new Headers({ 'Content-Type': 'text/plain' })
+                    });
+                });
+            })
+    );
 });
 

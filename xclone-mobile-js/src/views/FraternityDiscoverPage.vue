@@ -52,6 +52,11 @@
         </div>
       </div>
 
+      <!-- Friends Discovery -->
+      <div v-if="activeFilter === 'friends'" class="section">
+        <ContactDiscovery />
+      </div>
+
       <!-- Discover List -->
       <div v-if="activeFilter !== 'mine'" class="section">
         <h2 class="section-title" v-if="searchQuery">
@@ -197,6 +202,7 @@ import {
   IonToggle
 } from '@ionic/vue';
 import FraternityCard from '@/components/FraternityCard.vue';
+import ContactDiscovery from '@/components/ContactDiscovery.vue';
 import axios from 'axios';
 import config from '@/config/index.js';
 
@@ -206,7 +212,7 @@ export default {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
     IonButton, IonButtons, IonIcon, IonSearchbar,
     IonModal, IonItem, IonLabel, IonInput, IonTextarea,
-    IonToggle, FraternityCard
+    IonToggle, FraternityCard, ContactDiscovery
   },
   data() {
     return {
@@ -226,7 +232,8 @@ export default {
       filterTabs: [
         { key: 'discover', label: '🌐 Discover' },
         { key: 'mine', label: '🛡 Mine' },
-        { key: 'energy', label: '⚡ High Energy' }
+        { key: 'energy', label: '⚡ High Energy' },
+        { key: 'friends', label: '👥 Friends' }
       ],
       form: {
         name: '',

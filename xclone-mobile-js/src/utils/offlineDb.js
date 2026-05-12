@@ -332,4 +332,73 @@ export async function getPeerInfo(userId) {
     }
 }
 
+/**
+ * Update LAN-specific info for a peer (IP, ZeroConf name, etc).
+ * Also accumulates a list of known subnets the peer has appeared on.
+ */
+export async function updatePeerLanInfo(userId, info) {
+    try {
+        const existing = await db.peerInfo.get(String(userId)) || {};
+        const knownSubnets = existing.known_subnets || [];
+
+        // If a new resolved IP is given, add its subnet to the known list
+        if (info.last_resolved_ip) {
+            const parts = info.last_resolved_ip.split('.');
+            if (parts.length === 4) {
+                const subnet = parts.slice(0, 3).join('.');
+                if (!knownSubnets.includes(subnet)) {
+                    knownSubnets.push(subnet);
+                    // Keep last 10 subnets only
+                    if (knownSubnets.length > 10) knownSubnets.shift();
+                }
+            }
+        }
+
+        await db.peerInfo.put({
+            ...existing,
+            user_id: String(userId),
+            ...info,
+            known_subnets: knownSubnets,
+            last_seen: new Date().toISOString()
+        });
+    } catch (err) {
+        console.error('Error updating peer LAN info:', err);
+    }
+}
+
+/**
+ * Get the last known LAN IP for a peer.
+ */
+export async function getPeerLanIP(userId) {
+    try {
+        const info = await db.peerInfo.get(String(userId));
+        return info ? info.last_resolved_ip : null;
+    } catch (err) {
+        return null;
+    }
+}
+
+/**
+ * Get all known subnets for a peer (e.g. ["192.168.1", "10.0.0"]).
+ */
+export async function getPeerKnownSubnets(userId) {
+    try {
+        const info = await db.peerInfo.get(String(userId));
+        return info ? (info.known_subnets || []) : [];
+    } catch (err) {
+        return [];
+    }
+}
+
+/**
+ * Get all stored peer info records (for offline reconnect scanning).
+ */
+export async function getAllPeerInfo() {
+    try {
+        return await db.peerInfo.toArray();
+    } catch (err) {
+        return [];
+    }
+}
+
 export default db;

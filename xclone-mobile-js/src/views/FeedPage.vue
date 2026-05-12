@@ -124,7 +124,12 @@
 
       <!-- Feed Posts -->
       <div class="feed-container" v-if="posts.length > 0">
-        <div v-for="post in posts" :key="(post.item_type || 'post') + '_' + post.post_id + '_' + (post.repost_id || '')" class="post-item">
+        <div 
+          v-for="post in posts" 
+          :key="(post.item_type || 'post') + '_' + post.post_id + '_' + (post.repost_id || '')" 
+          class="post-item post-card-container"
+          :data-post-id="post.post_id"
+        >
           <div class="post-avatar" @click="openProfile(post)">
             <img
               :src="getImageUrl(post.profile_pic)"
@@ -177,11 +182,10 @@
                 <span class="timestamp">{{ formatRelativeTime(post.timestamp) }}</span>
               </div>
               <ion-button 
-                v-if="post.user_id === userId && !isAnonymous" 
                 fill="clear" 
                 size="small" 
                 class="more-btn"
-                @click="deletePost(post.post_id)">
+                @click.stop="openPostMoreOptions(post)">
                 <ion-icon :icon="ellipsisHorizontal"></ion-icon>
               </ion-button>
             </div>
@@ -304,6 +308,12 @@
         header="Repost"
         :buttons="undoRepostSheetButtons"
         @didDismiss="showUndoRepostSheet = false"
+      ></ion-action-sheet>
+      
+      <ion-action-sheet
+        :is-open="showPostMoreSheet"
+        @didDismiss="showPostMoreSheet = false"
+        :buttons="postMoreButtons"
       ></ion-action-sheet>
 
       <ion-modal :is-open="showQuoteRepostModal" @did-dismiss="closeQuoteRepostModal">
@@ -850,6 +860,13 @@ export default {
       showNewPostsBanner: false,
       _newPostsInterval: null,
       _isNearTop: true,
+      
+      showPostMoreSheet: false,
+      postMoreButtons: [],
+      activeMorePost: null,
+
+      dwellObserver: null,
+      dwellStartTimes: {},
 
       showRepostSheet: false,
       repostTarget: null,
@@ -1116,6 +1133,7 @@ export default {
       this.detailPost = post;
       this.showPostDetail = true;
       this.loadDetailComments(post?.post_id);
+      this.recordPostView(post?.post_id);
     },
 
     closePostDetail() {
@@ -1221,7 +1239,8 @@ export default {
 
         const nextPosts = (result?.posts || []).map(p => ({
           ...p,
-          liked: false,
+          liked: !!p.is_liked,   // ✅ Use real value from backend
+          likes: p.likes_count ?? p.likes ?? 0,
           comments: p.comments_count || 0
         }));
 
@@ -1320,7 +1339,11 @@ export default {
       if (imageData.startsWith('http')) return imageData;
       if (imageData.startsWith('data:image')) return imageData;
       if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
-      return `data:image/png;base64,${imageData}`;
+      // Fix: Handle base64 images properly
+      if (imageData.length > 100 && !imageData.startsWith('http') && !imageData.startsWith('data:image') && !imageData.startsWith('/static/')) {
+        return `data:image/png;base64,${imageData}`;
+      }
+      return imageData;
     },
     
     handleImageError(event) {
@@ -1429,7 +1452,8 @@ export default {
         if (result.success && result.posts) {
           this.posts = result.posts.map(p => ({
             ...p,
-            liked: false,
+            liked: !!p.is_liked,   // ✅ Use real value from backend
+            likes: p.likes_count ?? p.likes ?? 0,
             comments: p.comments_count || 0
           }));
 
@@ -1599,6 +1623,18 @@ export default {
 
 
     
+    async recordPostView(postId) {
+      if (!postId || !this.userId) return;
+      try {
+        await axios.post(`${this.API_URL}/api/posts/view`, {
+          user_id: this.userId,
+          post_id: postId
+        });
+      } catch (err) {
+        console.error('Failed to record post view:', err);
+      }
+    },
+    
     async extractVideoThumbnail(file) {
       return new Promise((resolve, reject) => {
         // Create video element
@@ -1673,26 +1709,46 @@ export default {
       if (!this.ensureAuthenticated()) return;
       const post = this.posts.find(p => p.post_id === postId);
       if (!post) return;
-      
+
       const previousLiked = post.liked;
       const previousLikes = post.likes;
-      
+
+      // Optimistic update
       post.liked = !liked;
-      post.likes += liked ? -1 : 1;
-      
+      post.likes = (post.likes || 0) + (liked ? -1 : 1);
+
+      // Also sync the detail modal if the same post is open
+      if (this.detailPost && this.detailPost.post_id === postId) {
+        this.detailPost.liked = post.liked;
+        this.detailPost.likes = post.likes;
+      }
+
       try {
-        await axios.post(
-          `${this.API_URL}/api/like`, 
-          { 
-            post_id: postId, 
-            user_id: this.userId 
-          },
-          { timeout: 5000 }  // 5 second timeout
+        const res = await axios.post(
+          `${this.API_URL}/api/like`,
+          { post_id: postId, user_id: this.userId },
+          { timeout: 5000 }
         );
+        
+        if (res.data && res.data.success) {
+          // Sync with server response
+          post.liked = res.data.liked;
+          post.likes = res.data.likes;
+          
+          if (this.detailPost && this.detailPost.post_id === postId) {
+            this.detailPost.liked = res.data.liked;
+            this.detailPost.likes = res.data.likes;
+          }
+        }
       } catch (err) {
+        // Roll back on failure
         post.liked = previousLiked;
         post.likes = previousLikes;
-        console.error('❌ Like error:', err);
+        if (this.detailPost && this.detailPost.post_id === postId) {
+          this.detailPost.liked = previousLiked;
+          this.detailPost.likes = previousLikes;
+        }
+        console.error('❌ Like error:', err.response?.data || err.message);
       }
     },
     
@@ -1717,6 +1773,116 @@ export default {
       } catch (err) {
         console.error('❌ Delete error:', err);
         alert('Failed to delete post');
+      }
+    },
+
+    openPostMoreOptions(post) {
+      this.activeMorePost = post;
+      const buttons = [];
+      
+      if (post.user_id === this.userId) {
+        buttons.push({
+          text: 'Delete Post',
+          role: 'destructive',
+          icon: close,
+          handler: () => { this.deletePost(post.post_id); }
+        });
+      } else {
+        buttons.push({
+          text: 'Not Interested',
+          icon: notificationsCircleOutline,
+          handler: () => { this.dislikePost(post.post_id); }
+        });
+        buttons.push({
+          text: `Mute @${post.username}`,
+          icon: notificationsCircleOutline,
+          role: 'destructive',
+          handler: () => { this.muteUser(post.user_id, post.username); }
+        });
+      }
+      
+      buttons.push({
+        text: 'Cancel',
+        role: 'cancel'
+      });
+      
+      this.postMoreButtons = buttons;
+      this.showPostMoreSheet = true;
+    },
+
+    async dislikePost(postId) {
+      if (!this.userId) return;
+      try {
+        await axios.post(`${this.API_URL}/api/posts/dislike`, {
+          user_id: this.userId,
+          target_type: 'post',
+          target_id: postId
+        });
+        this.posts = this.posts.filter(p => p.post_id !== postId);
+        alert('Post hidden. Your feed will be updated.');
+      } catch (err) {
+        console.error('Dislike error:', err);
+      }
+    },
+
+    async muteUser(authorId, username) {
+      if (!this.userId) return;
+      if (!confirm(`Are you sure you want to mute @${username}? You won't see their posts anymore.`)) return;
+      try {
+        await axios.post(`${this.API_URL}/api/posts/dislike`, {
+          user_id: this.userId,
+          target_type: 'user',
+          target_id: authorId
+        });
+        this.posts = this.posts.filter(p => p.user_id !== authorId);
+        alert(`@${username} muted.`);
+      } catch (err) {
+        console.error('Mute error:', err);
+      }
+    },
+
+    setupDwellObserver() {
+      if (typeof IntersectionObserver === 'undefined') return;
+      
+      this.dwellObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const postId = entry.target.getAttribute('data-post-id');
+          if (!postId) return;
+          
+          if (entry.isIntersecting) {
+            this.dwellStartTimes[postId] = Date.now();
+          } else {
+            if (this.dwellStartTimes[postId]) {
+              const duration = (Date.now() - this.dwellStartTimes[postId]) / 1000;
+              if (duration >= 2) { // Minimum 2 seconds to be meaningful
+                this.sendDwellTime(postId, duration);
+              }
+              delete this.dwellStartTimes[postId];
+            }
+          }
+        });
+      }, { threshold: 0.6 });
+      
+      this.observePosts();
+    },
+
+    observePosts() {
+      if (!this.dwellObserver) return;
+      const elements = document.querySelectorAll('.post-card-container[data-post-id]');
+      elements.forEach(el => this.dwellObserver.observe(el));
+    },
+
+    async sendDwellTime(postId, seconds) {
+      if (!this.userId || !postId) return;
+      try {
+        // Send dwell time silently
+        axios.post(`${this.API_URL}/api/posts/dwell`, {
+          user_id: this.userId,
+          post_id: postId,
+          seconds: parseFloat(seconds.toFixed(2))
+        }).catch(() => {}); // Ignore errors for background tracking
+      } catch (err) {
+        // Silent
       }
     },
     
@@ -1867,6 +2033,7 @@ export default {
       this.commentMediaPreview = '';
       this.showCommentsModal = true;
       this.loadComments(post.post_id);
+      this.recordPostView(post.post_id);
     },
 
     closeComments() {
@@ -2354,8 +2521,7 @@ export default {
       console.error('Feed socket setup failed:', e);
     }
 
-    // REMOVED: 5s polling for new posts to reduce backend load. 
-    // Relying on Socket.IO 'feed:new_post' instead.
+    this.setupDwellObserver();
     
     window.addEventListener('themeChanged', (e) => {
       this.theme = e.detail;
@@ -2380,6 +2546,11 @@ export default {
     if (this._newPostsInterval) {
       clearInterval(this._newPostsInterval);
       this._newPostsInterval = null;
+    }
+
+    if (this.dwellObserver) {
+      this.dwellObserver.disconnect();
+      this.dwellObserver = null;
     }
 
     try {
@@ -2985,8 +3156,33 @@ ion-toolbar {
   color: var(--ion-color-primary, #daa520);
 }
 
-.like-btn:hover, .like-btn.liked {
-  color: #daa520;
+.like-btn:hover {
+  color: #f59e0b;
+}
+
+.like-btn.liked {
+  color: #f59e0b !important;
+  --color: #f59e0b !important;
+}
+
+/* Make the icon itself gold — pierces Ionic shadow DOM */
+.like-btn.liked ion-icon {
+  color: #f59e0b !important;
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.6));
+  transform: scale(1.15);
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Pop animation when tapping Like */
+@keyframes likePop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.4); }
+  70%  { transform: scale(0.9); }
+  100% { transform: scale(1.15); }
+}
+
+.like-btn.liked ion-icon {
+  animation: likePop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 .retweet-btn:hover {

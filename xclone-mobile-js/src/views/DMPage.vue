@@ -1,4 +1,4 @@
-﻿
+
 <template>
   <ion-page>
     <!-- Main Conversations List View -->
@@ -6,6 +6,12 @@
       <ion-toolbar>
         <ion-title>Messages</ion-title>
         <ion-buttons slot="end">
+          <ion-button @click="openPendingInvitationsModal">
+            <ion-icon :icon="chatbubbles"></ion-icon>
+            <ion-badge v-if="pendingInvitations.length > 0" color="danger" style="position: absolute; top: 0; right: 0;">
+              {{ pendingInvitations.length }}
+            </ion-badge>
+          </ion-button>
           <ion-button @click="showSearchModal = true">
             <ion-icon :icon="search"></ion-icon>
           </ion-button>
@@ -36,7 +42,13 @@
             <img :src="getImageUrl(selectedChat.profile_pic)" class="header-avatar" alt="Avatar" />
             <div class="header-info">
               <div class="header-username">{{ selectedChat.username }}</div>
-              <div class="header-status">{{ selectedChat.online ? 'Online' : 'Offline' }}</div>
+              <div class="header-status-row">
+                <div class="header-status">{{ selectedChat.online ? 'Online' : 'Offline' }}</div>
+                <div v-if="isLanReachable(selectedChat.user_id)" class="lan-badge">
+                  <ion-icon :icon="flash" class="lan-icon"></ion-icon>
+                  LAN
+                </div>
+              </div>
             </div>
           </div>
         </ion-title>
@@ -46,6 +58,9 @@
           </ion-button>
           <ion-button @click="startCall('video')">
             <ion-icon :icon="videocam"></ion-icon>
+          </ion-button>
+          <ion-button @click="ghostMode = !ghostMode" :class="{ 'ghost-active': ghostMode }">
+            <ion-icon :icon="ghostMode ? eyeOff : eye"></ion-icon>
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -108,9 +123,9 @@
       </div>
 
       <!-- Chat Messages View -->
-      <div v-else class="chat-container" ref="chatContainer">
+      <div v-else class="chat-container" ref="chatContainer" :class="{ 'ghost-mode-view': ghostMode }">
         <!-- Animated ambient background -->
-        <div class="chat-ambient">
+        <div class="chat-ambient" :class="'ambient-' + currentMoodAtmosphere">
           <div class="ambient-orb orb-1"></div>
           <div class="ambient-orb orb-2"></div>
           <div class="ambient-orb orb-3"></div>
@@ -193,6 +208,17 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- AI Suggestions -->
+      <div v-if="selectedChat && aiSuggestions.length > 0" class="ai-suggestions-bar">
+        <div 
+          v-for="sugg in aiSuggestions" 
+          :key="sugg"
+          class="ai-suggestion-chip"
+          @click="useSuggestion(sugg)">
+          {{ sugg }}
         </div>
       </div>
 
@@ -395,6 +421,75 @@
       </ion-content>
     </ion-modal>
 
+    <!-- Invitation Modal -->
+    <ion-modal :is-open="showInvitationModal" @did-dismiss="showInvitationModal = false">
+      <ion-header>
+        <ion-toolbar>
+          <ion-buttons slot="start">
+            <ion-button @click="showInvitationModal = false">Cancel</ion-button>
+          </ion-buttons>
+          <ion-title>Start Conversation</ion-title>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <div v-if="invitationTarget" class="invitation-content">
+          <img :src="getImageUrl(invitationTarget.profile_pic)" class="invite-avatar" alt="Avatar" />
+          <h2>{{ invitationTarget.full_name || invitationTarget.username }}</h2>
+          <p class="invite-handle">@{{ invitationTarget.username }}</p>
+          <p class="invite-message">
+            You haven't chatted with this user before. Send an invitation to start a conversation.
+          </p>
+          <div class="invite-actions">
+            <ion-button expand="block" fill="solid" class="gold-btn" @click="sendInvitation" :disabled="sendingInvitation">
+              <ion-spinner v-if="sendingInvitation" name="crescent"></ion-spinner>
+              <span v-else>Send Invitation</span>
+            </ion-button>
+          </div>
+        </div>
+      </ion-content>
+    </ion-modal>
+
+    <!-- Pending Invitations Modal -->
+    <ion-modal :is-open="showPendingInvitationsModal" @did-dismiss="showPendingInvitationsModal = false">
+      <ion-header>
+        <ion-toolbar>
+          <ion-buttons slot="start">
+            <ion-button @click="showPendingInvitationsModal = false">Close</ion-button>
+          </ion-buttons>
+          <ion-title>Pending Invitations</ion-title>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content>
+        <div v-if="loadingPendingInvitations" class="loading-container">
+          <ion-spinner></ion-spinner>
+        </div>
+        <div v-else-if="pendingInvitations.length === 0" class="empty-state">
+          <ion-icon :icon="chatbubbles" class="empty-icon"></ion-icon>
+          <h3>No pending invitations</h3>
+        </div>
+        <div v-else class="invitations-list">
+          <div 
+            v-for="inv in pendingInvitations" 
+            :key="inv.id"
+            class="invitation-item">
+            <img :src="getImageUrl(inv.profile_pic)" class="invite-item-avatar" alt="Avatar" />
+            <div class="invite-item-info">
+              <div class="invite-item-name">{{ inv.full_name || inv.username }}</div>
+              <div class="invite-item-handle">@{{ inv.username }}</div>
+            </div>
+            <div class="invite-item-actions">
+              <ion-button size="small" fill="solid" color="success" @click="respondToInvitation(inv.id, 'accept')">
+                Accept
+              </ion-button>
+              <ion-button size="small" fill="outline" color="danger" @click="respondToInvitation(inv.id, 'decline')">
+                Decline
+              </ion-button>
+            </div>
+          </div>
+        </div>
+      </ion-content>
+    </ion-modal>
+
     <!-- Hidden file input for images -->
   <input
     type="file"
@@ -436,7 +531,8 @@ import {
 } from '@ionic/vue';
 import { 
   search, arrowBack, send, mic, add, call, videocam, chatbubbles,
-  checkmark, checkmarkDone, happy
+  checkmark, checkmarkDone, happy, flash, eye, eyeOff,
+  stop, trash, play, pause
 } from 'ionicons/icons';
 import api from '@/utils/api.js';
 import EmojiPicker from '@/components/EmojiPicker.vue';
@@ -446,12 +542,11 @@ import {
   saveMessagesOffline, getOfflineMessages, isNetworkOffline,
   saveLocalMessage
 } from '@/utils/offlineDb.js';
-import {
-  stop, trash, play, pause
-} from 'ionicons/icons';
 import lanService from '@/utils/lanService.js';
 import { startSyncWatcher } from '@/utils/syncService.js';
-import { v4 as uuidv4 } from 'uuid';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
+// Removed uuid import as it might be missing
+const uuidv4 = () => 'local-' + Math.random().toString(36).substr(2, 9);
 
 export default {
   name: 'DMPage',
@@ -481,7 +576,8 @@ export default {
       isSending: false,
       showEmojiPicker: false,
       search, arrowBack, send, mic, add, call, videocam, chatbubbles,
-      checkmark, checkmarkDone, happy,
+      checkmark, checkmarkDone, happy, flash, eye, eyeOff,
+      stop, trash, play, pause,
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
       _socketNewMessageHandler: null,
       // Voice Recording State
@@ -490,7 +586,6 @@ export default {
       audioChunks: [],
       recordingDuration: 0,
       recordingTimer: null,
-      stop, trash, play, pause,
       playingAudioId: null,
       audioElements: {},
       // Mood System
@@ -537,9 +632,37 @@ export default {
       playbackProgress: 0,
       isPlayingPending: false,
       pendingAudio: null, // Added for pending voice note playback
+      currentAtmosphere: 'serious', // Default
+      heartbeatTimer: null,
+      ghostMode: false,
+      lanConnectedPeers: {},
+      aiSuggestions: [],
+      // Conversation Invitations
+      showInvitationModal: false,
+      invitationTarget: null,
+      sendingInvitation: false,
+      showPendingInvitationsModal: false,
+      pendingInvitations: [],
+      loadingPendingInvitations: false,
     };
   },
   computed: {
+    currentMoodAtmosphere() {
+      // Analyze last 5 messages to determine dominant mood
+      const recentMessages = this.messages.slice(-5);
+      const moods = recentMessages.map(m => m.mood).filter(Boolean);
+      
+      if (moods.length === 0) return 'serious';
+      
+      // Count occurrences
+      const counts = moods.reduce((acc, m) => {
+        acc[m] = (acc[m] || 0) + 1;
+        return acc;
+      }, {});
+      
+      // Return most frequent mood
+      return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+    },
     inputPlaceholder() {
       if (this.selectedMood) {
         const m = this.moodMap[this.selectedMood];
@@ -645,16 +768,66 @@ export default {
       }
     },
 
-    startNewChat(user) {
+    async startNewChat(user) {
       console.log('Starting chat with:', user.username);
       this.closeSearchModal();
       
-      // Check if conversation already exists
+      // Check if conversation already exists in local list
       const existing = this.conversations.find(c => c.user_id === user.user_id);
       if (existing) {
         this.openChat(existing);
-      } else {
-        // Create new conversation placeholder
+        return;
+      }
+      
+      // Check with backend if conversation exists (based on message history)
+      try {
+        const res = await api.get('/api/conversations/invite/status', {
+          params: { 
+            user_id_1: this.userId,
+            user_id_2: user.user_id
+          }
+        });
+        
+        if (res.data.conversation_exists) {
+          // Conversation exists, open it directly
+          const newConv = {
+            user_id: user.user_id,
+            username: user.username,
+            profile_pic: user.profile_pic,
+            last_message: '',
+            last_message_time: new Date().toISOString(),
+            unread_count: 0,
+            online: false,
+            last_message_sent_by_me: false,
+            last_message_read: false
+          };
+          this.conversations.unshift(newConv);
+          this.filteredConversations = [...this.conversations];
+          this.openChat(newConv);
+        } else if (res.data.invitation && res.data.invitation.status === 'accepted') {
+          // Invitation accepted, open chat
+          const newConv = {
+            user_id: user.user_id,
+            username: user.username,
+            profile_pic: user.profile_pic,
+            last_message: '',
+            last_message_time: new Date().toISOString(),
+            unread_count: 0,
+            online: false,
+            last_message_sent_by_me: false,
+            last_message_read: false
+          };
+          this.conversations.unshift(newConv);
+          this.filteredConversations = [...this.conversations];
+          this.openChat(newConv);
+        } else {
+          // No conversation exists, show invitation UI
+          this.showInvitationModal = true;
+          this.invitationTarget = user;
+        }
+      } catch (err) {
+        console.error('Error checking conversation status:', err);
+        // Fallback: create new conversation placeholder
         const newConv = {
           user_id: user.user_id,
           username: user.username,
@@ -688,6 +861,8 @@ export default {
         this.markAsRead(conversation.user_id);
         conversation.unread_count = 0;
       }
+      
+      this.startHeartbeat();
     },
 
     closeChat() {
@@ -696,8 +871,10 @@ export default {
       this.messages = [];
       this.messageText = '';
       this.imagePreview = null;
+      this.selectedMood = null;
       this.showEmojiPicker = false;
       this.clearReply();
+      this.stopHeartbeat();
       
       // Reload conversations to get updated list
       this.loadConversations();
@@ -717,11 +894,11 @@ export default {
       
       try {
         this.loadingMessages = true;
-        console.log('ðŸ“¡ Loading messages for chat:', otherUserId);
+        console.log('📡 Loading messages for chat:', otherUserId);
         
         // Handle offline: Fetch from IndexedDB
         if (isNetworkOffline()) {
-          console.log('ðŸ“¡ OFFLINE: Fetching messages from IndexedDB');
+          console.log('📡 OFFLINE: Fetching messages from IndexedDB');
           const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
           this.messages = cachedMessages || [];
           this.$nextTick(() => this.scrollToBottom());
@@ -740,7 +917,7 @@ export default {
         }));
 
         this.messages = serverMessages;
-        console.log(`âœ… Loaded ${this.messages.length} messages`);
+        console.log(`✅ Loaded ${this.messages.length} messages`);
 
         // Save to offline DB
         if (this.messages.length > 0) {
@@ -798,55 +975,39 @@ export default {
         this.selectedMood = null;
         this.$nextTick(() => this.scrollToBottom());
 
-        // 2. Persistent Local Storage
-        await saveLocalMessage(newMessage);
+        // 2. Persistent Local Storage (Skip if Ghost Mode)
+        if (!this.ghostMode) {
+           await saveLocalMessage(newMessage);
+        }
 
-        // 3. P2P LAN Dispatch (Primary)
+        // 3. Duo-Path Dispatch (LAN + Server)
+        
+        // Path A: LAN (Fastest)
         let sentViaLan = false;
         if (lanService.isPeerReachable(this.selectedChat.user_id)) {
-          console.log('[LAN] Dispatching P2P to', this.selectedChat.user_id);
-          sentViaLan = lanService.sendMessage(this.selectedChat.user_id, {
-            local_id: localId,
-            from_user_id: this.userId,
-            to_user_id: this.selectedChat.user_id,
-            text: messageTextToSend,
-            image: imageToSend,
-            mood: moodToSend,
-            reply_to_id: replyToId,
-            reply_to_preview: replyToPreview,
-            timestamp: timestamp
-          });
-          
-          if (sentViaLan) {
-            // Update local state to 'delivered'
+          console.log('[LAN] Dispatching via LAN DataChannel');
+          sentViaLan = lanService.sendMessage(this.selectedChat.user_id, newMessage);
+          if (sentViaLan && !this.ghostMode) {
             newMessage.status = 'delivered';
-            await saveLocalMessage(newMessage); // Update in IndexedDB
+            await saveLocalMessage(newMessage);
           }
         }
 
-        // 4. API Dispatch (Fallback or Parallel)
-        // If we are online, we always send to API too (for broad persistence)
-        // If offline, the syncService will handle it later.
-        if (!isNetworkOffline()) {
+        // Path B: Server (Persistence/Cloud) - SKIP if Ghost Mode
+        if (!isNetworkOffline() && !this.ghostMode) {
           try {
             const res = await api.post('/api/messages/send', {
-              from_user_id: this.userId,
-              to_user_id: this.selectedChat.user_id,
-              text: messageTextToSend,
-              image: imageToSend || null,
-              mood: moodToSend || null,
-              reply_to_id: replyToId,
-              reply_to_preview: replyToPreview,
-              local_id: localId
+              ...newMessage,
+              local_id: localId // For deduplication on server/receiver
             });
 
-            if (res.success) {
+            if (res.success || res.message_id) {
               newMessage.status = 'synced';
-              newMessage.server_id = res.message_id;
+              newMessage.server_id = res.message_id || res.id;
               await saveLocalMessage(newMessage);
             }
           } catch (apiErr) {
-            console.warn('[DM] API send failed, relying on LAN/Sync', apiErr);
+            console.warn('[DM] Server dispatch failed, relying on LAN/Background Sync', apiErr);
           }
         }
 
@@ -1512,6 +1673,192 @@ export default {
         console.error('Check online status failed:', err);
       }
     },
+
+    isLanReachable(userId) {
+      return !!this.lanConnectedPeers[userId] || lanService.isPeerReachable(userId);
+    },
+
+    startHeartbeat() {
+      if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = setInterval(() => {
+        if (this.selectedChat && lanService.isPeerReachable(this.selectedChat.user_id)) {
+          lanService.sendHeartbeat(this.selectedChat.user_id, !!this.messageText.trim());
+        }
+      }, 4000);
+    },
+
+    stopHeartbeat() {
+      if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    },
+
+    async triggerHeartbeatHaptic(isTyping) {
+      try {
+        if (isTyping) {
+          // Double pulse for typing
+          await Haptics.impact({ style: ImpactStyle.Light });
+          setTimeout(() => Haptics.impact({ style: ImpactStyle.Light }), 150);
+        } else {
+          // Single subtle pulse
+          await Haptics.impact({ style: ImpactStyle.Light });
+        }
+      } catch (_) {}
+    },
+
+    async fetchAiSuggestions() {
+      if (!this.selectedChat || this.ghostMode || isNetworkOffline()) return;
+      try {
+        const res = await api.post('/api/ai/suggest-replies', {
+          user_id: this.userId,
+          other_user_id: this.selectedChat.user_id,
+          recent_messages: this.messages.slice(-5)
+        });
+        if (res.success) {
+          this.aiSuggestions = res.suggestions;
+        }
+      } catch (_) {
+        this.aiSuggestions = [];
+      }
+    },
+
+    useSuggestion(text) {
+      this.messageText = text;
+      this.aiSuggestions = [];
+      this.sendMessage();
+    },
+
+    sendReflection() {
+      console.log('Sending reflection:', this.reflectionText);
+      this.showReflection = false;
+      this.reflectionText = '';
+    },
+
+    cancelRecording() {
+      console.log('Recording cancelled');
+      this.isRecording = false;
+      this.stopRecording();
+    },
+
+    onVoiceTimestampReply(data) {
+      console.log('Voice timestamp reply:', data);
+      this.replyingTo = {
+        msg: data.msg,
+        preview: `Voice at ${this.formatDuration(data.timestamp)}`,
+        timestampSec: data.timestamp
+      };
+    },
+
+    fmtRepSec(s) {
+      return this.formatDuration(s);
+    },
+
+    onMsgTouchStart(msg, e) {
+      this.longPressTimer = setTimeout(() => {
+        this.replyToMessage(msg);
+      }, 600);
+    },
+
+    onMsgTouchEnd() {
+      if (this.longPressTimer) clearTimeout(this.longPressTimer);
+    },
+
+    // Conversation Invitation Methods
+    async sendInvitation() {
+      if (!this.invitationTarget || !this.userId) return;
+      
+      try {
+        this.sendingInvitation = true;
+        const res = await api.post('/api/conversations/invite', {
+          from_user_id: this.userId,
+          to_user_id: this.invitationTarget.user_id
+        });
+        
+        if (res.data.success) {
+          this.showInvitationModal = false;
+          this.invitationTarget = null;
+          alert('Invitation sent successfully!');
+        } else {
+          alert(res.data.message || 'Failed to send invitation');
+        }
+      } catch (err) {
+        console.error('Send invitation error:', err);
+        alert('Failed to send invitation');
+      } finally {
+        this.sendingInvitation = false;
+      }
+    },
+
+    async respondToInvitation(invitationId, action) {
+      if (!this.userId) return;
+      
+      try {
+        const res = await api.post(`/api/conversations/invite/${invitationId}/respond`, {
+          to_user_id: this.userId,
+          action: action
+        });
+        
+        if (res.data.success) {
+          this.pendingInvitations = this.pendingInvitations.filter(inv => inv.id !== invitationId);
+          
+          if (action === 'accept') {
+            const fromUserId = res.data.from_user_id;
+            const inv = this.pendingInvitations.find(i => i.id === invitationId);
+            if (inv) {
+              const newConv = {
+                user_id: inv.from_user_id,
+                username: inv.username,
+                profile_pic: inv.profile_pic,
+                last_message: '',
+                last_message_time: new Date().toISOString(),
+                unread_count: 0,
+                online: false,
+                last_message_sent_by_me: false,
+                last_message_read: false
+              };
+              this.conversations.unshift(newConv);
+              this.filteredConversations = [...this.conversations];
+              this.openChat(newConv);
+            }
+            alert('Invitation accepted! You can now chat.');
+          } else {
+            alert('Invitation declined.');
+          }
+          
+          if (this.pendingInvitations.length === 0) {
+            this.showPendingInvitationsModal = false;
+          }
+        } else {
+          alert(res.data.message || 'Failed to respond to invitation');
+        }
+      } catch (err) {
+        console.error('Respond to invitation error:', err);
+        alert('Failed to respond to invitation');
+      }
+    },
+
+    async loadPendingInvitations() {
+      if (!this.userId) return;
+      
+      try {
+        this.loadingPendingInvitations = true;
+        const res = await api.get('/api/conversations/invitations/pending', {
+          params: { user_id: this.userId }
+        });
+        
+        if (res.data.invitations) {
+          this.pendingInvitations = res.data.invitations;
+        }
+      } catch (err) {
+        console.error('Load pending invitations error:', err);
+      } finally {
+        this.loadingPendingInvitations = false;
+      }
+    },
+
+    openPendingInvitationsModal() {
+      this.showPendingInvitationsModal = true;
+      this.loadPendingInvitations();
+    }
   },
 
   mounted() {
@@ -1591,9 +1938,13 @@ export default {
       this.autoOpenFromQuery();
     });
 
+    // Load pending invitations
+    this.loadPendingInvitations();
+
     // Initialise P2P LAN Service
-    if (this.userId && this.$socket) {
-      lanService.init(this.$socket, this.userId);
+    const lanSocket = this.$socketService?.socket || this.$socket || null;
+    if (this.userId && lanSocket) {
+      lanService.init(lanSocket, this.userId, this.currentUsername || this.userId);
       lanService.onMessage((msg) => {
         // If currently in chat with sender, push message
         if (this.selectedChat && String(this.selectedChat.user_id) === String(msg.from_user_id)) {
@@ -1603,6 +1954,16 @@ export default {
           // Otherwise update conversation list
           this.loadConversations();
         }
+      });
+
+      lanService.onHeartbeat((peerId, isTyping) => {
+        if (this.selectedChat && String(this.selectedChat.user_id) === String(peerId)) {
+          this.triggerHeartbeatHaptic(isTyping);
+        }
+      });
+
+      lanService.onStatusChange((peerId, status) => {
+        this.lanConnectedPeers[String(peerId)] = (status === 'open');
       });
     }
 
@@ -1629,6 +1990,12 @@ export default {
         }
       },
       deep: true
+    },
+    messages: {
+      handler() {
+        this.fetchAiSuggestions();
+      },
+      deep: false
     }
   },
   beforeUnmount() {
@@ -1703,7 +2070,34 @@ export default {
 .header-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1.5px solid rgba(218,165,32,0.4); }
 .header-info { display: flex; flex-direction: column; }
 .header-username { font-size: 15px; font-weight: 700; line-height: 1.2; }
+.header-status-row { display: flex; align-items: center; gap: 6px; }
 .header-status { font-size: 11px; color: #10b981; line-height: 1.3; }
+
+.lan-badge {
+  background: rgba(218,165,32,0.15);
+  color: #daa520;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid rgba(218,165,32,0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lan-icon {
+  font-size: 10px;
+  animation: lanPulse 2s infinite;
+}
+
+@keyframes lanPulse {
+  0% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.7; }
+}
 
 .chat-container {
   position: relative;
@@ -1732,11 +2126,43 @@ export default {
   50%      { transform: translateY(-30px) scale(1.08); }
 }
 
+/* Atmosphere Themes */
+.ambient-bold .orb-1 { background: #ff6b35; opacity: 0.2; }
+.ambient-bold .orb-2 { background: #daa520; opacity: 0.15; }
+.ambient-bold .orb-3 { background: #ef4444; opacity: 0.1; }
+
+.ambient-deep .orb-1 { background: #6c63ff; opacity: 0.2; }
+.ambient-deep .orb-2 { background: #7c3aed; opacity: 0.15; }
+.ambient-deep .orb-3 { background: #1e1b4b; opacity: 0.1; }
+
+.ambient-playful .orb-1 { background: #ec4899; opacity: 0.2; }
+.ambient-playful .orb-2 { background: #00c9a7; opacity: 0.15; }
+.ambient-playful .orb-3 { background: #fb7185; opacity: 0.1; }
+
+.ambient-romantic .orb-1 { background: #fb7185; opacity: 0.25; }
+.ambient-romantic .orb-2 { background: #fda4af; opacity: 0.2; }
+.ambient-romantic .orb-3 { background: #ec4899; opacity: 0.1; }
+
+.ambient-pissed .orb-1 { background: #ef4444; opacity: 0.25; animation-duration: 4s; }
+.ambient-pissed .orb-2 { background: #000; opacity: 0.3; animation-duration: 3s; }
+.ambient-pissed .orb-3 { background: #f87171; opacity: 0.15; }
+
+.ambient-mysterious .orb-1 { background: #2e1065; opacity: 0.3; }
+.ambient-mysterious .orb-2 { background: #000; opacity: 0.4; }
+.ambient-mysterious .orb-3 { background: #7c3aed; opacity: 0.1; }
+
 /* â”€â”€ Messages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-.chat-messages {
-  position: relative; z-index: 1;
-  padding: 12px 16px 16px;
-  max-width: 600px; margin: 0 auto;
+.ghost-active { color: #888 !important; opacity: 0.6; }
+
+.ghost-mode-view {
+  filter: grayscale(0.8) contrast(1.2);
+  background: rgba(0,0,0,0.95);
+}
+.ghost-mode-view::after {
+  content: "GHOST MODE ACTIVE";
+  position: fixed; top: 100px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; color: rgba(255,255,255,0.2); letter-spacing: 0.4em;
+  pointer-events: none;
 }
 
 .date-separator { text-align: center; margin: 14px 0; }
@@ -1970,6 +2396,35 @@ export default {
 .dm-emoji-picker {
   position: absolute; bottom: 52px; right: 0;
   z-index: 2000;
+}
+
+.ai-suggestions-bar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: rgba(10,10,10,0.5);
+  backdrop-filter: blur(5px);
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+.ai-suggestions-bar::-webkit-scrollbar { display: none; }
+
+.ai-suggestion-chip {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 18px;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.ai-suggestion-chip:active {
+  background: #daa520;
+  color: #000;
+  transform: scale(0.95);
 }
 
 .textarea-wrap {
@@ -2388,5 +2843,75 @@ export default {
   background: none; border: none; color: rgba(255,255,255,0.3);
   font-size: 12px; cursor: pointer; padding: 0 4px;
   text-decoration: underline;
+}
+
+/* ── Invitation Modal Styles ───────────────────────────────── */
+.invitation-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px;
+}
+.invite-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 16px;
+  border: 3px solid rgba(218,165,32,0.3);
+}
+.invite-handle {
+  color: rgba(255,255,255,0.5);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.invite-message {
+  color: rgba(255,255,255,0.7);
+  font-size: 14px;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+.invite-actions {
+  width: 100%;
+  max-width: 280px;
+}
+
+/* ── Pending Invitations Modal Styles ───────────────────────── */
+.invitations-list {
+  padding: 16px;
+}
+.invitation-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+.invite-item-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.invite-item-info {
+  flex: 1;
+  min-width: 0;
+}
+.invite-item-name {
+  font-weight: 600;
+  color: #fff;
+  font-size: 14px;
+}
+.invite-item-handle {
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+}
+.invite-item-actions {
+  display: flex;
+  gap: 8px;
 }
 </style>

@@ -161,6 +161,14 @@
           </div>
         </div>
 
+        <!-- LAN Mode Panel (Only visible on own profile) -->
+        <LanModePanel 
+          v-if="profile && String(profile.user_id) === String(userId)"
+          :isOwnProfile="true"
+          :currentUserId="userId"
+          :currentUsername="profile.username"
+        />
+
         <!-- Tabs for Posts/Media/Likes -->
         <div class="profile-tabs">
           <div 
@@ -448,6 +456,7 @@ import api from '@/utils/api';
 import config from '@/config/index.js';
 import VideoPlayer from '@/components/VideoPlayer.vue';
 import PollDisplay from '@/components/PollDisplay.vue';
+import LanModePanel from '@/components/LanModePanel.vue';
 import { saveProfileOffline, getOfflineProfile, isNetworkOffline, savePostsOffline, getOfflinePosts } from '@/utils/offlineDb.js';
 
 export default {
@@ -455,7 +464,7 @@ export default {
   components: {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
     IonButtons, IonIcon, IonSpinner, IonRefresher, IonRefresherContent,
-    IonModal, IonList, IonItem, IonLabel, IonInput, VideoPlayer, PollDisplay
+    IonModal, IonList, IonItem, IonLabel, IonInput, VideoPlayer, PollDisplay, LanModePanel
   },
   data() {
     return {

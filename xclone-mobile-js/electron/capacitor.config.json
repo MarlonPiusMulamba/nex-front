@@ -1,0 +1,25 @@
+{
+  "appId": "org.xclone.app",
+  "appName": "NexFi",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#ffffff",
+      "showSpinner": false
+    }
+  },
+  "android": {
+    "allowMixedContent": true
+  },
+  "ios": {
+    "contentInset": "always"
+  },
+  "electron": {
+    "customScheme": "nexfi",
+    "nodeIntegration": true
+  }
+}
