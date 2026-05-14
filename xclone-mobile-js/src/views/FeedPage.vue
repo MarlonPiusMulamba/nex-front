@@ -133,6 +133,7 @@
           <div class="post-avatar" @click="openProfile(post)">
             <img
               :src="getImageUrl(post.profile_pic)"
+              :data-original-src="getImageUrl(post.profile_pic)"
               class="avatar-img"
               alt="Profile"
               @error="handleImageError"
@@ -158,6 +159,7 @@
                     <img
                       v-if="item.type === 'image'"
                       :src="getImageUrl(item.data)"
+                      :data-original-src="getImageUrl(item.data)"
                       class="media-img"
                       alt="Quote media"
                       @error="handleImageError"
@@ -1336,9 +1338,19 @@ export default {
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
       if (typeof imageData !== 'string') return this.defaultAvatar;
-      if (imageData.startsWith('http')) return imageData;
+      
+      // Handle Supabase URLs and other HTTP URLs
+      if (imageData.startsWith('http')) {
+        // Use proxy endpoint for Supabase images to avoid CORS issues
+        if (imageData.includes('supabase.co')) {
+          return `${this.API_URL}/api/proxy/image?url=${encodeURIComponent(imageData)}`;
+        }
+        return imageData;
+      }
+      
       if (imageData.startsWith('data:image')) return imageData;
       if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
+      
       // Fix: Handle base64 images properly
       if (imageData.length > 100 && !imageData.startsWith('http') && !imageData.startsWith('data:image') && !imageData.startsWith('/static/')) {
         return `data:image/png;base64,${imageData}`;
@@ -1347,6 +1359,21 @@ export default {
     },
     
     handleImageError(event) {
+      const originalSrc = event.target.getAttribute('data-original-src') || event.target.src;
+      
+      // If proxy failed, try direct Supabase URL
+      if (originalSrc.includes('/api/proxy/image?url=')) {
+        try {
+          const directUrl = decodeURIComponent(originalSrc.split('/api/proxy/image?url=')[1]);
+          event.target.src = directUrl;
+          event.target.setAttribute('data-original-src', directUrl);
+          return;
+        } catch (e) {
+          console.error('Failed to decode proxy URL:', e);
+        }
+      }
+      
+      // Final fallback to default avatar
       event.target.src = this.defaultAvatar;
     },
     
