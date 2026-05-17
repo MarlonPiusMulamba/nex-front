@@ -321,6 +321,7 @@ export default {
     return {
       postContent: '',
       postMedia: [],
+      rawFiles: [],
       mediaPreviews: [],
       showEmojiPicker: false,
       isPosting: false,
@@ -379,7 +380,7 @@ export default {
       return 'New Post';
     },
     canPost() {
-      const hasContent = this.postContent.trim().length > 0 || this.postMedia.length > 0;
+      const hasContent = this.postContent.trim().length > 0 || this.rawFiles.length > 0;
       const isContentValid = this.postContent.length <= 1000;
       
       let hasValidPoll = false;
@@ -402,7 +403,7 @@ export default {
       return (hasContent || hasValidPoll || hasValidAMA || hasValidSpace) && isContentValid;
     },
     canAddMoreMedia() {
-      return this.postMedia.length < 4;
+      return this.rawFiles.length < 4;
     },
     canSubmit() {
       if (this.isPosting) return false;
@@ -541,7 +542,7 @@ export default {
       const files = Array.from(e.target.files || []);
       if (!files.length) return;
 
-      const remainingSlots = 4 - this.postMedia.length;
+      const remainingSlots = 4 - this.rawFiles.length;
       const toAdd = files.slice(0, remainingSlots);
 
       for (const file of toAdd) {
@@ -553,31 +554,15 @@ export default {
           continue;
         }
 
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const dataUrl = ev.target.result;
-          let thumbnail = null;
-          if (isVideo) {
-            try {
-              thumbnail = await this.extractVideoThumbnail(file);
-            } catch (err) {
-              console.error('Failed to generate video thumbnail:', err);
-            }
-          }
-          
-          this.postMedia.push({
-            type: isVideo ? 'video' : 'image',
-            data: dataUrl,
-            thumbnail: thumbnail
-          });
-
-          this.mediaPreviews.push({
-            type: isVideo ? 'video' : 'image',
-            src: dataUrl,
-            thumbnail: thumbnail
-          });
-        };
-        reader.readAsDataURL(file);
+        // Instant preview using browser object URL (0 CPU/Base64 overhead!)
+        const previewUrl = URL.createObjectURL(file);
+        
+        this.rawFiles.push(file);
+        this.mediaPreviews.push({
+          type: isVideo ? 'video' : 'image',
+          src: previewUrl,
+          file: file
+        });
       }
 
       if (this.$refs.fileInput) {
@@ -586,7 +571,12 @@ export default {
     },
 
     removeMedia(index) {
-      this.postMedia.splice(index, 1);
+      // Revoke the object URL to release browser memory immediately
+      const preview = this.mediaPreviews[index];
+      if (preview && preview.src && preview.src.startsWith('blob:')) {
+        URL.revokeObjectURL(preview.src);
+      }
+      this.rawFiles.splice(index, 1);
       this.mediaPreviews.splice(index, 1);
     },
 
@@ -673,31 +663,38 @@ export default {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000);
         
-        const payload = {
-          user_id: this.userId,
-          content: this.postContent || '',
-          image: this.postMedia.find(m => m.type === 'image')?.data || null,
-          media: this.postMedia,
-          is_anonymous: this.isAnonymous ? 1 : 0,
-          fraternity_id: this.targetFraternity ? this.targetFraternity.id : null
-        };
+        const formData = new FormData();
+        formData.append('user_id', this.userId);
+        formData.append('content', this.postContent || '');
+        formData.append('is_anonymous', this.isAnonymous ? '1' : '0');
+        if (this.targetFraternity) {
+          formData.append('fraternity_id', this.targetFraternity.id);
+        }
+
+        // Append raw files directly
+        this.rawFiles.forEach((file) => {
+          formData.append('media_files', file);
+        });
 
         if (this.showPollCreator) {
-          payload.poll_question = this.pollQuestion;
-          payload.poll_options = this.pollOptions.filter(o => o.trim());
-          payload.poll_duration = this.pollDuration;
+          formData.append('poll_question', this.pollQuestion);
+          formData.append('poll_options', JSON.stringify(this.pollOptions.filter(o => o.trim())));
+          formData.append('poll_duration', this.pollDuration);
         } else if (this.showAMACreator) {
-            payload.ama_description = this.amaDescription || '';
-            payload.ama_duration = this.amaDuration;
+          formData.append('ama_description', this.amaDescription || '');
+          formData.append('ama_duration', this.amaDuration);
         } else if (this.showAudioSpaceCreator) {
-            payload.audio_space_title = this.audioSpaceTitle;
-            payload.is_locked = this.audioSpaceIsLocked ? 1 : 0;
+          formData.append('audio_space_title', this.audioSpaceTitle);
+          formData.append('is_locked', this.audioSpaceIsLocked ? '1' : '0');
         }
-        
+
         const res = await axios.post(
           `${this.API_URL}/api/post`, 
-          payload,
+          formData,
           { 
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            },
             signal: controller.signal,
             timeout: 60000 
           }
@@ -804,6 +801,14 @@ export default {
     resetForm() {
       this.postContent = '';
       this.postMedia = [];
+      this.rawFiles = [];
+      
+      // Revoke all remaining object URLs to prevent browser memory leaks
+      this.mediaPreviews.forEach((preview) => {
+        if (preview.src && preview.src.startsWith('blob:')) {
+          URL.revokeObjectURL(preview.src);
+        }
+      });
       this.mediaPreviews = [];
       this.showEmojiPicker = false;
       this.isAnonymous = false;
