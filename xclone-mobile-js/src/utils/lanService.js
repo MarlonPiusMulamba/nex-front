@@ -509,8 +509,69 @@ class LanService {
         try {
             // Capacitor Electron provides node access via window.CapacitorCustomPlatform
             const dgram = window.require?.('dgram');
-            if (!dgram) return;
+            const http = window.require?.('http');
+            
+            // 1. Start Local HTTP Hub for pure Web/Mobile clients to connect to us
+            if (http && !this._localHubServer) {
+                this._localHubServer = http.createServer((req, res) => {
+                    // CORS headers for local LAN access
+                    res.setHeader('Access-Control-Allow-Origin', '*');
+                    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+                    
+                    if (req.method === 'OPTIONS') {
+                        res.writeHead(200);
+                        res.end();
+                        return;
+                    }
 
+                    if (req.method === 'GET' && req.url === '/ping') {
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ app: 'nexfi-hub', userId: this.myUserId, username: this._myUsername }));
+                        return;
+                    }
+
+                    if (req.method === 'POST' && req.url === '/offer') {
+                        let body = '';
+                        req.on('data', chunk => body += chunk.toString());
+                        req.on('end', async () => {
+                            try {
+                                const payload = JSON.parse(body);
+                                const { acceptLanOffer } = await import('./lanSignaling.js');
+                                const { pc, answerPayload } = await acceptLanOffer(
+                                    payload.offer,
+                                    this.myUserId,
+                                    this._myUsername || this.myUserId
+                                );
+
+                                // Wire the incoming data channel
+                                pc.ondatachannel = (ev) => {
+                                    const dc = ev.channel;
+                                    this._setupDataChannel(dc, payload.from_user_id);
+                                    this.peers.set(payload.from_user_id, { pc, dc, state: dc.readyState });
+                                    if (this._onStatusChange) this._onStatusChange(payload.from_user_id, 'open');
+                                    console.log('[LAN Hub] Auto-connected to', payload.from_user_id);
+                                };
+
+                                res.writeHead(200, { 'Content-Type': 'application/json' });
+                                res.end(JSON.stringify({ answer: answerPayload }));
+                            } catch (e) {
+                                res.writeHead(500);
+                                res.end(JSON.stringify({ error: e.message }));
+                            }
+                        });
+                        return;
+                    }
+                    res.writeHead(404);
+                    res.end();
+                });
+                this._localHubServer.listen(5174, '0.0.0.0', () => {
+                    console.log('[LAN Hub] Local Signaling Server running on port 5174');
+                });
+            }
+
+            // 2. Start UDP Broadcast
+            if (!dgram) return;
             const server = dgram.createSocket('udp4');
             const PORT = 41234;
 
@@ -536,7 +597,7 @@ class LanService {
                 }, 5000);
             });
         } catch (e) {
-            console.error('[LAN] Desktop UDP discovery failed:', e);
+            console.error('[LAN] Desktop discovery failed:', e);
         }
     }
 
@@ -560,6 +621,10 @@ class LanService {
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
+        }
+        if (this._localHubServer) {
+            try { this._localHubServer.close(); } catch (_) {}
+            this._localHubServer = null;
         }
         this.stopDiscovery();
         this.peers.forEach(({ pc }) => {

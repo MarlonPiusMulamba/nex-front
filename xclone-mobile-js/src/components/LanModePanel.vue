@@ -236,7 +236,8 @@ import {
   fetchLanPeers,
   extractPeerIPFromSDP,
   getKnownContactsOffline,
-  scanForLocalNexfiBackend
+  scanForLocalNexfiBackend,
+  scanForLocalHubs
 } from '@/utils/lanSignaling.js';
 import { updatePeerLanInfo } from '@/utils/offlineDb.js';
 import lanService from '@/utils/lanService.js';
@@ -412,19 +413,77 @@ export default {
 
     // ── Connect to a known contact (offline-first) ───────────
     // If internet is up → try socket relay (auto handshake)
-    // If offline → generate invite code for them to paste
+    // If offline → try direct HTTP hub, else generate invite code
     async connectToPeerOrInvite(contact) {
       if (this.isConnected(contact.userId)) return;
+
+      this.connectingPeers[contact.userId] = true;
 
       const socket = lanService.socket;
       if (socket && socket.connected) {
         // Online path — let the socket relay handle it
         await this.connectToPeer(contact);
       } else {
-        // Offline path — generate an invite code for them to paste
-        this._pendingInviteForUser = contact;
-        await this.startCreateInvite();
+        // Offline path — attempt auto-connect via their Local Hub
+        const autoSuccess = await this.connectViaLocalHub(contact);
+        if (!autoSuccess) {
+          // Fallback — generate an invite code for them to paste
+          this._pendingInviteForUser = contact;
+          await this.startCreateInvite();
+        }
       }
+      
+      delete this.connectingPeers[contact.userId];
+    },
+
+    async connectViaLocalHub(contact) {
+      // 1. We need their IP. If not known, we can't connect directly via HTTP.
+      if (!contact.lastLanIP) return false;
+
+      try {
+        console.log(`[LAN] Attempting auto-connect to ${contact.username} at ${contact.lastLanIP}:5174...`);
+        const { pc, dc, payload } = await createLanOffer(
+          this.currentUserId,
+          this.currentUsername
+        );
+
+        // Send offer via HTTP to their Local Hub
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        
+        const res = await fetch(`http://${contact.lastLanIP}:5174/offer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            offer: payload,
+            from_user_id: this.currentUserId,
+            username: this.currentUsername
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+
+        if (!res.ok) return false;
+
+        const data = await res.json();
+        if (data && data.answer) {
+          // Complete handshake
+          await completeLanHandshake(pc, data.answer);
+          
+          return new Promise((resolve) => {
+            dc.onopen = () => {
+              lanService._registerExternalPeerConnection(contact.userId, pc, dc);
+              this.loadStoredPeers();
+              this.updateConnectedCount();
+              resolve(true);
+            };
+            setTimeout(() => resolve(false), 3000);
+          });
+        }
+      } catch (err) {
+        console.log(`[LAN] Auto-connect to ${contact.username} failed (hub offline or unreachable).`);
+      }
+      return false;
     },
 
     isConnected(userId) {

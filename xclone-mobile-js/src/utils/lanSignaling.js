@@ -321,6 +321,54 @@ export async function scanForLocalNexfiBackend(myLocalIP) {
 }
 
 // ─────────────────────────────────────────────────────────────
+//  Scan LAN for a Desktop/Mobile Local Signaling Hub (port 5174)
+//
+//  This allows pure Web Browsers to find an offline local hub
+//  to relay their WebRTC SDPs without scanning QR codes.
+// ─────────────────────────────────────────────────────────────
+export async function scanForLocalHubs(myLocalIP) {
+    if (!myLocalIP) return null;
+
+    const parts = myLocalIP.split('.');
+    if (parts.length !== 4) return null;
+    const subnet = parts.slice(0, 3).join('.');
+    const myOctet = parseInt(parts[3], 10);
+
+    const candidates = [myLocalIP];
+    for (let i = 1; i <= 254; i++) {
+        if (i !== myOctet) candidates.push(`${subnet}.${i}`);
+    }
+
+    let found = null;
+    await Promise.allSettled(
+        candidates.map(async (ip) => {
+            if (found) return;
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 500);
+            try {
+                const res = await fetch(`http://${ip}:5174/ping`, {
+                    signal: controller.signal,
+                    cache: 'no-store',
+                    mode: 'cors',
+                    headers: { 'Accept': 'application/json' }
+                });
+                clearTimeout(timer);
+                if (res.ok) {
+                    const data = await res.json().catch(() => null);
+                    if (data && data.app === 'nexfi-hub') {
+                        if (!found) found = `http://${ip}:5174`;
+                    }
+                }
+            } catch (_) {
+                clearTimeout(timer);
+            }
+        })
+    );
+
+    return found;
+}
+
+// ─────────────────────────────────────────────────────────────
 //  Extract peer's LAN IP from their SDP ICE candidates.
 //  Called after WebRTC offer/answer so we can cache the IP.
 // ─────────────────────────────────────────────────────────────
