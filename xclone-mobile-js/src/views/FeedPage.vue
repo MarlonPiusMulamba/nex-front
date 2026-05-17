@@ -160,7 +160,7 @@
                       :src="getImageUrl(item.data)"
                       class="media-img"
                       alt="Quote media"
-                      @error="handleImageError"
+                      @error="handleMediaError"
                     />
                     <VideoPlayer
                       v-else-if="item.type === 'video'"
@@ -219,7 +219,7 @@
                     :src="getImageUrl(item.data)"
                     class="media-img"
                     alt="Post media"
-                    @error="handleImageError"
+                    @error="handleMediaError"
                   />
                   <VideoPlayer
                     v-else-if="item.type === 'video'"
@@ -421,7 +421,7 @@
                     :src="getImageUrl(item.data)"
                     class="media-img"
                     alt="Post media"
-                    @error="handleImageError"
+                    @error="handleMediaError"
                   />
                   <video
                     v-else-if="item.type === 'video'"
@@ -632,7 +632,7 @@
                           :src="getImageUrl(item.data)"
                           class="media-img"
                           alt="Post media"
-                          @error="handleImageError"
+                          @error="handleMediaError"
                         />
                         <VideoPlayer
                           v-else-if="item.type === 'video'"
@@ -673,7 +673,7 @@
                       :src="getMediaSrc(c.image)"
                       class="comment-img"
                       alt="Comment media"
-                      @error="handleImageError"
+                      @error="handleMediaError"
                     />
                     <VideoPlayer
                       v-else
@@ -1350,6 +1350,15 @@ export default {
     handleImageError(event) {
       // Fall back to default avatar on broken images
       event.target.src = this.defaultAvatar;
+    },
+
+    handleMediaError(event) {
+      // Premium fallback: hide broken post media so it doesn't leave an ugly blank card or stretched avatar
+      event.target.style.display = 'none';
+      const parent = event.target.closest('.media-item');
+      if (parent) {
+        parent.style.display = 'none';
+      }
     },
 
     
