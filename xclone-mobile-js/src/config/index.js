@@ -33,7 +33,7 @@ const config = {
       }
       // Priority 2: For Electron apps, use production backend
       else if (isElectron) {
-        apiUrl = 'https://nex-back-3-stoz.onrender.com';
+        apiUrl = 'https://politics-handbook-kentucky-continue.trycloudflare.com';
         console.log('🖥️ Electron app detected, using production backend');
       }
       // Priority 3: For local development, use local backend if available (localhost:5000)
@@ -43,12 +43,12 @@ const config = {
       }
       // Priority 3: For Capacitor apps, always use production backend
       else if (isNative) {
-        apiUrl = 'https://nex-back-3-stoz.onrender.com';
+        apiUrl = 'https://politics-handbook-kentucky-continue.trycloudflare.com';
         console.log('📱 Capacitor app detected, using production backend');
       }
       // Priority 4: Default to production backend
       else {
-        apiUrl = 'https://nex-back-3-stoz.onrender.com';
+        apiUrl = 'https://politics-handbook-kentucky-continue.trycloudflare.com';
         console.log('🌐 Using production backend');
       }
 
