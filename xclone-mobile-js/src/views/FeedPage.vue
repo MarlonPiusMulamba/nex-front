@@ -252,6 +252,7 @@
               v-if="post.audio_space"
               :space="post.audio_space"
               @join-space="handleJoinSpace"
+              @view-recording="handleViewRecording"
             />
 
 
@@ -459,6 +460,7 @@
               v-if="detailPost.audio_space"
               :space="detailPost.audio_space"
               @join-space="handleJoinSpace"
+              @view-recording="handleViewRecording"
             />
 
 
@@ -781,6 +783,13 @@
       @leave="leaveSpace"
     />
 
+    <!-- Audio Space Recording Modal -->
+    <AudioSpaceRecordingModal
+      :is-open="showRecordingModal"
+      :space="currentRecordingSpace"
+      @close="showRecordingModal = false"
+    />
+
   </ion-page>
 
 </template>
@@ -808,6 +817,7 @@ import { savePostsOffline, getOfflinePosts, isNetworkOffline } from '@/utils/off
 import PollDisplay from '@/components/PollDisplay.vue';
 import AudioSpaceCard from '@/components/AudioSpaceCard.vue';
 import AudioSpaceModal from '@/components/AudioSpaceModal.vue';
+import AudioSpaceRecordingModal from '@/components/AudioSpaceRecordingModal.vue';
 import VerificationBadge from '@/components/VerificationBadge.vue';
 
 export default {
@@ -817,7 +827,7 @@ export default {
     IonContent, IonFab, IonFabButton, IonIcon, IonModal, IonTextarea, 
     IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent,
     IonActionSheet, VideoPlayer, PollDisplay, EmojiPicker, PostComposerModal, AMACard,
-    AudioSpaceCard, AudioSpaceModal, VerificationBadge
+    AudioSpaceCard, AudioSpaceModal, AudioSpaceRecordingModal, VerificationBadge
   },
   data() {
     const API_URL = config.api.baseURL;
@@ -892,6 +902,8 @@ export default {
       // Audio Space
       showSpaceModal: false,
       currentSpace: null,
+      showRecordingModal: false,
+      currentRecordingSpace: null,
 
       loadingDetailComments: false,
       mediaZoom: 1,
@@ -1001,7 +1013,13 @@ export default {
         this.currentSpace = space;
         this.showSpaceModal = true;
     },
-    
+
+    handleViewRecording(space) {
+        console.log('Viewing recording:', space);
+        this.currentRecordingSpace = space;
+        this.showRecordingModal = true;
+    },
+
     leaveSpace() {
         this.showSpaceModal = false;
         this.currentSpace = null;
@@ -2533,7 +2551,26 @@ export default {
           }
         };
 
+        this._socketSpaceEndedHandler = async (payload) => {
+          try {
+            const spaceId = payload?.space_id;
+            if (spaceId) {
+              console.log('📻 Space ended event received:', spaceId);
+              // Find the post with this audio space and update its status
+              const postWithSpace = this.posts.find(p => p.audio_space && String(p.audio_space.id) === String(spaceId));
+              if (postWithSpace && postWithSpace.audio_space) {
+                postWithSpace.audio_space.status = 'ended';
+                // Force reactivity update
+                this.$forceUpdate();
+              }
+            }
+          } catch (e) {
+            console.error('Socket space:ended handler error:', e);
+          }
+        };
+
         socket.on('feed:new_post', this._socketNewPostHandler);
+        socket.on('space:ended', this._socketSpaceEndedHandler);
       }
     } catch (e) {
       console.error('Feed socket setup failed:', e);
@@ -2576,6 +2613,10 @@ export default {
       if (socket && this._socketNewPostHandler) {
         socket.off('feed:new_post', this._socketNewPostHandler);
         this._socketNewPostHandler = null;
+      }
+      if (socket && this._socketSpaceEndedHandler) {
+        socket.off('space:ended', this._socketSpaceEndedHandler);
+        this._socketSpaceEndedHandler = null;
       }
     } catch (_) {}
 

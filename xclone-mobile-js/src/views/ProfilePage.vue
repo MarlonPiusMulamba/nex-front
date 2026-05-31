@@ -63,13 +63,22 @@
           <div class="action-buttons-row">
             <div class="action-buttons">
               <ion-button 
-                v-if="profile && String(profile.user_id) === String(userId)"
+                v-if="profile && String(profile.user_id) === String(userId) && !profile.is_verified"
                 fill="solid" 
                 color="primary"
                 size="small"
                 class="verify-inline-btn"
                 @click="getVerified">
                 ✓ Get Verified
+              </ion-button>
+              <ion-button 
+                v-if="profile && String(profile.user_id) === String(userId) && profile.is_verified && profile.verification_tier !== 'gold'"
+                fill="solid" 
+                color="primary"
+                size="small"
+                class="verify-inline-btn"
+                @click="getVerified">
+                🚀 Upgrade
               </ion-button>
               <ion-button 
                 v-if="profile && String(profile.user_id) === String(userId)"
@@ -340,9 +349,13 @@
             <ion-icon :icon="shareOutline" slot="start"></ion-icon>
             <ion-label>Share Profile</ion-label>
           </ion-item>
-          <ion-item button @click="getVerified">
+          <ion-item button @click="getVerified" v-if="!profile || !profile.is_verified">
             <ion-icon :icon="checkmarkCircle" slot="start" color="primary"></ion-icon>
             <ion-label>Get Verified</ion-label>
+          </ion-item>
+          <ion-item button @click="getVerified" v-if="profile && profile.is_verified && profile.verification_tier !== 'gold'">
+            <ion-icon :icon="colorWand" slot="start" color="primary"></ion-icon>
+            <ion-label>Upgrade Verification</ion-label>
           </ion-item>
           <ion-item button @click="settings">
             <ion-icon :icon="settingsOutline" slot="start"></ion-icon>

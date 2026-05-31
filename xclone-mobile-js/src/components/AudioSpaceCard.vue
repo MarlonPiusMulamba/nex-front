@@ -99,7 +99,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['join-space']);
+const emit = defineEmits(['join-space', 'view-recording']);
 
 const localSpace = computed(() => props.space);
 const userId = localStorage.getItem('userId');
@@ -134,7 +134,13 @@ const checkRequestStatus = async () => {
 
 const handleAction = async () => {
     if (localSpace.value.status !== 'live') {
-        emit('join-space', localSpace.value);
+        // If space has ended and has a recording, emit view-recording event
+        if (localSpace.value.recording_url) {
+            emit('view-recording', localSpace.value);
+        } else {
+            // Space ended without recording
+            emit('join-space', localSpace.value);
+        }
         return;
     }
 

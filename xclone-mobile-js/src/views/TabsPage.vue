@@ -87,11 +87,7 @@
               <ion-label>DM</ion-label>
             </ion-tab-button>
 
-            <!-- Mobile Post Button -->
-            <ion-tab-button class="post-tab-btn" @click="triggerGlobalPost">
-              <ion-icon :icon="add" class="post-icon"></ion-icon>
-              <ion-label>Post</ion-label>
-            </ion-tab-button>
+            <!-- Mobile Post Button Removed in favor of FAB -->
 
             <ion-tab-button tab="notifications" href="/tabs/notifications">
               <ion-icon :icon="notificationsOutline"></ion-icon>
@@ -110,6 +106,11 @@
             </ion-tab-button>
           </ion-tab-bar>
         </ion-tabs>
+
+        <!-- Mobile Floating Post Button -->
+        <button class="mobile-fab-btn mobile-only" @click="triggerGlobalPost">
+          <ion-icon :icon="add" class="post-icon"></ion-icon>
+        </button>
       </main>
 
       <!-- Right Sidebar (Desktop only) -->
@@ -410,12 +411,32 @@ ion-page {
   z-index: 10;
 }
 
-.post-tab-btn {
-  transform: scale(1.1);
+.mobile-fab-btn {
+  position: fixed;
+  bottom: 80px;
+  right: 16px;
+  width: 56px;
+  height: 56px;
+  background-color: gold;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  z-index: 1000;
+  border: none;
+  color: #000;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.mobile-fab-btn:active {
+  transform: scale(0.95);
 }
 
 .post-icon {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: bold;
 }
 
