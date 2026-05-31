@@ -143,6 +143,7 @@
             <div v-if="post.item_type === 'repost'" class="repost-context">
               <ion-icon :icon="repeat" class="repost-icon"></ion-icon>
               <span class="repost-text">Reposted by @{{ truncateUsername(post.reposted_by_username) }}</span>
+              <VerificationBadge v-if="post.reposted_by_verification_tier" :tier="post.reposted_by_verification_tier" />
             </div>
 
             <div v-if="post.item_type === 'repost' && (post.quote_text || (post.quote_media && post.quote_media.length))" class="quote-container">
@@ -394,7 +395,10 @@
             <div class="detail-header" @click="openProfile(detailPost)">
               <img :src="getImageUrl(detailPost.profile_pic)" class="avatar-img" alt="Profile" />
               <div>
-                <div class="detail-name">{{ (detailPost.first_name || detailPost.last_name) ? (detailPost.first_name + ' ' + detailPost.last_name).trim() : detailPost.username }}</div>
+                <div class="detail-name">
+                  {{ (detailPost.first_name || detailPost.last_name) ? (detailPost.first_name + ' ' + detailPost.last_name).trim() : detailPost.username }}
+                  <VerificationBadge :tier="detailPost.verification_tier" />
+                </div>
                 <div class="detail-handle">@{{ truncateUsername(detailPost.username) }}</div>
               </div>
             </div>
@@ -514,6 +518,7 @@
                     <div class="detail-comment-body">
                       <div class="detail-comment-meta">
                         <span class="detail-comment-username">@{{ truncateUsername(c.username) }}</span>
+                        <VerificationBadge v-if="c.verification_tier" :tier="c.verification_tier" />
                         <span class="separator">·</span>
                         <span class="detail-comment-time">{{ formatRelativeTime(c.created_at || c.timestamp) }}</span>
                       </div>

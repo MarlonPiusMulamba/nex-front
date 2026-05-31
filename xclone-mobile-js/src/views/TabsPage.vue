@@ -108,10 +108,13 @@
         </ion-tabs>
 
         <!-- Mobile Floating Post Button -->
-        <button class="mobile-fab-btn mobile-only" @click="triggerGlobalPost">
-          <ion-icon :icon="add" class="post-icon"></ion-icon>
-        </button>
+        <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="mobile-only" style="margin-bottom: 70px; margin-right: 8px; z-index: 99999;">
+          <ion-fab-button class="gold-fab" @click="triggerGlobalPost">
+            <ion-icon :icon="add" class="post-icon" style="font-size: 32px; font-weight: bold; color: black;"></ion-icon>
+          </ion-fab-button>
+        </ion-fab>
       </main>
+
 
       <!-- Right Sidebar (Desktop only) -->
       <aside class="right-sidebar desktop-only">
@@ -140,7 +143,7 @@
 
 import { 
   IonPage, IonTabs, IonRouterOutlet, IonTabBar, IonTabButton, 
-  IonIcon, IonLabel, IonBadge 
+  IonIcon, IonLabel, IonBadge, IonFab, IonFabButton 
 } from '@ionic/vue';
 import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline, add, shieldOutline } from 'ionicons/icons';
 import axios from 'axios';
@@ -155,7 +158,7 @@ export default {
   name: 'TabsPage',
   components: { 
     IonPage, IonTabs, IonRouterOutlet, IonTabBar, IonTabButton, 
-    IonIcon, IonLabel, IonBadge,
+    IonIcon, IonLabel, IonBadge, IonFab, IonFabButton,
     TrendingWidget,
     SuggestedUsersWidget,
     PostComposerModal,
@@ -411,28 +414,13 @@ ion-page {
   z-index: 10;
 }
 
-.mobile-fab-btn {
-  position: fixed;
-  bottom: 80px;
-  right: 16px;
-  width: 56px;
-  height: 56px;
-  background-color: gold;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.gold-fab {
+  --background: gold;
+  --background-activated: #e6c200;
+  --background-focused: #e6c200;
+  --background-hover: #e6c200;
+  --color: #000;
   box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-  z-index: 1000;
-  border: none;
-  color: #000;
-  padding: 0;
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-
-.mobile-fab-btn:active {
-  transform: scale(0.95);
 }
 
 .post-icon {
