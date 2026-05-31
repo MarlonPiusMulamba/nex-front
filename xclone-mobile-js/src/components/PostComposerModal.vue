@@ -67,84 +67,78 @@
           <!-- Poll Creator -->
           <div v-if="showPollCreator" class="poll-creator">
 
-            <!-- Gradient Header -->
+            <!-- Header -->
             <div class="poll-creator-header">
-              <span class="poll-creator-icon">📊</span>
+              <div class="pc-header-left">
+                <span class="pc-icon">📊</span>
+                <span class="pc-title">Create Poll</span>
+              </div>
               <div class="poll-type-chips">
-                <button
-                  class="type-chip"
-                  :class="{ active: pollType === 'standard' }"
-                  @click="setPollType('standard')">
+                <button class="type-chip" :class="{ active: pollType === 'standard' }" @click="setPollType('standard')">
                   Standard
                 </button>
-                <button
-                  class="type-chip battle-chip"
-                  :class="{ active: pollType === 'battle' }"
-                  @click="setPollType('battle')">
+                <button class="type-chip battle-chip" :class="{ active: pollType === 'battle' }" @click="setPollType('battle')">
                   ⚔️ Battle
                 </button>
               </div>
             </div>
 
-            <!-- Question Input -->
-            <ion-item lines="none" class="poll-input-item">
+            <!-- Question -->
+            <div class="pc-question-wrap">
               <ion-input
                 v-model="pollQuestion"
-                placeholder="Ask a question..."
-                class="poll-question-input"
+                placeholder="What do you want to ask?"
+                class="pc-question-input"
                 @focus="lastFocusedField = 'pollQuestion'"
               ></ion-input>
-            </ion-item>
+            </div>
 
             <!-- Options -->
-            <div class="poll-options-list">
+            <div class="pc-options-list">
               <div
                 v-for="(option, index) in pollOptions"
                 :key="index"
-                class="poll-option-row"
-                :style="{ animationDelay: index * 60 + 'ms' }"
+                class="pc-option-row"
+                :class="'pc-opt-' + index"
+                :style="{ animationDelay: index * 55 + 'ms' }"
               >
-                <!-- Color dot preview -->
-                <span class="option-color-dot" :class="'opt-color-' + index"></span>
+                <span class="pc-opt-dot"></span>
                 <ion-input
                   v-model="pollOptions[index]"
-                  :placeholder="'Choice ' + (index + 1) + '…'"
-                  class="poll-option-input"
+                  :placeholder="pollType === 'battle' ? (index === 0 ? '🔴 Side A' : '🔵 Side B') : 'Choice ' + (index + 1)"
+                  class="pc-opt-input"
                   @focus="lastFocusedField = 'pollOption' + index"
                 ></ion-input>
-                <ion-button
+                <button
                   v-if="pollOptions.length > 2 && pollType !== 'battle'"
-                  fill="clear"
-                  size="small"
-                  color="medium"
+                  class="pc-remove-btn"
                   @click="removePollOption(index)">
                   <ion-icon :icon="close"></ion-icon>
-                </ion-button>
+                </button>
               </div>
             </div>
 
-            <!-- Add Option + Duration -->
-            <div class="poll-actions">
-              <ion-button
+            <!-- Bottom row: add option + duration -->
+            <div class="pc-footer">
+              <button
                 v-if="pollOptions.length < 4 && pollType !== 'battle'"
-                fill="clear"
-                size="small"
-                class="add-option-btn"
+                class="pc-add-btn"
                 @click="addPollOption">
-                <ion-icon :icon="add" slot="start"></ion-icon>
-                Add Choice
-              </ion-button>
-
-              <!-- Duration Chips -->
-              <div class="duration-chips">
-                <button
-                  v-for="d in durationOptions"
-                  :key="d.value"
-                  class="duration-chip"
-                  :class="{ active: pollDuration === d.value }"
-                  @click="pollDuration = d.value">
-                  {{ d.label }}
-                </button>
+                <ion-icon :icon="add"></ion-icon>
+                Add choice
+              </button>
+              <div class="pc-duration-group">
+                <span class="pc-duration-label">Duration</span>
+                <div class="pc-duration-pills">
+                  <button
+                    v-for="d in durationOptions"
+                    :key="d.value"
+                    class="pc-dur-pill"
+                    :class="{ active: pollDuration === d.value }"
+                    @click="pollDuration = d.value">
+                    {{ d.label }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1129,151 +1123,154 @@ export default {
 
 /* ========== POLL CREATOR ========== */
 .poll-creator {
-  border-radius: 16px;
+  border-radius: 18px;
   margin: 12px 0;
   overflow: hidden;
-  background: rgba(255, 215, 0, 0.05);
-  border: 1.5px solid rgba(255, 215, 0, 0.3);
+  background: #f0f1ff !important;
+  border: 1.5px solid #c7d2fe;
+  box-shadow: 0 4px 24px rgba(99,102,241,0.12);
+}
+body.dark .poll-creator {
+  background: #1a1b2e !important;
+  border-color: #312e81;
+  box-shadow: 0 4px 24px rgba(99,102,241,0.25);
 }
 
+/* Header */
 .poll-creator-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: linear-gradient(135deg, #daa520, #FFD700);
-}
-
-.poll-creator-icon {
-  font-size: 22px;
-  flex-shrink: 0;
-}
-
-.poll-type-chips {
-  display: flex;
-  gap: 6px;
-  margin-left: auto;
-}
-
-.type-chip {
-  border: none;
-  border-radius: 20px;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  background: rgba(255,255,255,0.2);
-  color: rgba(255,255,255,0.8);
-  transition: all 0.2s ease;
-}
-
-.type-chip.active,
-.type-chip:active {
-  background: #000;
-  color: #FFD700;
-}
-
-.battle-chip.active {
-  color: #f91880;
-}
-
-.poll-input-item {
-  --padding-start: 14px;
-  --padding-end: 14px;
-  --inner-padding-end: 0;
-}
-
-.poll-question-input {
-  --padding-start: 0;
-  --padding-end: 0;
-  font-weight: 600;
-  font-size: 15px;
-}
-
-.poll-options-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 14px 4px;
-}
-
-.poll-option-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  animation: slide-in-option 0.3s ease both;
-}
-
-@keyframes slide-in-option {
-  from { opacity: 0; transform: translateX(-12px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-/* Color dots matching PollDisplay colors */
-.option-color-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.opt-color-0 { background: linear-gradient(135deg, #FFD700, #daa520); }
-.opt-color-1 { background: linear-gradient(135deg, #1d9bf0, #00cfff); }
-.opt-color-2 { background: linear-gradient(135deg, #f91880, #ff7043); }
-.opt-color-3 { background: linear-gradient(135deg, #00ba7c, #00e5a0); }
-
-.poll-option-input {
-  flex: 1;
-  --padding-start: 12px;
-  --padding-end: 12px;
-  --background: rgba(255,255,255,0.7);
-  border-radius: 10px;
-  --placeholder-color: #9ca3af;
-}
-
-body.dark .poll-option-input {
-  --background: rgba(255,255,255,0.06);
-}
-
-.poll-actions {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px 12px;
-  flex-wrap: wrap;
-  gap: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
 }
+.pc-header-left { display: flex; align-items: center; gap: 8px; }
+.pc-icon { font-size: 18px; }
+.pc-title { font-size: 13px; font-weight: 800; color: #fff; letter-spacing: 0.4px; text-transform: uppercase; }
 
-.add-option-btn {
-  --color: #FFD700;
-  font-weight: 700;
-  font-size: 13px;
-}
-
-/* Duration Chips */
-.duration-chips {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.duration-chip {
-  border: 1.5px solid rgba(29,155,240,0.3);
-  border-radius: 20px;
-  padding: 4px 10px;
-  font-size: 12px;
+/* type chips */
+.poll-type-chips { display: flex; gap: 6px; margin-left: auto; }
+.type-chip {
+  border: 1.5px solid rgba(255,255,255,0.45);
+  border-radius: 99px;
+  padding: 4px 12px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
   background: transparent;
-  color: #687684;
+  color: rgba(255,255,255,0.85);
   transition: all 0.2s ease;
 }
-
-.duration-chip.active {
-  background: linear-gradient(135deg, #daa520, #FFD700);
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(29,155,240,0.35);
+.type-chip.active {
+  background: #fff;
+  color: #6366f1;
+  border-color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
+.battle-chip.active { color: #f43f5e; }
+
+/* Question input */
+.pc-question-wrap {
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+body.dark .pc-question-wrap { border-bottom-color: #2f3336; }
+.pc-question-input {
+  --padding-start: 0;
+  --padding-end: 0;
+  --background: transparent;
+  font-size: 16px;
+  font-weight: 700;
+  --placeholder-color: #9ca3af;
+}
+body.dark .pc-question-input { --color: #f9fafb; }
+
+/* Options */
+.pc-options-list { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 6px; }
+
+.pc-opt-0 { --oc1: #7c3aed; --oc2: #a855f7; }
+.pc-opt-1 { --oc1: #0ea5e9; --oc2: #38bdf8; }
+.pc-opt-2 { --oc1: #f43f5e; --oc2: #fb7185; }
+.pc-opt-3 { --oc1: #10b981; --oc2: #34d399; }
+
+.pc-option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.9) !important;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0 12px;
+  height: 44px;
+  animation: slide-in-option 0.28s ease both;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+body.dark .pc-option-row { background: rgba(30,31,46,0.95) !important; border-color: #374151; }
+.pc-option-row:focus-within {
+  border-color: var(--oc1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--oc1) 15%, transparent);
+}
+
+@keyframes slide-in-option {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pc-opt-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--oc1), var(--oc2));
+}
+.pc-opt-input {
+  flex: 1;
+  --padding-start: 0;
+  --padding-end: 0;
+  --background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  --placeholder-color: #9ca3af;
+}
+body.dark .pc-opt-input { --color: #f9fafb; }
+.pc-remove-btn {
+  background: none; border: none; cursor: pointer;
+  color: #9ca3af; display: flex; align-items: center; padding: 4px;
+  border-radius: 6px; transition: color 0.2s, background 0.2s;
+}
+.pc-remove-btn:hover { color: #ef4444; background: #fee2e2; }
+
+/* Footer */
+.pc-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px 14px;
+  flex-wrap: wrap; gap: 8px;
+}
+.pc-add-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: 1.5px dashed #c4b5fd; border-radius: 99px;
+  padding: 5px 14px; font-size: 13px; font-weight: 700;
+  color: #7c3aed; cursor: pointer;
+  transition: all 0.2s ease;
+}
+body.dark .pc-add-btn { border-color: #4c1d95; color: #c4b5fd; }
+.pc-add-btn:hover { background: #ede9fe; }
+
+.pc-duration-group { display: flex; align-items: center; gap: 8px; }
+.pc-duration-label { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+body.dark .pc-duration-label { color: #9ca3af; }
+.pc-duration-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+.pc-dur-pill {
+  border: 1.5px solid #e5e7eb;
+  border-radius: 99px;
+  padding: 3px 10px; font-size: 12px; font-weight: 700;
+  cursor: pointer; background: transparent; color: #6b7280;
+  transition: all 0.2s ease;
+}
+body.dark .pc-dur-pill { border-color: #374151; color: #9ca3af; }
+.pc-dur-pill.active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-color: transparent; color: #fff;
+  box-shadow: 0 2px 10px rgba(99,102,241,0.4);
+}
+
 
 /* ========== AMA CREATOR ========== */
 .ama-creator {

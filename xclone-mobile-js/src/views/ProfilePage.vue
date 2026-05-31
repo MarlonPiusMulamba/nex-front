@@ -64,6 +64,15 @@
             <div class="action-buttons">
               <ion-button 
                 v-if="profile && String(profile.user_id) === String(userId)"
+                fill="solid" 
+                color="primary"
+                size="small"
+                class="verify-inline-btn"
+                @click="getVerified">
+                ✓ Get Verified
+              </ion-button>
+              <ion-button 
+                v-if="profile && String(profile.user_id) === String(userId)"
                 fill="outline" 
                 size="small" 
                 class="edit-profile-btn"
@@ -120,6 +129,7 @@
           <div class="user-details">
             <h2 class="display-name">
               {{ (profile.first_name || profile.last_name) ? (profile.first_name + ' ' + profile.last_name).trim() : profile.username }}
+              <VerificationBadge :tier="profile.verification_tier" />
               <ion-badge v-if="profile.is_anonymous" color="medium" class="anonymous-badge">
                 <ion-icon :icon="skull"></ion-icon> Anonymous
               </ion-badge>
@@ -251,9 +261,31 @@
               @click="viewMedia({type: 'image', data: post.image})"
             />
 
-            <div class="post-stats">
-              <span><ion-icon :icon="heart"></ion-icon> {{ post.likes || 0 }}</span>
-              <span><ion-icon :icon="chatbubble"></ion-icon> {{ post.comments_count || 0 }}</span>
+            <div class="post-actions">
+              <ion-button fill="clear" size="small" class="action-btn">
+                <ion-icon :icon="chatbubbleOutline"></ion-icon>
+                <span v-if="post.comments_count || post.comments">{{ post.comments_count || post.comments }}</span>
+              </ion-button>
+              
+              <ion-button
+                fill="clear"
+                size="small"
+                :class="['action-btn', 'retweet-btn', { 'reposted': post.is_reposted_by_me }]"
+              >
+                <ion-icon :icon="repeat"></ion-icon>
+              </ion-button>
+              
+              <ion-button 
+                fill="clear" 
+                size="small" 
+                :class="['action-btn', 'like-btn', { 'liked': post.liked }]">
+                <ion-icon :icon="post.liked ? heart : heartOutline"></ion-icon>
+                <span v-if="(post.likes || 0) > 0">{{ post.likes }}</span>
+              </ion-button>
+              
+              <ion-button fill="clear" size="small" class="action-btn">
+                <ion-icon :icon="shareOutline"></ion-icon>
+              </ion-button>
             </div>
           </div>
         </div>
@@ -307,6 +339,10 @@
           <ion-item button @click="shareProfile">
             <ion-icon :icon="shareOutline" slot="start"></ion-icon>
             <ion-label>Share Profile</ion-label>
+          </ion-item>
+          <ion-item button @click="getVerified">
+            <ion-icon :icon="checkmarkCircle" slot="start" color="primary"></ion-icon>
+            <ion-label>Get Verified</ion-label>
           </ion-item>
           <ion-item button @click="settings">
             <ion-icon :icon="settingsOutline" slot="start"></ion-icon>
@@ -449,7 +485,7 @@ import {
 import {
   checkmark, personAdd, mail, camera, 
   images, calendar, arrowBack, person, logOut, sunny, moon, ellipsisVertical,
-  grid, heart, documentText, chatbubble, alertCircle,
+  grid, heart, heartOutline, chatbubbleOutline, repeat, documentText, chatbubble, alertCircle,
   shareOutline, checkmarkCircle, skull, colorWand, happy, add, remove, settingsOutline
 } from 'ionicons/icons';
 import api from '@/utils/api';
@@ -457,6 +493,7 @@ import config from '@/config/index.js';
 import VideoPlayer from '@/components/VideoPlayer.vue';
 import PollDisplay from '@/components/PollDisplay.vue';
 import LanModePanel from '@/components/LanModePanel.vue';
+import VerificationBadge from '@/components/VerificationBadge.vue';
 import { saveProfileOffline, getOfflineProfile, isNetworkOffline, savePostsOffline, getOfflinePosts } from '@/utils/offlineDb.js';
 
 export default {
@@ -464,7 +501,7 @@ export default {
   components: {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
     IonButtons, IonIcon, IonSpinner, IonRefresher, IonRefresherContent,
-    IonModal, IonList, IonItem, IonLabel, IonInput, VideoPlayer, PollDisplay, LanModePanel
+    IonModal, IonList, IonItem, IonLabel, IonInput, VideoPlayer, PollDisplay, LanModePanel, VerificationBadge
   },
   data() {
     return {
@@ -481,8 +518,10 @@ export default {
       ellipsisVertical,
       calendar,
       grid,
-      images,
       heart,
+      heartOutline,
+      chatbubbleOutline,
+      repeat,
       documentText,
       chatbubble,
       alertCircle,
@@ -772,6 +811,11 @@ export default {
       this.$root.toggleTheme?.();
     },
 
+    getVerified() {
+      this.showOptionsMenu = false;
+      this.$router.push('/tabs/verify');
+    },
+
     editProfile() {
       this.showEditModal = true;
     },
@@ -1020,7 +1064,11 @@ export default {
     settings() {
       console.log('Settings');
       this.showOptionsMenu = false;
-      // TODO: Navigate to settings
+    },
+
+    getVerified() {
+      this.showOptionsMenu = false;
+      this.$router.push('/tabs/verify');
     },
 
     toggleTheme() {
@@ -1034,6 +1082,33 @@ export default {
         localStorage.removeItem('userAvatar');
         this.$router.push('/login');
       }
+    },
+
+    async toggleLike(postId, isLiked) {
+       console.log('Toggled like:', postId);
+       // Simple immediate UI update
+       const post = this.userPosts.find(p => p.post_id === postId);
+       if (post) {
+         post.liked = !post.liked;
+         post.likes += post.liked ? 1 : -1;
+       }
+    },
+
+    openComments(post) {
+       console.log('Open comments for', post.post_id);
+    },
+
+    retweet(postId) {
+       console.log('Retweet', postId);
+       // Simple immediate UI update
+       const post = this.userPosts.find(p => p.post_id === postId);
+       if (post) {
+         post.is_reposted_by_me = !post.is_reposted_by_me;
+       }
+    },
+
+    share(post) {
+       console.log('Share post', post.post_id);
     }
   },
 
@@ -1560,6 +1635,62 @@ export default {
 
 .post-stats ion-icon {
   font-size: 16px;
+}
+
+.post-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  max-width: 400px;
+}
+
+.action-btn {
+  --color: var(--ion-color-medium, #536471);
+  --padding-start: 8px;
+  --padding-end: 8px;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.action-btn::part(native) {
+  border-radius: 50%;
+}
+
+.action-btn ion-icon {
+  font-size: 18px;
+  margin-right: 4px;
+}
+
+.action-btn:hover {
+  --color: var(--ion-color-primary, #1D9BF0);
+}
+
+.like-btn.liked {
+  --color: #f91880 !important;
+}
+
+.like-btn.liked ion-icon {
+  color: #f91880;
+}
+
+.retweet-btn.reposted {
+  --color: #00ba7c !important;
+}
+
+/* CTA */
+.verification-cta-section {
+  margin: 16px 0;
+}
+
+.cta-verify-btn {
+  --box-shadow: 0 4px 12px rgba(218, 165, 32, 0.4);
+  margin-top: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.cta-verify-btn ion-icon {
+  font-size: 20px;
 }
 
 .media-grid {

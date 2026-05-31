@@ -11,6 +11,7 @@ import NotificationsPage from '../views/NotificationsPage.vue';
 import UserFollowListPage from '../views/UserFollowListPage.vue';
 import FraternityDiscoverPage from '../views/FraternityDiscoverPage.vue';
 import FraternityPage from '../views/FraternityPage.vue';
+import VerificationPortal from '../views/VerificationPortal.vue';
 
 const routes = [
   {
@@ -80,6 +81,11 @@ const routes = [
         path: 'fraternity/:slug',
         component: FraternityPage,
         meta: { requiresAuth: false }
+      },
+      {
+        path: 'verify',
+        component: VerificationPortal,
+        meta: { requiresAuth: true }
       }
     ]
   }

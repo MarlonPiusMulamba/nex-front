@@ -24,9 +24,16 @@ class SocketService {
 
         this.socket = io(apiUrl, {
             transports: ['websocket', 'polling'],
+            // ── Render resilience settings ─────────────────────────────────────
             reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionAttempts: 5
+            reconnectionAttempts: Infinity,   // Never give up reconnecting
+            reconnectionDelay: 1000,          // Start with 1s delay
+            reconnectionDelayMax: 10000,      // Cap at 10s between attempts
+            randomizationFactor: 0.3,         // Add jitter to avoid thundering herd
+            timeout: 20000,                   // 20s connection timeout
+            // Tune ping to detect dead Render connections faster (default is 25s/5s)
+            pingInterval: 20000,              // Ping server every 20s
+            pingTimeout: 15000,               // Declare dead after 15s no pong
         });
 
         this.socket.on('connect', () => {
@@ -35,9 +42,29 @@ class SocketService {
 
             // Register user for presence tracking
             this.socket.emit('user:register', { user_id: this.userId });
+            // Also join personal room explicitly (needed after reconnects)
+            this.socket.emit('join', { user_id: this.userId });
 
             // Start heartbeat
             this.startHeartbeat();
+        });
+
+        // Re-register presence after every automatic reconnect so that
+        // calls and live chat resume without the user needing to refresh.
+        this.socket.on('reconnect', (attemptNumber) => {
+            console.log(`🔄 Socket.IO reconnected after ${attemptNumber} attempt(s). Re-registering presence...`);
+            if (this.userId) {
+                this.socket.emit('user:register', { user_id: this.userId });
+                this.socket.emit('join', { user_id: this.userId });
+            }
+        });
+
+        this.socket.on('reconnect_attempt', (attemptNumber) => {
+            console.log(`⏳ Socket.IO reconnect attempt #${attemptNumber}...`);
+        });
+
+        this.socket.on('reconnect_error', (error) => {
+            console.warn('⚠️ Socket.IO reconnect error:', error.message);
         });
 
         this.socket.on('disconnect', () => {

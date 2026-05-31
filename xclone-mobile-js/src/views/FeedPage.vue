@@ -176,6 +176,7 @@
               <div class="post-user-info" @click="openProfile(post)">
                 <span class="username">
                   {{ (post.first_name || post.last_name) ? (post.first_name + ' ' + post.last_name).trim() : post.username }}
+                  <VerificationBadge :tier="post.verification_tier" />
                 </span>
                 <span class="handle">@{{ truncateUsername(post.username) }}</span>
                 <span class="separator">·</span>
@@ -601,6 +602,7 @@
                     <div class="post-user-info" @click="openProfile(activeCommentPost)">
                       <span class="username">
                         {{ (activeCommentPost.first_name || activeCommentPost.last_name) ? (activeCommentPost.first_name + ' ' + activeCommentPost.last_name).trim() : activeCommentPost.username }}
+                        <VerificationBadge :tier="activeCommentPost.verification_tier" />
                       </span>
                       <span class="handle">@{{ truncateUsername(activeCommentPost.username) }}</span>
                       <span class="separator">·</span>
@@ -656,7 +658,10 @@
                 </div>
                 <div class="comment-content-wrapper">
                   <div class="comment-header">
-                    <span class="username" @click="goToCommentUser(c)">{{ c.display_name || c.username }}</span>
+                    <span class="username" @click="goToCommentUser(c)">
+                      {{ c.display_name || c.username }}
+                      <VerificationBadge :tier="c.verification_tier" />
+                    </span>
                     <span class="handle">@{{ truncateUsername(c.username) }}</span>
                     <span class="separator">·</span>
                     <span class="timestamp">{{ formatRelativeTime(c.created_at) }}</span>
@@ -803,6 +808,7 @@ import { savePostsOffline, getOfflinePosts, isNetworkOffline } from '@/utils/off
 import PollDisplay from '@/components/PollDisplay.vue';
 import AudioSpaceCard from '@/components/AudioSpaceCard.vue';
 import AudioSpaceModal from '@/components/AudioSpaceModal.vue';
+import VerificationBadge from '@/components/VerificationBadge.vue';
 
 export default {
   name: 'FeedPage',
@@ -811,7 +817,7 @@ export default {
     IonContent, IonFab, IonFabButton, IonIcon, IonModal, IonTextarea, 
     IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent,
     IonActionSheet, VideoPlayer, PollDisplay, EmojiPicker, PostComposerModal, AMACard,
-    AudioSpaceCard, AudioSpaceModal
+    AudioSpaceCard, AudioSpaceModal, VerificationBadge
   },
   data() {
     const API_URL = config.api.baseURL;

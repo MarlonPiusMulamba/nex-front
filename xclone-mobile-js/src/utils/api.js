@@ -13,6 +13,24 @@ const api = axios.create({
 
 console.log('📡 API baseURL:', api.defaults.baseURL, '(VITE_API_URL:', import.meta.env.VITE_API_URL || 'not set', ')');
 
+// ─── Retry Configuration ────────────────────────────────────────────────────
+// Silently retries failed requests caused by Render cold-starts (502/503/504)
+// or transient network blips, so the user never sees a failed request.
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 1500; // doubles each attempt: 1.5s, 3s, 6s
+
+function shouldRetry(error) {
+  // Retry on network errors (no response at all — server asleep)
+  if (!error.response) return true;
+  // Retry on Render cold-start / overload HTTP codes
+  const retryableCodes = [502, 503, 504];
+  return retryableCodes.includes(error.response.status);
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
@@ -43,10 +61,29 @@ api.interceptors.response.use(
     }
     return response.data;
   },
-  (error) => {
-    // Handle errors globally
-    console.error('❌ API Error:', {
-      url: error.config?.url,
+  async (error) => {
+    const requestConfig = error.config;
+
+    // ── Auto-retry logic ─────────────────────────────────────────────────────
+    // Track how many times we have already retried this specific request
+    requestConfig._retryCount = requestConfig._retryCount || 0;
+
+    if (shouldRetry(error) && requestConfig._retryCount < MAX_RETRIES) {
+      requestConfig._retryCount += 1;
+      const delay = RETRY_BASE_DELAY_MS * Math.pow(2, requestConfig._retryCount - 1);
+      console.warn(
+        `⚠️ Request failed (${error.response?.status || 'network error'}). ` +
+        `Retrying ${requestConfig._retryCount}/${MAX_RETRIES} in ${delay}ms...`,
+        requestConfig.url
+      );
+      await wait(delay);
+      return api(requestConfig); // Re-issue the exact same request
+    }
+    // ── End retry logic ──────────────────────────────────────────────────────
+
+    // All retries exhausted — log and handle normally
+    console.error('❌ API Error (all retries failed):', {
+      url: requestConfig?.url,
       status: error.response?.status,
       message: error.message,
       data: error.response?.data,

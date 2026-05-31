@@ -1,95 +1,108 @@
 <template>
-  <div class="poll-container" :class="{ 'battle-mode': isBattleMode }" @click.stop>
+  <div class="poll-card" :class="{ 'battle-mode': isBattleMode, 'is-expired': poll.is_expired }" @click.stop>
 
-    <!-- Live Badge -->
+    <!-- Header Row -->
     <div class="poll-header">
-      <span v-if="!poll.is_expired" class="live-badge">
-        <span class="live-dot"></span>
-        Live
-      </span>
-      <span v-else class="expired-badge">Ended</span>
-      <span class="poll-emoji">📊</span>
+      <div class="poll-meta-left">
+        <span class="poll-type-badge" :class="isBattleMode ? 'badge-battle' : 'badge-poll'">
+          <span v-if="!isBattleMode">📊 Poll</span>
+          <span v-else>⚔️ Battle</span>
+        </span>
+        <span v-if="!poll.is_expired" class="live-chip">
+          <span class="live-dot"></span>
+          LIVE
+        </span>
+        <span v-else class="ended-chip">ENDED</span>
+      </div>
+      <div class="poll-timer" v-if="!poll.is_expired">
+        <svg class="timer-ring" viewBox="0 0 32 32">
+          <circle class="ring-track" cx="16" cy="16" r="13"/>
+          <circle class="ring-progress" cx="16" cy="16" r="13"
+            :stroke-dasharray="`${countdownPercent * 81.68 / 100} 81.68`"
+            :style="{ stroke: timerColor }"/>
+        </svg>
+        <span class="timer-label" :style="{ color: timerColor }">{{ timeLeft }}</span>
+      </div>
+      <span v-else class="final-label">Final Results</span>
     </div>
 
     <!-- Question -->
-    <div v-if="poll.question" class="poll-question">{{ poll.question }}</div>
+    <h3 v-if="poll.question" class="poll-question">{{ poll.question }}</h3>
 
-    <!-- === BATTLE MODE (2 options) === -->
+    <!-- ── BATTLE MODE ── -->
     <div v-if="isBattleMode" class="battle-arena">
       <div
         v-for="(option, idx) in poll.options"
         :key="option.id"
-        class="battle-option"
-        :class="{
-          'voted': poll.has_voted && poll.user_voted_option_id === option.id,
-          'winner': isWinner(option) && showResults,
-          'selectable': !showResults,
-          ['color-' + idx]: true
-        }"
+        class="battle-side"
+        :class="[
+          `side-${idx}`,
+          { 'winner-side': isWinner(option) && showResults, 'my-vote': poll.user_voted_option_id === option.id }
+        ]"
         @click="handleVote(option.id)"
       >
-        <!-- Burst particles -->
-        <div v-if="votedOptionId === option.id" class="burst-wrapper">
-          <span v-for="n in 8" :key="n" class="burst-particle" :style="getBurstStyle(n)"></span>
+        <!-- Burst confetti -->
+        <div v-if="votedOptionId === option.id" class="burst">
+          <span v-for="n in 10" :key="n" class="burst-dot" :style="burstStyle(n)"></span>
         </div>
 
-        <!-- Progress fill (only after voting/expired) -->
-        <div
-          v-if="showResults"
-          class="battle-fill"
-          :style="{ width: getPercentage(option) + '%' }"
-        ></div>
+        <!-- Fill bar -->
+        <div v-if="showResults" class="battle-fill" :style="{ height: getPercentage(option) + '%' }"></div>
 
-        <div class="battle-content">
-          <span class="crown" v-if="isWinner(option) && showResults">👑</span>
-          <span class="battle-label">{{ option.option_text }}</span>
-          <span v-if="showResults" class="battle-percent">{{ getPercentage(option) }}%</span>
-          <ion-icon v-if="poll.has_voted && poll.user_voted_option_id === option.id" :icon="checkmarkCircle" class="voted-icon"></ion-icon>
+        <div class="battle-body">
+          <span v-if="isWinner(option) && showResults" class="crown-icon">👑</span>
+          <span class="battle-text">{{ option.option_text }}</span>
+          <template v-if="showResults">
+            <span class="battle-pct">{{ getPercentage(option) }}%</span>
+            <span class="battle-votes">{{ option.vote_count || 0 }} votes</span>
+          </template>
+          <ion-icon v-if="poll.user_voted_option_id === option.id" :icon="checkmarkCircle" class="my-check"/>
         </div>
       </div>
 
-      <div class="vs-divider"><span>VS</span></div>
+      <!-- VS badge -->
+      <div class="vs-badge">VS</div>
     </div>
 
-    <!-- === STANDARD MODE === -->
-    <div v-else class="poll-options">
+    <!-- ── STANDARD MODE ── -->
+    <div v-else class="options-list">
       <div
         v-for="(option, idx) in poll.options"
         :key="option.id"
-        class="poll-option"
-        :class="{
-          'voted': poll.has_voted && poll.user_voted_option_id === option.id,
-          'winner': isWinner(option) && showResults,
-          'selectable': !showResults,
-          ['color-' + idx]: true
-        }"
+        class="option-row"
+        :class="[
+          `opt-${idx}`,
+          {
+            'my-vote': poll.user_voted_option_id === option.id,
+            'is-winner': isWinner(option) && showResults,
+            'can-vote': !showResults
+          }
+        ]"
         @click="handleVote(option.id)"
       >
-        <!-- Burst particles -->
-        <div v-if="votedOptionId === option.id" class="burst-wrapper">
-          <span v-for="n in 8" :key="n" class="burst-particle" :style="getBurstStyle(n)"></span>
+        <!-- Animated progress fill -->
+        <div v-if="showResults" class="option-fill" :style="{ width: getPercentage(option) + '%' }"></div>
+
+        <!-- Burst -->
+        <div v-if="votedOptionId === option.id" class="burst">
+          <span v-for="n in 8" :key="n" class="burst-dot" :style="burstStyle(n)"></span>
         </div>
 
-        <!-- Progress Bar (only after voting/expired) -->
-        <div
-          v-if="showResults"
-          class="poll-progress"
-          :style="{ width: getPercentage(option) + '%' }"
-        ></div>
-
-        <!-- Content -->
-        <div class="poll-content">
-          <div class="poll-label-group">
-            <span class="crown" v-if="isWinner(option) && showResults">👑</span>
-            <span class="poll-label">{{ option.option_text }}</span>
+        <div class="option-content">
+          <!-- Left: color indicator + text -->
+          <div class="option-left">
+            <span class="opt-dot"></span>
+            <span v-if="isWinner(option) && showResults" class="crown-icon">👑</span>
+            <span class="option-text">{{ option.option_text }}</span>
           </div>
-          <div class="poll-right">
-            <span v-if="showResults" class="poll-percent">{{ getPercentage(option) }}%</span>
+          <!-- Right: checkmark + percentage -->
+          <div class="option-right">
             <ion-icon
-              v-if="poll.has_voted && poll.user_voted_option_id === option.id"
+              v-if="poll.user_voted_option_id === option.id"
               :icon="checkmarkCircle"
-              class="voted-icon"
-            ></ion-icon>
+              class="my-check"
+            />
+            <span v-if="showResults" class="option-pct">{{ getPercentage(option) }}%</span>
           </div>
         </div>
       </div>
@@ -97,23 +110,17 @@
 
     <!-- Footer -->
     <div class="poll-footer">
-      <span class="vote-count">
-        <span class="vote-num" :class="{ 'count-pop': justVoted }">{{ totalVotes }}</span>
-        {{ totalVotes === 1 ? 'vote' : 'votes' }}
-      </span>
-      <span class="dot">•</span>
-      <span class="time-left">{{ timeLeft }}</span>
-
-      <!-- Countdown Ring -->
-      <svg v-if="!poll.is_expired && countdownPercent !== null" class="countdown-ring" viewBox="0 0 24 24">
-        <circle class="ring-bg" cx="12" cy="12" r="10" />
-        <circle
-          class="ring-fill"
-          cx="12" cy="12" r="10"
-          :stroke-dasharray="`${countdownPercent * 62.83 / 100} 62.83`"
-          :style="{ stroke: countdownPercent > 30 ? '#1d9bf0' : countdownPercent > 10 ? '#f59e0b' : '#ef4444' }"
-        />
-      </svg>
+      <div class="footer-votes">
+        <span class="votes-num" :class="{ pop: justVoted }">{{ totalVotes }}</span>
+        <span class="votes-label">{{ totalVotes === 1 ? 'vote' : 'votes' }}</span>
+      </div>
+      <div class="footer-sep"></div>
+      <div class="footer-hint" v-if="!showResults">
+        Tap to vote
+      </div>
+      <div class="footer-hint" v-else-if="poll.has_voted">
+        Your response is recorded
+      </div>
     </div>
   </div>
 </template>
@@ -145,63 +152,61 @@ export default {
       return this.poll.has_voted || this.poll.is_expired;
     },
     totalVotes() {
-      return (this.poll.options || []).reduce((acc, opt) => acc + (opt.vote_count || 0), 0);
+      return (this.poll.options || []).reduce((a, o) => a + (o.vote_count || 0), 0);
     },
     isBattleMode() {
       return (this.poll.options || []).length === 2;
     },
     timeLeft() {
-      if (this.poll.is_expired) return 'Final results';
+      if (this.poll.is_expired) return 'Ended';
       if (!this.poll.expires_at) return '';
-      // Use native Date parsing — browsers handle ISO 8601 with Z correctly
-      const expiresAt = new Date(this.poll.expires_at);
-      if (isNaN(expiresAt.getTime())) return '';
-      const now = new Date();
-      const diffMs = expiresAt - now;
-      if (diffMs <= 0) return 'Final results';
-      const diffMins = Math.floor(diffMs / (1000 * 60));
-      const diffHrs = Math.floor(diffMins / 60);
-      const diffDays = Math.floor(diffHrs / 24);
-      if (diffDays > 0) return `${diffDays}d left`;
-      if (diffHrs > 0) return `${diffHrs}h left`;
-      if (diffMins > 0) return `${diffMins}m left`;
-      return 'Ending soon';
+      const diff = new Date(this.poll.expires_at) - new Date();
+      if (diff <= 0) return 'Ended';
+      const m = Math.floor(diff / 60000);
+      const h = Math.floor(m / 60);
+      const d = Math.floor(h / 24);
+      if (d > 0) return `${d}d`;
+      if (h > 0) return `${h}h`;
+      if (m > 0) return `${m}m`;
+      return '<1m';
     },
     countdownPercent() {
-      if (this.poll.is_expired || !this.poll.expires_at || !this.poll.created_at) return null;
+      if (this.poll.is_expired || !this.poll.expires_at || !this.poll.created_at) return 0;
       const start = new Date(this.poll.created_at);
       const end = new Date(this.poll.expires_at);
       const now = new Date();
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
       const total = end - start;
-      const elapsed = now - start;
-      if (total <= 0) return null;
-      return Math.max(0, Math.min(100, 100 - (elapsed / total) * 100));
+      if (total <= 0) return 0;
+      return Math.max(0, Math.min(100, 100 - ((now - start) / total) * 100));
+    },
+    timerColor() {
+      const p = this.countdownPercent;
+      if (p > 50) return '#22c55e';
+      if (p > 20) return '#f59e0b';
+      return '#ef4444';
     }
   },
   methods: {
     async handleVote(optionId) {
       if (this.showResults || this.isVoting) return;
+      this.isVoting = true;
+      this.votedOptionId = optionId;
+      this.$emit('vote-cast', { pollId: this.poll.id, optionId });
+      this.justVoted = false;
+      this.$nextTick(() => { this.justVoted = true; });
+      setTimeout(() => { this.justVoted = false; }, 900);
+      setTimeout(() => { this.votedOptionId = null; }, 1000);
       try {
-        this.isVoting = true;
-        this.votedOptionId = optionId;
-        const userId = localStorage.getItem('userId');
-        this.$emit('vote-cast', { pollId: this.poll.id, optionId });
-        this.justVoted = false;
-        this.$nextTick(() => { this.justVoted = true; });
-        setTimeout(() => { this.justVoted = false; }, 800);
-        setTimeout(() => { this.votedOptionId = null; }, 900);
         const res = await axios.post(`${this.API_URL}/api/polls/vote`, {
-          user_id: userId,
+          user_id: localStorage.getItem('userId'),
           poll_id: this.poll.id,
           option_id: optionId
         });
         if (res.data.success) {
           this.$emit('poll-updated', { postId: this.postId, options: res.data.result.options });
         }
-      } catch (err) {
-        console.error('Vote error:', err);
-        alert('Failed to cast vote');
+      } catch (e) {
+        console.error('Vote error:', e);
       } finally {
         this.isVoting = false;
       }
@@ -212,421 +217,310 @@ export default {
     },
     isWinner(option) {
       if (!this.showResults || this.totalVotes === 0) return false;
-      const maxVotes = Math.max(...(this.poll.options || []).map(o => o.vote_count || 0));
-      return (option.vote_count || 0) === maxVotes;
+      const max = Math.max(...(this.poll.options || []).map(o => o.vote_count || 0));
+      return (option.vote_count || 0) === max;
     },
-    getBurstStyle(n) {
-      const angle = (n - 1) * 45;
-      const colors = ['#f91880','#1d9bf0','#ffd400','#00ba7c','#7856ff','#ff7a00','#ff004f','#00cfff'];
-      return { '--angle': `${angle}deg`, '--color': colors[n - 1] };
+    burstStyle(n) {
+      const angle = (n - 1) * (360 / 10);
+      const colors = ['#f91880','#1d9bf0','#ffd400','#00ba7c','#7856ff','#ff7a00','#ff004f','#00cfff','#a78bfa','#34d399'];
+      return { '--angle': `${angle}deg`, '--color': colors[(n - 1) % colors.length] };
     }
   }
 };
 </script>
 
 <style scoped>
-/* ==================== CONTAINER ==================== */
-.poll-container {
+/* ── Google Font ─────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+/* ── Card ─────────────────────────────────────────── */
+.poll-card {
+  font-family: 'Inter', sans-serif;
   margin-top: 14px;
   width: 100%;
+  border-radius: 20px;
+  padding: 18px 16px 14px;
   background: #ffffff;
-  border-radius: 18px;
-  padding: 14px;
-  box-shadow: 0 2px 16px rgba(0,0,0,0.07);
-  border: 1px solid #e4e6eb;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.07);
   position: relative;
   overflow: visible;
+  transition: box-shadow 0.3s ease;
 }
-
-body.dark .poll-container {
-  background: #1e2128;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-  border-color: #3a3d44;
+body.dark .poll-card {
+  background: #16181c;
+  border-color: #2f3336;
+  box-shadow: 0 4px 28px rgba(0,0,0,0.4);
 }
+.poll-card.battle-mode { border-color: transparent; }
 
-/* ==================== HEADER ==================== */
+/* ── Header ────────────────────────────────────────── */
 .poll-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
   gap: 8px;
-  margin-bottom: 10px;
 }
+.poll-meta-left { display: flex; align-items: center; gap: 8px; }
 
-.live-badge {
+/* type badge */
+.poll-type-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 99px;
+}
+.badge-poll { background: #ede9fe; color: #7c3aed; }
+.badge-battle { background: #fee2e2; color: #dc2626; }
+body.dark .badge-poll { background: #2e2550; color: #c4b5fd; }
+body.dark .badge-battle { background: #3d0f0f; color: #f87171; }
+
+/* live chip */
+.live-chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: linear-gradient(135deg, #ff3c5f, #f91880);
+  background: linear-gradient(135deg, #ef4444, #f91880);
   color: #fff;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: 99px;
   text-transform: uppercase;
-  padding: 3px 10px;
-  border-radius: 20px;
-  box-shadow: 0 2px 8px rgba(249,24,128, 0.45);
+  box-shadow: 0 0 10px rgba(249,24,128,0.4);
 }
-
 .live-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px; height: 5px;
   border-radius: 50%;
   background: #fff;
-  animation: pulse-dot 1.2s ease-in-out infinite;
+  animation: blink 1.2s infinite;
 }
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.4; transform: scale(0.7); }
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
-
-.expired-badge {
-  display: inline-flex;
-  align-items: center;
-  background: #e4e6eb;
-  color: #555;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 20px;
+.ended-chip {
+  font-size: 10px; font-weight: 700;
+  padding: 3px 9px; border-radius: 99px;
+  background: #f3f4f6; color: #6b7280;
+  text-transform: uppercase; letter-spacing: 0.5px;
 }
+body.dark .ended-chip { background: #374151; color: #9ca3af; }
 
-body.dark .expired-badge {
-  background: #3a3d44;
-  color: #aaa;
+/* timer */
+.poll-timer {
+  display: flex; align-items: center; gap: 6px;
 }
+.timer-ring { width: 26px; height: 26px; transform: rotate(-90deg); }
+.ring-track { fill: none; stroke: #e5e7eb; stroke-width: 3; }
+body.dark .ring-track { stroke: #374151; }
+.ring-progress { fill: none; stroke-width: 3; stroke-linecap: round; transition: stroke-dasharray 1s ease, stroke 0.5s ease; }
+.timer-label { font-size: 12px; font-weight: 800; }
 
-.poll-emoji {
-  font-size: 18px;
-  margin-left: auto;
-}
+.final-label { font-size: 12px; font-weight: 700; color: #6b7280; }
+body.dark .final-label { color: #9ca3af; }
 
-/* ==================== QUESTION ==================== */
+/* ── Question ─────────────────────────────────────── */
 .poll-question {
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 12px;
-  color: #0f1419;
+  font-size: 17px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 16px;
   line-height: 1.4;
 }
+body.dark .poll-question { color: #f9fafb; }
 
-body.dark .poll-question { color: #e7e9ea; }
+/* ── Standard Options ─────────────────────────────── */
+.options-list { display: flex; flex-direction: column; gap: 10px; }
 
-/* ==================== OPTION COLORS ====================
-   Use opaque theme-aware backgrounds — vivid on both light & dark.
-*/
-.color-0 { --opt-color-a: #7856ff; --opt-color-b: #b04bff; --opt-bg-light: #ede8ff; --opt-bg-dark: #2e2550; --opt-border-light: #a488ff; --opt-border-dark: #7856ff; }
-.color-1 { --opt-color-a: #1d9bf0; --opt-color-b: #00cfff; --opt-bg-light: #dff1fd; --opt-bg-dark: #10303f; --opt-border-light: #6cc6fa; --opt-border-dark: #1d9bf0; }
-.color-2 { --opt-color-a: #f91880; --opt-color-b: #ff7043; --opt-bg-light: #fde0ee; --opt-bg-dark: #3d1025; --opt-border-light: #fb6db1; --opt-border-dark: #f91880; }
-.color-3 { --opt-color-a: #00ba7c; --opt-color-b: #00e5a0; --opt-bg-light: #d5f5ea; --opt-bg-dark: #0a2e20; --opt-border-light: #45d49a; --opt-border-dark: #00ba7c; }
+/* option color palette using CSS vars */
+.opt-0 { --c1: #7c3aed; --c2: #a855f7; --bg: #ede9fe; --bgd: #1e1540; --border: #c4b5fd; --borderd: #7c3aed; }
+.opt-1 { --c1: #0ea5e9; --c2: #38bdf8; --bg: #e0f2fe; --bgd: #082f49; --border: #7dd3fc; --borderd: #0ea5e9; }
+.opt-2 { --c1: #f43f5e; --c2: #fb7185; --bg: #ffe4e6; --bgd: #4c0519; --border: #fda4af; --borderd: #f43f5e; }
+.opt-3 { --c1: #10b981; --c2: #34d399; --bg: #d1fae5; --bgd: #064e3b; --border: #6ee7b7; --borderd: #10b981; }
 
-/* Light: use light bg + light border */
-.poll-option, .battle-option {
-  border-color: var(--opt-border-light);
-  background: var(--opt-bg-light);
-}
-
-/* Dark: use dark bg + vivid border */
-body.dark .poll-option,
-body.dark .battle-option {
-  border-color: var(--opt-border-dark);
-  background: var(--opt-bg-dark);
-}
-
-/* ==================== STANDARD OPTIONS ==================== */
-.poll-options {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.poll-option {
+.option-row {
   position: relative;
-  min-height: 30px;
-  border-radius: 12px;
+  min-height: 48px;
+  border-radius: 14px;
   overflow: hidden;
+  border: 2px solid var(--border);
+  background: var(--bg);
   cursor: pointer;
-  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease;
-  border: 2px solid var(--opt-border-light);
+  transition: transform 0.18s cubic-bezier(.34,1.56,.64,1), box-shadow 0.2s ease;
 }
-
-.poll-option.selectable:active { transform: scale(0.97); }
-
-.poll-option.selectable:hover {
-  box-shadow: 0 4px 14px rgba(0,0,0,0.12);
-  transform: translateY(-1px);
+body.dark .option-row {
+  border-color: var(--borderd);
+  background: var(--bgd);
 }
+.option-row.can-vote:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+.option-row.can-vote:active { transform: scale(0.97); }
+.option-row.my-vote { border-color: var(--c1); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c1) 20%, transparent); }
+.option-row.is-winner { box-shadow: 0 0 0 2px var(--c1), 0 6px 20px color-mix(in srgb, var(--c1) 25%, transparent); }
 
-.poll-option.voted {
-  border-color: var(--opt-color-a);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--opt-color-a) 25%, transparent);
-}
-
-.poll-option.winner {
-  box-shadow: 0 4px 18px color-mix(in srgb, var(--opt-color-a) 30%, transparent),
-              0 0 0 2px var(--opt-color-a);
-}
-
-/* ==================== PROGRESS BAR ==================== */
-.poll-progress {
+/* fill bar */
+.option-fill {
   position: absolute;
   top: 0; left: 0;
   height: 100%;
-  background: linear-gradient(90deg, var(--opt-color-a), var(--opt-color-b));
-  opacity: 0.28;
+  background: linear-gradient(90deg, var(--c1), var(--c2));
+  opacity: 0.22;
   z-index: 1;
-  border-radius: 10px 0 0 10px;
-  transition: width 1.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  border-radius: 12px 0 0 12px;
+  transition: width 1.4s cubic-bezier(.25,.8,.25,1);
 }
+body.dark .option-fill { opacity: 0.38; }
+.option-row.my-vote .option-fill { opacity: 0.32; }
+.option-row.is-winner .option-fill { opacity: 0.46; }
 
-body.dark .poll-progress { opacity: 0.45; }
-
-.poll-option.voted .poll-progress  { opacity: 0.38; }
-.poll-option.winner .poll-progress { opacity: 0.52; }
-
-body.dark .poll-option.voted .poll-progress  { opacity: 0.55; }
-body.dark .poll-option.winner .poll-progress { opacity: 0.7; }
-
-/* ==================== CONTENT ==================== */
-.poll-content {
-  position: relative;
-  min-height: 30px;
-  z-index: 2;
-  display: flex;
-  align-items: center;
+/* content layer */
+.option-content {
+  position: relative; z-index: 2;
+  display: flex; align-items: center;
   justify-content: space-between;
   padding: 0 14px;
+  height: 48px;
 }
-
-.poll-label-group {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex: 1;
-  min-width: 0;
+.option-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.opt-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--c1), var(--c2));
+  flex-shrink: 0;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--c1) 60%, transparent);
 }
-
-.poll-label {
-  font-weight: 600;
+.option-text {
   font-size: 14px;
-  color: #0f1419;
+  font-weight: 700;
+  color: #111827;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 30px;
 }
+body.dark .option-text { color: #f9fafb; }
+.option-row.can-vote .option-text { color: var(--c1); }
 
-body.dark .poll-label { color: #e7e9ea; }
-
-.poll-option.selectable .poll-label {
-  color: var(--opt-color-a);
-  font-weight: 700;
-}
-
-body.dark .poll-option.selectable .poll-label {
-  /* stays as vivid color — already bright enough on dark */
-  color: var(--opt-color-a);
-}
-
-.poll-right {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-}
-
-.poll-percent {
-  font-weight: 800;
-  font-size: 14px;
-  color: var(--opt-color-a);
-  font-feature-settings: "tnum";
+.option-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.option-pct {
+  font-size: 15px; font-weight: 900;
+  color: var(--c1);
   font-variant-numeric: tabular-nums;
+  min-width: 38px; text-align: right;
 }
+.my-check { font-size: 18px; color: var(--c1); }
+.crown-icon { font-size: 14px; animation: float 2s ease-in-out infinite; flex-shrink: 0; }
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
 
-.voted-icon {
-  font-size: 18px;
-  color: var(--opt-color-a);
-}
-
-.crown {
-  font-size: 14px;
-  animation: crown-float 2s ease-in-out infinite;
-  flex-shrink: 0;
-}
-
-@keyframes crown-float {
-  0%, 100% { transform: translateY(0); }
-  50%       { transform: translateY(-3px); }
-}
-
-/* ==================== BURST ANIMATION ==================== */
-.burst-wrapper {
-  position: absolute;
-  top: 50%; left: 50%;
-  width: 0; height: 0;
-  z-index: 10;
-  pointer-events: none;
-}
-
-.burst-particle {
-  position: absolute;
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: var(--color);
-  animation: burst-fly 0.7s ease-out forwards;
-}
-
-@keyframes burst-fly {
-  0%   { transform: rotate(var(--angle)) translateX(0) scale(1); opacity: 1; }
-  100% { transform: rotate(var(--angle)) translateX(34px) scale(0); opacity: 0; }
-}
-
-/* ==================== BATTLE MODE ==================== */
+/* ── Battle Mode ─────────────────────────────────── */
 .battle-arena {
+  position: relative;
   display: flex;
   gap: 10px;
-  position: relative;
+  height: 120px;
 }
-
-.battle-option {
+.battle-side {
   flex: 1;
   position: relative;
-  min-height: 44px;
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
   display: flex;
-  align-items: center;
-  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
-  border: 2px solid var(--opt-border-light);
+  align-items: flex-end;
+  transition: transform 0.2s cubic-bezier(.34,1.56,.64,1), box-shadow 0.2s ease;
+  border: 2px solid transparent;
 }
+.side-0 { background: linear-gradient(160deg, #4c1d95, #7c3aed); }
+.side-1 { background: linear-gradient(160deg, #0c4a6e, #0ea5e9); }
 
-.battle-option.selectable:active { transform: scale(0.96); }
-.battle-option.selectable:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 18px rgba(0,0,0,0.14);
-}
+.battle-side.my-vote { border-color: #fde047; box-shadow: 0 0 0 3px rgba(253,224,71,0.3), inset 0 0 20px rgba(255,255,255,0.1); }
+.battle-side.winner-side { box-shadow: 0 8px 32px rgba(255,215,0,0.4); }
+.battle-side:hover { transform: translateY(-3px) scale(1.01); }
+.battle-side:active { transform: scale(0.97); }
 
+/* animated fill from bottom */
 .battle-fill {
   position: absolute;
-  top: 0; left: 0;
-  height: 100%;
-  width: 0;
-  background: linear-gradient(90deg, var(--opt-color-a), var(--opt-color-b));
-  opacity: 0.3;
-  transition: width 1.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  bottom: 0; left: 0; right: 0;
+  background: rgba(255,255,255,0.15);
+  transition: height 1.4s cubic-bezier(.25,.8,.25,1);
+  backdrop-filter: blur(4px);
 }
-
-body.dark .battle-fill { opacity: 0.5; }
-
-.battle-content {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 44px;
-  gap: 2px;
-  padding: 6px 8px;
-  text-align: center;
+.battle-body {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+  padding: 10px 8px;
+  gap: 2px; text-align: center;
 }
-
-.battle-label {
-  font-weight: 700;
-  font-size: 13px;
-  color: #0f1419;
-  word-break: break-word;
-  line-height: 1.2;
+.battle-text {
+  font-size: 13px; font-weight: 800;
+  color: rgba(255,255,255,0.95);
+  line-height: 1.2; word-break: break-word;
 }
-
-body.dark .battle-label { color: #e7e9ea; }
-.battle-option.selectable .battle-label { color: var(--opt-color-a); }
-
-.battle-percent {
-  font-size: 16px;
-  font-weight: 900;
-  color: var(--opt-color-a);
-  font-feature-settings: "tnum";
+.battle-pct {
+  font-size: 22px; font-weight: 900;
+  color: #fff; line-height: 1;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
+.battle-votes { font-size: 10px; color: rgba(255,255,255,0.7); font-weight: 600; }
+.battle-side .my-check { font-size: 20px; color: #fde047; }
 
-.vs-divider {
-  position: absolute;
-  left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  width: 28px; height: 28px;
-  background: linear-gradient(135deg, #f91880, #7856ff);
+/* VS badge */
+.vs-badge {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%,-50%);
+  width: 34px; height: 34px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 900;
-  z-index: 5;
-  box-shadow: 0 2px 8px rgba(249,24,128, 0.5);
-  pointer-events: none;
+  background: linear-gradient(135deg, #f91880, #7c3aed);
+  color: #fff; font-size: 10px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(249,24,128,0.5);
+  z-index: 10; pointer-events: none;
+  border: 2px solid #fff;
+  letter-spacing: 0.5px;
 }
 
-/* ==================== FOOTER ==================== */
+/* ── Burst confetti ──────────────────────────────── */
+.burst { position: absolute; top: 50%; left: 50%; width: 0; height: 0; pointer-events: none; z-index: 20; }
+.burst-dot {
+  position: absolute; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--color);
+  animation: burst-out 0.7s ease-out forwards;
+}
+@keyframes burst-out {
+  0% { transform: rotate(var(--angle)) translateX(0) scale(1); opacity: 1; }
+  100% { transform: rotate(var(--angle)) translateX(36px) scale(0); opacity: 0; }
+}
+
+/* ── Footer ──────────────────────────────────────── */
 .poll-footer {
-  margin-top: 12px;
-  font-size: 12px;
-  color: #687684;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 500;
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
 }
+body.dark .poll-footer { border-top-color: #2f3336; }
 
-body.dark .poll-footer { color: #8b98a5; }
-
-.vote-count { display: flex; align-items: center; gap: 3px; }
-
-.vote-num {
-  font-weight: 800;
-  color: #0f1419;
-  font-feature-settings: "tnum";
+.footer-votes { display: flex; align-items: baseline; gap: 4px; }
+.votes-num {
+  font-size: 15px; font-weight: 900;
+  color: #111827;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.3s;
 }
+body.dark .votes-num { color: #f9fafb; }
+.votes-num.pop { animation: num-pop 0.5s cubic-bezier(.34,1.56,.64,1); }
+@keyframes num-pop { 0%{transform:scale(1)} 50%{transform:scale(1.5)} 100%{transform:scale(1)} }
+.votes-label { font-size: 13px; color: #6b7280; font-weight: 500; }
+body.dark .votes-label { color: #9ca3af; }
 
-body.dark .vote-num { color: #e7e9ea; }
+.footer-sep { width: 1px; height: 14px; background: #e5e7eb; margin: 0 2px; }
+body.dark .footer-sep { background: #374151; }
 
-.vote-num.count-pop {
-  animation: count-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes count-pop {
-  0%   { transform: scale(1); }
-  50%  { transform: scale(1.4); }
-  100% { transform: scale(1); }
-}
-
-.dot { font-weight: bold; opacity: 0.35; }
-
-.time-left { color: #687684; }
-body.dark .time-left { color: #8b98a5; }
-
-/* ==================== COUNTDOWN RING ==================== */
-.countdown-ring {
-  width: 20px; height: 20px;
-  margin-left: auto;
-  transform: rotate(-90deg);
-  flex-shrink: 0;
-}
-
-.ring-bg {
-  fill: none;
-  stroke: #dde0e4;
-  stroke-width: 3;
-}
-
-body.dark .ring-bg { stroke: #3a3d44; }
-
-.ring-fill {
-  fill: none;
-  stroke-width: 3;
-  stroke-linecap: round;
-  transition: stroke-dasharray 1s ease, stroke 0.5s ease;
-}
+.footer-hint { font-size: 12px; color: #9ca3af; font-weight: 500; }
 </style>
