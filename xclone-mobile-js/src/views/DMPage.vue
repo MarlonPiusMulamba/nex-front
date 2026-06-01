@@ -41,7 +41,10 @@
           <div class="chat-header-content">
             <img :src="getImageUrl(selectedChat.profile_pic)" class="header-avatar" alt="Avatar" />
             <div class="header-info">
-              <div class="header-username">{{ selectedChat.username }}</div>
+              <div class="header-username-row">
+                <span class="header-username">{{ selectedChat.username }}</span>
+                <VerificationBadge :tier="selectedChat.verification_tier" />
+              </div>
               <div class="header-status-row">
                 <div class="header-status">{{ selectedChat.online ? 'Online' : 'Offline' }}</div>
                 <div v-if="isLanReachable(selectedChat.user_id)" class="lan-badge">
@@ -102,7 +105,10 @@
           </div>
           <div class="conv-content">
             <div class="conv-header">
-              <span class="conv-username">{{ conv.username }}</span>
+              <div class="conv-username-row">
+                <span class="conv-username">{{ conv.username }}</span>
+                <VerificationBadge :tier="conv.verification_tier" />
+              </div>
               <span class="conv-time">{{ formatTime(conv.last_message_time) }}</span>
             </div>
             <div class="conv-preview">
@@ -414,7 +420,10 @@
           @click="startNewChat(user)">
           <img :src="getImageUrl(user.profile_pic)" class="result-avatar" alt="Avatar" />
           <div class="result-info">
-            <div class="result-username">{{ user.full_name || user.username }}</div>
+            <div class="result-username">
+              {{ user.full_name || user.username }}
+              <VerificationBadge :tier="user.verification_tier" />
+            </div>
             <div class="result-handle">@{{ user.username }}</div>
           </div>
         </div>
@@ -434,7 +443,10 @@
       <ion-content class="ion-padding">
         <div v-if="invitationTarget" class="invitation-content">
           <img :src="getImageUrl(invitationTarget.profile_pic)" class="invite-avatar" alt="Avatar" />
-          <h2>{{ invitationTarget.full_name || invitationTarget.username }}</h2>
+          <h2>
+            {{ invitationTarget.full_name || invitationTarget.username }}
+            <VerificationBadge :tier="invitationTarget.verification_tier" />
+          </h2>
           <p class="invite-handle">@{{ invitationTarget.username }}</p>
           <p class="invite-message">
             You haven't chatted with this user before. Send an invitation to start a conversation.
@@ -474,7 +486,10 @@
             class="invitation-item">
             <img :src="getImageUrl(inv.profile_pic)" class="invite-item-avatar" alt="Avatar" />
             <div class="invite-item-info">
-              <div class="invite-item-name">{{ inv.full_name || inv.username }}</div>
+              <div class="invite-item-name">
+                {{ inv.full_name || inv.username }}
+                <VerificationBadge :tier="inv.verification_tier" />
+              </div>
               <div class="invite-item-handle">@{{ inv.username }}</div>
             </div>
             <div class="invite-item-actions">
@@ -537,6 +552,7 @@ import {
 import api from '@/utils/api.js';
 import EmojiPicker from '@/components/EmojiPicker.vue';
 import VoiceDrop from '@/components/VoiceDrop.vue';
+import VerificationBadge from '@/components/VerificationBadge.vue';
 import {
   saveConversationsOffline, getOfflineConversations,
   saveMessagesOffline, getOfflineMessages, isNetworkOffline,
@@ -555,7 +571,8 @@ export default {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
     IonButtons, IonIcon, IonSearchbar, IonModal, IonTextarea, IonSpinner,
     IonRefresher, IonRefresherContent,
-    EmojiPicker
+    EmojiPicker,
+    VerificationBadge
   },
   data() {
     return {
@@ -2053,6 +2070,12 @@ export default {
 
 .conv-content { flex: 1; min-width: 0; }
 .conv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+.conv-username-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .conv-username { font-weight: 600; font-size: 15px; }
 .conv-time { font-size: 11px; color: var(--ion-color-medium, #6b7280); }
 .conv-preview {
@@ -2073,6 +2096,12 @@ export default {
 .chat-header-content { display: flex; align-items: center; gap: 10px; }
 .header-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1.5px solid rgba(218,165,32,0.4); }
 .header-info { display: flex; flex-direction: column; }
+.header-username-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .header-username { font-size: 15px; font-weight: 700; line-height: 1.2; }
 .header-status-row { display: flex; align-items: center; gap: 6px; }
 .header-status { font-size: 11px; color: #10b981; line-height: 1.3; }

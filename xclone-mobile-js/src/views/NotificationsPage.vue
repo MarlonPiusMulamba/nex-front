@@ -34,7 +34,10 @@
 
             <ion-label>
               <div class="notif-title">
-                <span class="notif-message">{{ n.message || fallbackMessage(n) }}</span>
+                <div class="notif-message-row">
+                  <span class="notif-message">{{ n.message || fallbackMessage(n) }}</span>
+                  <VerificationBadge :tier="n.actor_verification_tier" />
+                </div>
                 <span v-if="!n.read" class="notif-dot"></span>
               </div>
               <div class="notif-time">{{ formatRelativeTime(n.created_at) }}</div>
@@ -63,6 +66,7 @@ import {
 } from '@ionic/vue';
 import axios from 'axios';
 import config from '@/config/index.js';
+import VerificationBadge from '@/components/VerificationBadge.vue';
 import { saveNotificationsOffline, getOfflineNotifications, isNetworkOffline } from '@/utils/offlineDb.js';
 
 export default {
@@ -79,7 +83,8 @@ export default {
     IonSpinner,
     IonButtons,
     IonButton,
-    IonAvatar
+    IonAvatar,
+    VerificationBadge
   },
   data() {
     return {
@@ -241,14 +246,25 @@ export default {
 
 .notif-title {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.notif-message-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 .notif-message {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ion-text-color, #0f1419);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .notif-time {

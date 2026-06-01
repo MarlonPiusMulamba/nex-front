@@ -107,7 +107,10 @@
                              <img :src="getImageUrl(user.profile_pic)" class="suggested-avatar" />
                         </div>
                         <div class="suggested-info">
-                            <div class="suggested-name">{{ user.display_name }}</div>
+                            <div class="suggested-name-row">
+                              <span class="suggested-name">{{ user.display_name }}</span>
+                              <VerificationBadge :tier="user.verification_tier" />
+                            </div>
                             <div class="suggested-username">@{{ user.username }}</div>
                         </div>
                         <ion-button size="small" @click="followUser(user)" :disabled="user.isFollowing" class="follow-btn">
@@ -143,7 +146,7 @@
             <div v-if="post.item_type === 'repost'" class="repost-context">
               <ion-icon :icon="repeat" class="repost-icon"></ion-icon>
               <span class="repost-text">Reposted by @{{ truncateUsername(post.reposted_by_username) }}</span>
-              <VerificationBadge v-if="post.reposted_by_verification_tier" :tier="post.reposted_by_verification_tier" />
+              <VerificationBadge v-if="post.reposted_by_verification_tier && post.reposted_by_verification_tier !== 'none'" :tier="post.reposted_by_verification_tier" />
             </div>
 
             <div v-if="post.item_type === 'repost' && (post.quote_text || (post.quote_media && post.quote_media.length))" class="quote-container">
@@ -175,10 +178,10 @@
 
             <div class="post-header">
               <div class="post-user-info" @click="openProfile(post)">
-                <span class="username">
+                <span class="display-name">
                   {{ (post.first_name || post.last_name) ? (post.first_name + ' ' + post.last_name).trim() : post.username }}
-                  <VerificationBadge :tier="post.verification_tier" />
                 </span>
+                <VerificationBadge :tier="post.verification_tier" />
                 <span class="handle">@{{ truncateUsername(post.username) }}</span>
                 <span class="separator">·</span>
                 <span class="timestamp">{{ formatRelativeTime(post.timestamp) }}</span>
@@ -2312,16 +2315,20 @@ export default {
     async share(post) {
       if (!post) return;
       
-      // Backend share URL for rich link previews (WhatsApp, Facebook, etc.)
-      const backendShareUrl = `${this.API_URL}/share/post/${post.post_id}`;
+      // Determine base URL: use production frontend in native/production, else current origin
+      const isNative = window?.location?.protocol === 'capacitor:' || window?.location?.protocol === 'ionic:' || typeof window.Capacitor !== 'undefined';
+      const frontendBase = isNative ? 'https://nex-front.vercel.app' : window.location.origin;
       
-      // Frontend URL for direct access (cleaner for clipboard)
-      const frontendUrl = `${window.location.origin}/tabs/feed?post=${post.post_id}`;
+      // Frontend deep-link URL – this is what gets shared
+      const frontendUrl = `${frontendBase}/tabs/feed?post=${post.post_id}`;
+      
+      // Backend share URL for rich OG/Twitter card previews (WhatsApp, Facebook, etc.)
+      const backendShareUrl = `${this.API_URL}/share/post/${post.post_id}`;
       
       const shareData = {
         title: `NexFi - Post by @${post.username}`,
         text: post.content || 'Check out this post on NexFi!',
-        url: backendShareUrl  // Use backend URL for native share (better previews)
+        url: frontendUrl  // Use frontend URL so recipients open the post in the app
       };
 
       // Check if native share is available
@@ -2341,7 +2348,7 @@ export default {
             text: 'Share to WhatsApp',
             icon: 'logo-whatsapp',
             handler: () => {
-              // Use backend URL for WhatsApp to get rich preview
+              // Use backend URL for WhatsApp for rich preview, with redirect param pointing to specific post
               const whatsappText = encodeURIComponent(`${shareData.text}\n\n${backendShareUrl}`);
               window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
             }
@@ -2847,12 +2854,18 @@ ion-toolbar {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
 }
 
-.username {
+.post-user-info .display-name {
   font-weight: 700;
   color: var(--ion-text-color, #0f1419);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
   font-size: 15px;
 }
 
@@ -3602,17 +3615,33 @@ ion-toolbar {
 }
 
 .suggested-user-card {
-    min-width: 140px;
-    width: 140px;
-    background: var(--ion-card-background);
-    border: 1px solid var(--ion-border-color);
-    border-radius: 12px;
-    padding: 15px 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    flex-shrink: 0;
+  flex: 0 0 140px;
+  background: var(--ion-background-color, #fff);
+  border: 1px solid var(--ion-border-color, #eff3f4);
+  border-radius: 12px;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.suggested-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.suggested-name {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
 }
 
 .card-pfp {

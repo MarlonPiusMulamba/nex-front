@@ -123,7 +123,8 @@ export default {
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
       // icons
       heart, heartOutline, chatbubbleOutline, shareOutline, play, pause,
-      volumeHigh, volumeMute, shieldCheckmark, star, videocam
+      volumeHigh, volumeMute, shieldCheckmark, star, videocam,
+      currentPlayStartTime: null
     };
   },
   mounted() {
@@ -142,6 +143,9 @@ export default {
     }
   },
   deactivated() {
+    if (this.currentPlayStartTime) {
+      this.reportVideoDwell(this.currentIndex);
+    }
     this.pauseAll();
   },
   watch: {
@@ -228,6 +232,9 @@ export default {
             // Load more when near end
             if (index >= this.videos.length - 3) this.loadMore();
           } else {
+            if (this.playingStates[index]) {
+               this.reportVideoDwell(index);
+            }
             this.pauseVideoAt(index);
           }
         });
@@ -247,6 +254,9 @@ export default {
     playVideoAt(index) {
       const video = this.videoRefs[index];
       if (!video) return;
+      
+      this.currentPlayStartTime = Date.now();
+      
       video.muted = this.isMuted;
       video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
       this.playingStates[index] = true;
@@ -257,6 +267,29 @@ export default {
       const video = this.videoRefs[index];
       if (video) video.pause();
       this.playingStates[index] = false;
+    },
+
+    reportVideoDwell(index) {
+      const video = this.videoRefs[index];
+      const post = this.videos[index];
+      if (!video || !post || !this.currentPlayStartTime) return;
+      
+      const dwellMs = Date.now() - this.currentPlayStartTime;
+      const seconds = dwellMs / 1000;
+      if (seconds < 1) return;
+      
+      const completionRate = video.duration ? video.currentTime / video.duration : 0;
+      
+      console.log(`📊 Reporting video dwell: ${seconds.toFixed(1)}s, ${Math.round(completionRate*100)}% complete`);
+
+      axios.post(`${this.API_URL}/api/posts/dwell`, {
+        user_id: this.userId,
+        post_id: post.post_id,
+        seconds: seconds,
+        completion_rate: completionRate
+      }).catch(e => console.error('Dwell report error:', e));
+      
+      this.currentPlayStartTime = null;
     },
 
     pauseAll() {
@@ -279,6 +312,7 @@ export default {
     },
 
     onVideoEnded(index) {
+      this.reportVideoDwell(index);
       const nextIndex = index + 1;
       if (nextIndex < this.videos.length) {
         const nextSlide = this.videoSlides[nextIndex];

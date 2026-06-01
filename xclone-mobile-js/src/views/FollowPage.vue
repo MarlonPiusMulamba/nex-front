@@ -57,9 +57,12 @@
               class="user-item"
               @click="viewProfile(user)">
               <img :src="getImageUrl(user.profile_pic)" class="user-avatar" alt="Avatar" />
-              <div class="user-info">
-                <div class="user-name">{{ user.username }}</div>
-                <div class="user-handle">@{{ user.username }}</div>
+              <div class="user-info-vertical">
+                <div class="user-name-row">
+                  <span class="user-name">{{ user.full_name || user.username }}</span>
+                  <VerificationBadge :tier="user.verification_tier" />
+                  <span class="user-handle-inline">@{{ user.username }}</span>
+                </div>
               </div>
               <ion-button 
                 size="small" 
@@ -92,9 +95,12 @@
                 class="user-item"
                 @click="viewProfile(user)">
                 <img :src="getImageUrl(user.profile_pic)" class="user-avatar" alt="Avatar" />
-                <div class="user-info">
-                  <div class="user-name">{{ user.full_name || user.username }}</div>
-                  <div class="user-handle">@{{ user.username }}</div>
+                <div class="user-info-vertical">
+                  <div class="user-name-row">
+                    <span class="user-name">{{ user.full_name || user.username }}</span>
+                    <VerificationBadge :tier="user.verification_tier" />
+                    <span class="user-handle-inline">@{{ user.username }}</span>
+                  </div>
                 </div>
                 <ion-button 
                   size="small" 
@@ -115,7 +121,10 @@
               <h3 class="section-title" v-if="searchTab === 'top'">Posts</h3>
               <div v-for="post in postResults" :key="post.post_id" class="post-item">
                 <div class="post-header">
-                  <span class="user-handle">@{{ post.username }}</span>
+                  <div class="post-user-info">
+                    <span class="handle">@{{ post.username }}</span>
+                    <VerificationBadge :tier="post.verification_tier" />
+                  </div>
                   <span class="post-time">{{ formatPostTime(post.timestamp) }}</span>
                 </div>
                 <div
@@ -216,6 +225,7 @@
             <div class="user-details">
               <h2 class="display-name">
                 {{ (userProfile.first_name || userProfile.last_name) ? (userProfile.first_name + ' ' + userProfile.last_name).trim() : userProfile.username }}
+                <VerificationBadge :tier="userProfile.verification_tier" />
               </h2>
               <p class="username">@{{ userProfile.username }}</p>
             </div>
@@ -299,6 +309,7 @@ import {
 import axios from 'axios';
 import api from '@/utils/api';
 import config from '@/config/index.js';
+import VerificationBadge from '@/components/VerificationBadge.vue';
 import { 
   isNetworkOffline, saveProfileOffline, getOfflineProfile,
   savePostsOffline, getOfflinePosts, saveTrendingOffline, getOfflineTrending,
@@ -309,7 +320,8 @@ export default {
   name: 'FollowPage',
   components: {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonSearchbar,
-    IonButton, IonButtons, IonIcon, IonSpinner, IonSegment, IonSegmentButton, IonLabel
+    IonButton, IonButtons, IonIcon, IonSpinner, IonSegment, IonSegmentButton, IonLabel,
+    VerificationBadge
   },
   data() {
     return {
@@ -806,19 +818,33 @@ export default {
   object-fit: cover;
 }
 
-.user-info {
+.user-info-vertical {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.user-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .user-name {
   font-weight: 700;
   font-size: 15px;
   color: var(--ion-text-color, #0f1419);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
 }
 
-.user-handle {
-  font-size: 15px;
+.user-handle-inline {
+  font-size: 14px;
   color: var(--ion-color-medium, #536471);
 }
 
@@ -991,7 +1017,16 @@ export default {
 }
 
 .post-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
+}
+
+.post-user-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .post-time {
