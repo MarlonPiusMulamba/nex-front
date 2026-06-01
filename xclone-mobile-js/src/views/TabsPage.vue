@@ -20,6 +20,11 @@
             <span class="nav-label">Search</span>
           </router-link>
 
+          <router-link to="/tabs/videos" class="nav-item">
+            <ion-icon :icon="playCircleOutline" class="nav-icon"></ion-icon>
+            <span class="nav-label">Videos</span>
+          </router-link>
+
           <router-link to="/tabs/dm" class="nav-item">
             <ion-icon :icon="mail" class="nav-icon"></ion-icon>
             <span class="nav-label">Messages</span>
@@ -80,7 +85,7 @@
               <ion-icon :icon="search"></ion-icon>
               <ion-label>Search</ion-label>
             </ion-tab-button>
-            
+
             <ion-tab-button tab="dm" href="/tabs/dm">
               <ion-icon :icon="mail"></ion-icon>
               <ion-badge v-if="unreadCount > 0" class="dm-badge">{{ unreadCount }}</ion-badge>
@@ -145,7 +150,7 @@ import {
   IonPage, IonTabs, IonRouterOutlet, IonTabBar, IonTabButton, 
   IonIcon, IonLabel, IonBadge, IonFab, IonFabButton 
 } from '@ionic/vue';
-import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline, add, shieldOutline } from 'ionicons/icons';
+import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline, add, shieldOutline, playCircleOutline } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config/index.js';
 import TrendingWidget from '@/components/TrendingWidget.vue';
@@ -175,6 +180,7 @@ export default {
       logOutOutline,
       add,
       shieldOutline,
+      playCircleOutline,
       unreadCount: 0,
       prevUnreadCount: 0,
       unreadNotifCount: 0,

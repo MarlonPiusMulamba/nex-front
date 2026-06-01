@@ -16,28 +16,46 @@
         :key="user.user_id"
         class="user-item"
       >
-        <img
-          :src="getImageUrl(user.profile_pic)"
-          class="user-avatar"
-          alt="Avatar"
-          @click="goToProfile(user)"
-        />
-        <div class="user-info" @click="goToProfile(user)">
-          <div class="user-name">{{ user.username }}</div>
-          <div class="user-handle">@{{ user.username }}</div>
+        <div class="user-main-row">
+          <img
+            :src="getImageUrl(user.profile_pic)"
+            class="user-avatar"
+            alt="Avatar"
+            @click="goToProfile(user)"
+          />
+          <div class="user-info" @click="goToProfile(user)">
+            <div class="user-name-row">
+              <span class="user-name">{{ user.display_name }}</span>
+              <VerificationBadge v-if="user.verification_tier && user.verification_tier !== 'none'" :tier="user.verification_tier" />
+            </div>
+            <div class="user-handle">@{{ user.username }}</div>
+          </div>
+          <ion-button
+            size="small"
+            fill="solid"
+            class="follow-btn"
+            @click="followUser(user)"
+            :disabled="user.following || user.followLoading"
+          >
+            <ion-spinner v-if="user.followLoading" name="crescent"></ion-spinner>
+            <template v-else>
+              {{ user.following ? 'Following' : 'Follow' }}
+            </template>
+          </ion-button>
         </div>
-        <ion-button
-          size="small"
-          :fill="user.following ? 'solid' : 'solid'"
-          class="follow-btn"
-          @click="followUser(user)"
-          :disabled="user.following || user.followLoading"
-        >
-          <ion-spinner v-if="user.followLoading" name="crescent"></ion-spinner>
-          <template v-else>
-            {{ user.following ? 'Following' : 'Follow' }}
-          </template>
-        </ion-button>
+
+        <div v-if="user.bio" class="user-bio line-clamp-1" @click="goToProfile(user)">
+          {{ user.bio }}
+        </div>
+
+        <div class="user-stats">
+          <span v-if="user.followers_count > 0" class="stat-badge">
+            {{ formatCount(user.followers_count) }} followers
+          </span>
+          <span v-if="user.mutual_username" class="mutual-follow">
+             Followed by @{{ user.mutual_username }}
+          </span>
+        </div>
       </div>
     </div>
     
@@ -56,7 +74,8 @@ export default {
   name: 'SuggestedUsersWidget',
   components: {
     IonSpinner,
-    IonButton
+    IonButton,
+    VerificationBadge: () => import('@/components/VerificationBadge.vue')
   },
   data() {
     return {
@@ -124,6 +143,13 @@ export default {
     
     showMore() {
       this.$router.push('/tabs/follow');
+    },
+    
+    formatCount(n) {
+      if (!n) return '0';
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+      return String(n);
     }
   },
   mounted() {
@@ -163,11 +189,11 @@ export default {
 
 .user-item {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   padding: 12px 16px;
-  gap: 12px;
+  gap: 8px;
   border-bottom: 1px solid var(--ion-border-color, #eff3f4);
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
 }
 
 .user-item:last-child {
@@ -178,19 +204,32 @@ export default {
   background-color: var(--ion-color-light, #f7f9f9);
 }
 
+.user-main-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .user-avatar {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   object-fit: cover;
   cursor: pointer;
   flex-shrink: 0;
+  border: 1px solid var(--ion-border-color, #eff3f4);
 }
 
 .user-info {
   flex: 1;
   min-width: 0;
   cursor: pointer;
+}
+
+.user-name-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .user-name {
@@ -210,12 +249,49 @@ export default {
   text-overflow: ellipsis;
 }
 
+.user-bio {
+  font-size: 13px;
+  color: var(--ion-text-color, #0f1419);
+  line-height: 1.3;
+  margin-left: 56px; /* Align with info */
+  cursor: pointer;
+}
+
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.user-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 56px;
+  flex-wrap: wrap;
+}
+
+.stat-badge {
+  font-size: 12px;
+  color: var(--ion-color-medium, #536471);
+  font-weight: 500;
+}
+
+.mutual-follow {
+  font-size: 11px;
+  color: var(--ion-color-primary, #daa520);
+  background: rgba(218, 165, 32, 0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
 .follow-btn {
   --border-radius: 20px;
   height: 32px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
-  min-width: 80px;
+  min-width: 76px;
   flex-shrink: 0;
   --background: var(--ion-text-color, #0f1419);
   --color: var(--ion-background-color, #fff);
@@ -224,8 +300,6 @@ export default {
 
 .follow-btn[disabled] {
   opacity: 0.6;
-  --background: var(--ion-color-medium, #536471);
-  --color: #fff;
 }
 
 .widget-footer {
@@ -234,6 +308,7 @@ export default {
   font-size: 15px;
   cursor: pointer;
   transition: background-color 0.2s;
+  text-align: center;
 }
 
 .widget-footer:hover {

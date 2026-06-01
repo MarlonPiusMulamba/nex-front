@@ -12,6 +12,7 @@ import UserFollowListPage from '../views/UserFollowListPage.vue';
 import FraternityDiscoverPage from '../views/FraternityDiscoverPage.vue';
 import FraternityPage from '../views/FraternityPage.vue';
 import VerificationPortal from '../views/VerificationPortal.vue';
+import VideoFeedPage from '../views/VideoFeedPage.vue';
 
 const routes = [
   {
@@ -86,6 +87,11 @@ const routes = [
         path: 'verify',
         component: VerificationPortal,
         meta: { requiresAuth: true }
+      },
+      {
+        path: 'videos',
+        component: VideoFeedPage,
+        meta: { requiresAuth: false }
       }
     ]
   }

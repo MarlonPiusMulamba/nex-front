@@ -1235,6 +1235,10 @@ export default {
     },
 
     openMedia(post, mediaItem) {
+      if (mediaItem?.type === 'video') {
+         this.$router.push(`/tabs/videos?start_post_id=${post.post_id}`);
+         return;
+      }
       const src = mediaItem?.data ? this.getImageUrl(mediaItem.data) : (post && post.image ? this.getImageUrl(post.image) : '');
       if (!src) return;
       this.mediaSrc = src;
@@ -1333,6 +1337,10 @@ export default {
     },
 
     openMedia(post, mediaItem) {
+      if (mediaItem?.type === 'video') {
+         this.$router.push(`/tabs/videos?start_post_id=${post.post_id}`);
+         return;
+      }
       const src = mediaItem?.data ? this.getImageUrl(mediaItem.data) : (post && post.image ? this.getImageUrl(post.image) : '');
       if (!src) return;
       this.mediaSrc = src;
