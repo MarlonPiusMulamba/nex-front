@@ -193,7 +193,12 @@ export default {
 
         this.offset = feedVideos.length;
         this.hasMore = feedVideos.length >= 20;
-        this.$nextTick(() => this.initObserver());
+        this.$nextTick(() => {
+          if (this.$refs.scrollContainer) {
+            this.$refs.scrollContainer.scrollTop = 0;
+          }
+          this.initObserver();
+        });
       } catch (e) {
         console.error('Video feed error:', e);
       } finally {

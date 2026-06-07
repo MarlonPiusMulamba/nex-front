@@ -1,5 +1,5 @@
 <template>
-  <div class="video-container" ref="container">
+  <div class="video-container" :class="{ 'is-playing': isPlaying, 'is-portrait': isPortrait, 'is-landscape': !isPortrait }" ref="container" @click="togglePlay">
     <video
       ref="video"
       :src="videoSrc"
@@ -7,21 +7,49 @@
       class="video-player"
       playsinline
       webkit-playsinline
+      autoplay
       muted
       loop
-      preload="metadata"
-      @click="togglePlay"
-      @playing="isPlaying = true"
-      @pause="isPlaying = false"
+      preload="auto"
+      @playing="onPlaying"
+      @pause="onPause"
+      @timeupdate="onTimeUpdate"
+      @loadedmetadata="onMetadata"
+      @canplay="onCanPlay"
+      @loadeddata="onLoadedData"
     ></video>
-    
-    <div class="mute-overlay" @click.stop="toggleMute" :class="{ 'is-muted': isMuted }">
-      <ion-icon :icon="isMuted ? volumeMute : volumeHigh"></ion-icon>
-    </div>
-    
-    <div class="play-indicator" v-if="!isPlaying" @click="togglePlay">
+
+    <!-- Play/Pause ripple overlay -->
+    <transition name="ripple-fade">
+      <div v-if="showRipple" class="ripple-overlay">
+        <div class="ripple-icon">
+          <ion-icon :icon="rippleIcon"></ion-icon>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Play indicator when paused -->
+    <div class="play-indicator" v-if="!isPlaying && !showRipple">
       <div class="play-button">
         <ion-icon :icon="play"></ion-icon>
+      </div>
+    </div>
+
+    <!-- Bottom controls bar -->
+    <div class="controls-bar" @click.stop>
+      <!-- Progress bar -->
+      <div class="progress-track" @click.stop="seekTo($event)" ref="progressTrack">
+        <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+      </div>
+
+      <div class="controls-row">
+        <!-- Time display -->
+        <span class="time-display">{{ currentTimeFormatted }} / {{ durationFormatted }}</span>
+
+        <!-- Mute button -->
+        <div class="mute-btn" @click.stop="toggleMute" :class="{ 'is-muted': isMuted }">
+          <ion-icon :icon="isMuted ? volumeMute : volumeHigh"></ion-icon>
+        </div>
       </div>
     </div>
   </div>
@@ -29,7 +57,7 @@
 
 <script>
 import { IonIcon } from '@ionic/vue';
-import { volumeHigh, volumeMute, play, pause } from 'ionicons/icons';
+import { volumeHigh, volumeMute, play, pause, playCircle, pauseCircle } from 'ionicons/icons';
 
 export default {
   name: 'VideoPlayer',
@@ -48,8 +76,15 @@ export default {
     return {
       isPlaying: false,
       isMuted: true,
+      isVisible: false,
+      isPortrait: false,
+      currentTime: 0,
+      duration: 0,
+      showRipple: false,
+      rippleIcon: play,
+      rippleTimer: null,
       volumeHigh,
-      volumeMute, // Fixed: template used 'volumeMute' correctly but logic should ensure consistency
+      volumeMute,
       play,
       pause,
       observer: null
@@ -57,64 +92,140 @@ export default {
   },
   computed: {
     videoSrc() {
-      if (!this.src) return '';
-      // Append #t=0.1 to force first frame as thumbnail in most browsers
-      const baseSrc = this.src.includes('#t=') ? this.src : `${this.src}#t=0.1`;
-      return baseSrc;
+      // Do NOT append #t= — it blocks autoplay in Chrome/Safari
+      return this.src || '';
+    },
+    progressPercent() {
+      if (!this.duration) return 0;
+      return Math.min((this.currentTime / this.duration) * 100, 100);
+    },
+    currentTimeFormatted() {
+      return this.formatTime(this.currentTime);
+    },
+    durationFormatted() {
+      return this.formatTime(this.duration);
     }
   },
   mounted() {
     this.initObserver();
+    // Ensure muted state is synced on mount
+    this.$nextTick(() => {
+      const video = this.$refs.video;
+      if (video) {
+        video.muted = true;
+        this.isMuted = true;
+      }
+    });
   },
   beforeUnmount() {
-    if (this.observer) {
-      this.observer.disconnect();
-    }
+    if (this.observer) this.observer.disconnect();
+    if (this.rippleTimer) clearTimeout(this.rippleTimer);
   },
   methods: {
     initObserver() {
       this.observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
+          this.isVisible = entry.isIntersecting;
           if (entry.isIntersecting) {
             this.playVideo();
           } else {
             this.pauseVideo();
           }
         });
-      }, { threshold: 0.5 });
-      
+      }, { threshold: 0.3, rootMargin: '0px' });
       this.observer.observe(this.$refs.container);
     },
     playVideo() {
       const video = this.$refs.video;
-      if (video) {
-        video.play().catch(() => {
-          // Auto-play might be blocked by browser if not muted
-          // But we have 'muted' attribute, so it should be fine
+      if (!video) return;
+      // Force muted — required for autoplay policy in all browsers
+      video.muted = true;
+      this.isMuted = true;
+      const promise = video.play();
+      if (promise !== undefined) {
+        promise.catch(() => {
+          // Autoplay blocked — video stays paused, user must tap
+          this.isPlaying = false;
         });
+      }
+    },
+    // Called when enough data is buffered to start playing
+    onCanPlay() {
+      const video = this.$refs.video;
+      if (!video) return;
+      video.muted = true;
+      this.isMuted = true;
+      if (this.isVisible && video.paused) {
+        video.play().catch(() => { this.isPlaying = false; });
+      }
+    },
+    // Fired after first frame is decoded — last resort retry
+    onLoadedData() {
+      const video = this.$refs.video;
+      if (!video) return;
+      video.muted = true;
+      this.isMuted = true;
+      if (this.isVisible && video.paused) {
+        video.play().catch(() => { this.isPlaying = false; });
       }
     },
     pauseVideo() {
       const video = this.$refs.video;
-      if (video) {
-        video.pause();
-      }
+      if (video) video.pause();
     },
     togglePlay() {
       const video = this.$refs.video;
       if (!video) return;
       if (video.paused) {
         video.play();
+        this.flashRipple(play);
       } else {
         video.pause();
+        this.flashRipple(pause);
       }
     },
     toggleMute() {
       const video = this.$refs.video;
+      if (!video) return;
+      video.muted = !video.muted;
+      this.isMuted = video.muted;
+    },
+    seekTo(event) {
+      const video = this.$refs.video;
+      const track = this.$refs.progressTrack;
+      if (!video || !track || !this.duration) return;
+      const rect = track.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+      video.currentTime = ratio * this.duration;
+    },
+    onPlaying() {
+      this.isPlaying = true;
+    },
+    onPause() {
+      this.isPlaying = false;
+    },
+    onTimeUpdate() {
+      const video = this.$refs.video;
+      if (video) this.currentTime = video.currentTime;
+    },
+    onMetadata() {
+      const video = this.$refs.video;
       if (video) {
-        video.muted = !video.muted;
-        this.isMuted = video.muted;
+        this.duration = video.duration;
+        this.isPortrait = video.videoHeight > video.videoWidth;
       }
+    },
+    flashRipple(icon) {
+      this.rippleIcon = icon;
+      this.showRipple = true;
+      if (this.rippleTimer) clearTimeout(this.rippleTimer);
+      this.rippleTimer = setTimeout(() => { this.showRipple = false; }, 600);
+    },
+    formatTime(secs) {
+      if (!secs || isNaN(secs)) return '0:00';
+      const m = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
     }
   }
 };
@@ -130,92 +241,192 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  max-height: 450px;
   background-color: #0b0f14;
-  margin: 8px 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Prevent collapse in grid layouts */
+  min-height: 180px;
+  max-height: 480px;
+}
+
+.video-container.is-portrait {
+  aspect-ratio: 3 / 4;
+}
+
+.video-container.is-landscape {
+  aspect-ratio: 1 / 1;
 }
 
 .video-player {
   width: 100%;
-  height: auto;
-  max-height: 450px;
+  height: 100%;
   object-fit: contain;
   display: block;
+  background: #000;
 }
 
-.mute-overlay {
+/* ── Play/Pause ripple ── */
+.ripple-overlay {
   position: absolute;
-  bottom: 15px;
-  right: 15px;
-  background: rgba(0, 0, 0, 0.7);
-  color: #fff;
-  width: 36px;
-  height: 36px;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.ripple-icon {
+  width: 72px;
+  height: 72px;
+  background: rgba(0, 0, 0, 0.55);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  z-index: 10;
-  backdrop-filter: blur(8px);
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  backdrop-filter: blur(6px);
 }
 
-.mute-overlay:active {
-  transform: scale(0.9);
-  background: rgba(29, 155, 240, 0.8);
+.ripple-icon ion-icon {
+  font-size: 38px;
+  color: #fff;
 }
 
-.mute-overlay.is-muted {
-  border-color: rgba(255, 255, 255, 0.1);
+.ripple-fade-enter-active {
+  animation: rippleIn 0.15s ease;
+}
+.ripple-fade-leave-active {
+  animation: rippleOut 0.45s ease forwards;
+}
+@keyframes rippleIn {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+@keyframes rippleOut {
+  from { transform: scale(1);   opacity: 1; }
+  to   { transform: scale(1.4); opacity: 0; }
 }
 
-.mute-overlay ion-icon {
-  font-size: 20px;
-}
-
+/* ── Paused big play button ── */
 .play-indicator {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 5;
-  background: rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-  transition: background 0.3s ease;
-}
-
-.video-container:hover .play-indicator {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.25);
+  transition: background 0.25s ease;
+  pointer-events: none;
 }
 
 .play-button {
-  width: 60px;
-  height: 60px;
-  background: rgba(218, 165, 32, 0.95); /* Using NexFi Gold */
+  width: 62px;
+  height: 62px;
+  background: rgba(218, 165, 32, 0.92);
   color: #fff;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
-  transform: scale(1);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
   transition: transform 0.2s ease;
-}
-
-.play-button:hover {
-  transform: scale(1.1);
 }
 
 .play-button ion-icon {
   font-size: 32px;
   margin-left: 4px;
+}
+
+/* ── Bottom controls bar ── */
+.controls-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0 10px 8px;
+  background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%);
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.video-container:hover .controls-bar,
+.video-container:focus-within .controls-bar {
+  opacity: 1;
+}
+
+/* always show controls when paused */
+.video-container:not(.is-playing) .controls-bar {
+  opacity: 1;
+}
+
+.progress-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 2px;
+  cursor: pointer;
+  margin-bottom: 6px;
+  position: relative;
+  transition: height 0.15s ease;
+}
+
+.progress-track:hover {
+  height: 6px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #daa520;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.time-display {
+  font-size: 11px;
+  color: rgba(255,255,255,0.85);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.mute-btn {
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.15);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.mute-btn:hover {
+  background: rgba(218, 165, 32, 0.8);
+  transform: scale(1.1);
+}
+
+.mute-btn:active {
+  transform: scale(0.9);
+}
+
+.mute-btn ion-icon {
+  font-size: 16px;
+}
+
+.mute-btn.is-muted {
+  border-color: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.6);
 }
 </style>

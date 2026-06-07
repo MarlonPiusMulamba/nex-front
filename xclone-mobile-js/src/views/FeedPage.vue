@@ -432,13 +432,11 @@
                     alt="Post media"
                     @error="handleMediaError"
                   />
-                  <video
+                  <VideoPlayer
                     v-else-if="item.type === 'video'"
-                    class="media-video"
                     :src="getImageUrl(item.data)"
-                    controls
-                    playsinline
-                  ></video>
+                    :poster="item.thumbnail ? getImageUrl(item.thumbnail) : ''"
+                  />
                 </div>
               </div>
             </div>
@@ -1705,11 +1703,11 @@ export default {
         }, 5000);
 
         video.onloadedmetadata = () => {
-          // Seek to 1 second or middle of video, whichever is smaller
+          // Seek to 10 seconds or middle of video, whichever is smaller
           // Ensure duration is valid
-          let seekTime = 1.0;
+          let seekTime = 10.0;
           if (video.duration && isFinite(video.duration)) {
-              seekTime = Math.min(1.0, video.duration / 2);
+              seekTime = Math.min(10.0, video.duration / 2);
           }
           video.currentTime = seekTime;
         };
@@ -2995,9 +2993,34 @@ ion-toolbar {
 .media-item {
   position: relative;
   overflow: hidden;
+  /* Ensure video containers don't collapse */
+  min-height: 160px;
 }
 
-.media-item img,
+.media-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* VideoPlayer fills the media-item cell */
+.media-item :deep(.video-container) {
+  width: 100%;
+  height: 100%;
+  min-height: 160px;
+  border-radius: 0;
+  border: none;
+  aspect-ratio: unset;
+  max-height: none;
+}
+
+/* Single video: taller and nicer ratio */
+.media-grid.count-1 .media-item :deep(.video-container) {
+  min-height: 200px;
+  max-height: 480px;
+}
+
 .media-item video {
   width: 100%;
   height: 100%;
