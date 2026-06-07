@@ -1,5 +1,10 @@
 <template>
-  <div class="video-container" :class="{ 'is-playing': isPlaying, 'is-portrait': isPortrait, 'is-landscape': !isPortrait }" ref="container" @click="togglePlay">
+  <div
+    class="video-container"
+    :class="{ 'is-playing': isPlaying, 'is-portrait': isPortrait, 'is-landscape': !isPortrait, 'feed-mode': feedMode }"
+    ref="container"
+    @click="handleContainerClick"
+  >
     <video
       ref="video"
       :src="videoSrc"
@@ -19,8 +24,8 @@
       @loadeddata="onLoadedData"
     ></video>
 
-    <!-- Play/Pause ripple overlay -->
-    <transition name="ripple-fade">
+    <!-- Play/Pause ripple overlay (only in non-feedMode) -->
+    <transition name="ripple-fade" v-if="!feedMode">
       <div v-if="showRipple" class="ripple-overlay">
         <div class="ripple-icon">
           <ion-icon :icon="rippleIcon"></ion-icon>
@@ -28,15 +33,30 @@
       </div>
     </transition>
 
-    <!-- Play indicator when paused -->
-    <div class="play-indicator" v-if="!isPlaying && !showRipple">
+    <!-- Feed mode: muted badge + "tap to watch" overlay -->
+    <template v-if="feedMode">
+      <!-- Muted badge (always shown in feed mode) -->
+      <div class="feed-muted-badge">
+        <ion-icon :icon="volumeMute"></ion-icon>
+      </div>
+      <!-- "Tap to watch" hint shown when paused or as persistent overlay -->
+      <div class="feed-tap-overlay">
+        <div class="feed-tap-hint">
+          <ion-icon :icon="play" class="feed-tap-icon"></ion-icon>
+          <span>Tap to watch</span>
+        </div>
+      </div>
+    </template>
+
+    <!-- Play indicator when paused (non-feed mode) -->
+    <div class="play-indicator" v-if="!feedMode && !isPlaying && !showRipple">
       <div class="play-button">
         <ion-icon :icon="play"></ion-icon>
       </div>
     </div>
 
-    <!-- Bottom controls bar -->
-    <div class="controls-bar" @click.stop>
+    <!-- Bottom controls bar (non-feed mode only) -->
+    <div class="controls-bar" @click.stop v-if="!feedMode">
       <!-- Progress bar -->
       <div class="progress-track" @click.stop="seekTo($event)" ref="progressTrack">
         <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
@@ -62,6 +82,7 @@ import { volumeHigh, volumeMute, play, pause, playCircle, pauseCircle } from 'io
 export default {
   name: 'VideoPlayer',
   components: { IonIcon },
+  emits: ['open-in-feed'],
   props: {
     src: {
       type: String,
@@ -70,6 +91,11 @@ export default {
     poster: {
       type: String,
       default: ''
+    },
+    // When true: video autoplays muted in feed; tapping navigates to video feed
+    feedMode: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
@@ -104,6 +130,19 @@ export default {
     },
     durationFormatted() {
       return this.formatTime(this.duration);
+    }
+  },
+  watch: {
+    // Re-attempt play when src changes (e.g., lazy-loaded)
+    src(newSrc) {
+      if (!newSrc) return;
+      this.$nextTick(() => {
+        const video = this.$refs.video;
+        if (video && this.isVisible) {
+          video.load();
+          this.playVideo();
+        }
+      });
     }
   },
   mounted() {
@@ -182,6 +221,14 @@ export default {
       } else {
         video.pause();
         this.flashRipple(pause);
+      }
+    },
+    // Unified click handler: in feedMode emit event; otherwise toggle play
+    handleContainerClick() {
+      if (this.feedMode) {
+        this.$emit('open-in-feed');
+      } else {
+        this.togglePlay();
       }
     },
     toggleMute() {
@@ -428,5 +475,58 @@ export default {
 .mute-btn.is-muted {
   border-color: rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.6);
+}
+
+/* ── Feed mode styles ── */
+.video-container.feed-mode {
+  cursor: pointer;
+}
+
+/* Muted badge — top-right corner in feed mode */
+.feed-muted-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  z-index: 15;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.15);
+  pointer-events: none;
+}
+
+/* "Tap to watch" gradient overlay — always visible in feed mode */
+.feed-tap-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 10px 12px;
+  background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 50%);
+  z-index: 12;
+  pointer-events: none;
+}
+
+.feed-tap-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.7);
+  letter-spacing: 0.3px;
+}
+
+.feed-tap-icon {
+  font-size: 14px;
 }
 </style>

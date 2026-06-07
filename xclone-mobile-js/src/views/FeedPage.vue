@@ -168,8 +168,11 @@
                     />
                     <VideoPlayer
                       v-else-if="item.type === 'video'"
-                      :src="getImageUrl(item.data)"
+                      :src="getVideoUrl(item)"
                       :poster="item.thumbnail ? getImageUrl(item.thumbnail) : ''"
+                      :feedMode="true"
+                      @open-in-feed="openMedia(post, item)"
+                      @click.stop
                     />
                   </div>
                 </div>
@@ -228,8 +231,11 @@
                   />
                   <VideoPlayer
                     v-else-if="item.type === 'video'"
-                    :src="getImageUrl(item.data)"
+                    :src="getVideoUrl(item)"
                     :poster="item.thumbnail ? getImageUrl(item.thumbnail) : ''"
+                    :feedMode="true"
+                    @open-in-feed="openMedia(post, item)"
+                    @click.stop
                   />
                 </div>
               </div>
@@ -434,8 +440,11 @@
                   />
                   <VideoPlayer
                     v-else-if="item.type === 'video'"
-                    :src="getImageUrl(item.data)"
+                    :src="getVideoUrl(item)"
                     :poster="item.thumbnail ? getImageUrl(item.thumbnail) : ''"
+                    :feedMode="true"
+                    @open-in-feed="openMedia(detailPost, item)"
+                    @click.stop
                   />
                 </div>
               </div>
@@ -646,8 +655,11 @@
                         />
                         <VideoPlayer
                           v-else-if="item.type === 'video'"
-                          :src="getImageUrl(item.data)"
+                          :src="getVideoUrl(item)"
                           :poster="item.thumbnail ? getImageUrl(item.thumbnail) : ''"
+                          :feedMode="true"
+                          @open-in-feed="openMedia(activeCommentPost, item)"
+                          @click.stop
                         />
                       </div>
                     </div>
@@ -1374,15 +1386,24 @@ export default {
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
       if (typeof imageData !== 'string') return this.defaultAvatar;
+      // Already a full URL (Supabase CDN, http, https)
       if (imageData.startsWith('http')) return imageData;
-      if (imageData.startsWith('data:image')) return imageData;
+      // Already a data URI (legacy base64 thumbnails)
+      if (imageData.startsWith('data:')) return imageData;
+      // Local static path — prepend API base URL
       if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
-      
-      // Handle base64 images properly
-      if (imageData.length > 100 && !imageData.startsWith('http') && !imageData.startsWith('data:image') && !imageData.startsWith('/static/')) {
-        return `data:image/png;base64,${imageData}`;
-      }
-      return imageData;
+      return this.defaultAvatar;
+    },
+
+    getVideoUrl(mediaItem) {
+      if (!mediaItem) return '';
+      const data = mediaItem.data || '';
+      if (!data) return '';
+      if (data.startsWith('http')) return data;
+      if (data.startsWith('/static/')) return `${this.API_URL}${data}`;
+      // Legacy bare base64 — shouldn't exist in new uploads but handle gracefully
+      if (data.startsWith('data:')) return data;
+      return '';
     },
     
     handleImageError(event) {

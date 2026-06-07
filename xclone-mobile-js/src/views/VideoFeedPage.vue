@@ -17,9 +17,11 @@
           playsinline
           webkit-playsinline
           loop
-          preload="auto"
+          muted
+          preload="metadata"
           @ended="onVideoEnded(index)"
           @click="togglePlay(index)"
+          @error="onVideoError(index, $event)"
         ></video>
 
         <!-- Gradient overlay -->
@@ -109,7 +111,7 @@ export default {
       videos: [],
       loading: false,
       loadingMore: false,
-      isMuted: false,
+      isMuted: true,
       currentIndex: 0,
       playingStates: {},
       videoRefs: {},
@@ -197,7 +199,12 @@ export default {
           if (this.$refs.scrollContainer) {
             this.$refs.scrollContainer.scrollTop = 0;
           }
-          this.initObserver();
+          // Wait two ticks: first for DOM update, second for :ref callbacks to fire
+          this.$nextTick(() => {
+            this.initObserver();
+            // Extra safety: retry after a short delay for slow renders
+            setTimeout(() => this.initObserver(), 300);
+          });
         });
       } catch (e) {
         console.error('Video feed error:', e);
@@ -245,9 +252,13 @@ export default {
         });
       }, { threshold: 0.75 });
 
-      Object.values(this.videoSlides).forEach(slide => {
-        if (slide) this.observer.observe(slide);
-      });
+      const slides = Object.values(this.videoSlides).filter(Boolean);
+      slides.forEach(slide => this.observer.observe(slide));
+
+      // If first slide is already in view (normal case on load), play it directly
+      if (slides.length > 0 && this.videoRefs[0]) {
+        this.playVideoAt(0);
+      }
     },
 
     refreshObserver() {
@@ -261,11 +272,49 @@ export default {
       if (!video) return;
       
       this.currentPlayStartTime = Date.now();
-      
-      video.muted = this.isMuted;
-      video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
-      this.playingStates[index] = true;
       this.currentIndex = index;
+      
+      // Always muted on first play attempt — required by browser autoplay policy
+      video.muted = true;
+      // Then honour the user's mute preference (only matters if isMuted was toggled off)
+      // We keep muted=true initially to guarantee autoplay, then sync after canplay
+      
+      const doPlay = () => {
+        video.muted = this.isMuted;
+        video.play().catch(() => {
+          // Autoplay blocked without mute — force muted and retry
+          video.muted = true;
+          video.play().catch(() => {});
+        });
+        this.playingStates[index] = true;
+      };
+
+      if (video.readyState >= 2) {
+        // HAVE_CURRENT_DATA or better — play immediately
+        doPlay();
+      } else {
+        // Not loaded yet — wait for canplay
+        const onReady = () => {
+          video.removeEventListener('canplay', onReady);
+          doPlay();
+        };
+        video.addEventListener('canplay', onReady);
+        // Also kick off loading if not started
+        if (video.networkState === HTMLMediaElement.NETWORK_EMPTY) {
+          video.load();
+        }
+      }
+    },
+
+    onVideoError(index, event) {
+      const video = this.videoRefs[index];
+      const post = this.videos[index];
+      const src = video?.src || 'unknown';
+      console.error(`❌ Video error at index ${index}:`, {
+        src: src.substring(0, 120),
+        post_id: post?.post_id,
+        error: event?.target?.error
+      });
     },
 
     pauseVideoAt(index) {
@@ -313,6 +362,7 @@ export default {
 
     toggleGlobalMute() {
       this.isMuted = !this.isMuted;
+      // Apply to all loaded video elements
       Object.values(this.videoRefs).forEach(v => { if (v) v.muted = this.isMuted; });
     },
 
@@ -379,10 +429,11 @@ export default {
       const item = video.media?.[0];
       if (!item) return '';
       const src = item.data || '';
+      if (!src) return '';
       if (src.startsWith('http')) return src;
       if (src.startsWith('/static/')) return `${this.API_URL}${src}`;
-      if (src.length > 100) return `data:video/mp4;base64,${src}`;
-      return src;
+      if (src.startsWith('data:')) return src; // legacy base64
+      return '';
     },
 
     getVideoPoster(video) {
@@ -391,17 +442,16 @@ export default {
       const t = item.thumbnail;
       if (t.startsWith('http')) return t;
       if (t.startsWith('/static/')) return `${this.API_URL}${t}`;
-      if (t.length > 100) return `data:image/jpeg;base64,${t}`;
-      return t;
+      if (t.startsWith('data:')) return t; // legacy base64 thumbnail
+      return '';
     },
 
     getImageUrl(imageData) {
       if (!imageData) return this.defaultAvatar;
       if (imageData.startsWith('http')) return imageData;
-      if (imageData.startsWith('data:image')) return imageData;
+      if (imageData.startsWith('data:')) return imageData;
       if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
-      if (imageData.length > 100) return `data:image/png;base64,${imageData}`;
-      return imageData;
+      return this.defaultAvatar;
     },
 
     formatCount(n) {
