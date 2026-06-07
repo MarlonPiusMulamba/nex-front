@@ -493,3 +493,91 @@ export async function scanSubnetForKnownPeers(myLocalIP, knownContacts) {
     console.log('[LAN Scan] Found', found.length, 'reachable hosts');
     return found;
 }
+
+// ─────────────────────────────────────────────────────────────
+//  Master Auto-Discovery Orchestrator
+//
+//  Call this once after conversations are loaded (e.g. in
+//  DMPage.vue mounted()). It runs all three tiers silently:
+//
+//  Tier 1 — Backend-assisted (needs internet):
+//    Announce → fetch peers on same subnet → connect each
+//
+//  Tier 2 — Socket.IO rendezvous (handled in lanService.js)
+//    Server fires dm:lan_peer_ready → lanService auto-connects
+//
+//  Tier 3 — Offline subnet scan (no internet):
+//    Read known contacts from IndexedDB → scan their last IPs
+//    → initiate WebRTC via local hub or Socket.IO relay
+//
+//  Returns immediately; connections happen in the background.
+// ─────────────────────────────────────────────────────────────
+export async function autoDiscoverAndConnect(lanServiceInstance) {
+    if (!lanServiceInstance?.myUserId) return;
+
+    try {
+        const localIP = await getLocalIP();
+        if (!localIP) {
+            console.warn('[LAN Discovery] Could not determine local IP');
+            return;
+        }
+
+        console.log('[LAN Discovery] Local IP:', localIP);
+
+        // ── Tier 1: Backend-assisted (when online) ───────────────────
+        if (navigator.onLine) {
+            try {
+                // announceLanPresence + fetchLanPeers already called via
+                // lanService._startAnnounceLoop(). Here we also do an
+                // immediate peer fetch to bootstrap connections faster.
+                await announceLanPresence(
+                    lanServiceInstance.myUserId,
+                    lanServiceInstance._myUsername || lanServiceInstance.myUserId,
+                    localIP
+                );
+
+                const peers = await fetchLanPeers(lanServiceInstance.myUserId, localIP);
+                for (const peer of peers) {
+                    const peerId = String(peer.userId || peer.user_id || '');
+                    if (!peerId || peerId === lanServiceInstance.myUserId) continue;
+                    if (!lanServiceInstance.peers.has(peerId) ||
+                        lanServiceInstance.peers.get(peerId).state !== 'open') {
+                        console.log('[LAN Discovery] Tier-1 connecting to', peerId);
+                        lanServiceInstance.connectToPeer(peerId);
+                        // Cache the peer's IP for future offline reconnects
+                        if (peer.localIP) {
+                            updatePeerLanInfo(peerId, { last_resolved_ip: peer.localIP });
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[LAN Discovery] Tier-1 (backend) failed:', e);
+            }
+        }
+
+        // ── Tier 3: Offline subnet scan ──────────────────────────────
+        // Run regardless of internet status.
+        // Useful when on company Wi-Fi with no internet access.
+        try {
+            const knownContacts = await getKnownContactsOffline();
+            if (knownContacts.length) {
+                const reachable = await scanSubnetForKnownPeers(localIP, knownContacts);
+                for (const { contact } of reachable) {
+                    const peerId = String(contact.userId);
+                    if (!peerId || peerId === lanServiceInstance.myUserId) continue;
+                    if (!lanServiceInstance.peers.has(peerId) ||
+                        lanServiceInstance.peers.get(peerId).state !== 'open') {
+                        console.log('[LAN Discovery] Tier-3 connecting to', peerId, 'via subnet scan');
+                        lanServiceInstance.connectToPeer(peerId);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[LAN Discovery] Tier-3 (subnet scan) failed:', e);
+        }
+
+    } catch (e) {
+        console.warn('[LAN Discovery] autoDiscoverAndConnect error:', e);
+    }
+}
+

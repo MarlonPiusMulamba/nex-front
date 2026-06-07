@@ -130,11 +130,22 @@ export default {
     };
   },
   mounted() {
+    this.initMuteState();
     this.loadVideos();
+  },
+  created() {
+    this.storageHandler = (e) => {
+      if (e.key === 'nexfi_video_muted') {
+        this.isMuted = e.newValue !== 'false';
+        Object.values(this.videoRefs).forEach(v => { if (v) v.muted = this.isMuted; });
+      }
+    };
+    window.addEventListener('storage', this.storageHandler);
   },
   beforeUnmount() {
     this.pauseAll();
     if (this.observer) this.observer.disconnect();
+    if (this.storageHandler) window.removeEventListener('storage', this.storageHandler);
   },
   activated() {
     this.initObserver();
@@ -364,6 +375,17 @@ export default {
       this.isMuted = !this.isMuted;
       // Apply to all loaded video elements
       Object.values(this.videoRefs).forEach(v => { if (v) v.muted = this.isMuted; });
+      // Save globally
+      localStorage.setItem('nexfi_video_muted', this.isMuted);
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'nexfi_video_muted',
+        newValue: String(this.isMuted)
+      }));
+    },
+
+    initMuteState() {
+      const savedMute = localStorage.getItem('nexfi_video_muted');
+      this.isMuted = savedMute !== 'false';
     },
 
     onVideoEnded(index) {

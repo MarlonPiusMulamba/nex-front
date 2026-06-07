@@ -118,6 +118,16 @@ try {
     socketService.disconnect();
   });
 
+  // Listen for backend failover to reconnect socket to the new URL
+  window.addEventListener('backend:failover', (event) => {
+    const newUrl = event.detail.baseURL;
+    console.warn('🔄 Backend failover detected! Reconnecting socket to:', newUrl);
+    const userId = localStorage.getItem('userId');
+    if (userId) {
+      socketService.connectToUrl(newUrl, userId);
+    }
+  });
+
 } catch (e) {
   console.error('❌ Socket init failed:', e);
 }

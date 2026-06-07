@@ -10,8 +10,9 @@
  *   local → delivered → synced
  */
 
-import { saveLocalMessage, markMessageDelivered, updatePeerLanInfo, getPeerLanIP } from './offlineDb.js';
+import { saveLocalMessage, markMessageDelivered, updatePeerLanInfo, getPeerLanIP, getOfflineConversations, getAllPeerInfo } from './offlineDb.js';
 import { Capacitor } from '@capacitor/core';
+import api from './api.js';
 
 const isNative = Capacitor.isNativePlatform();
 let Zeroconf = null;
@@ -40,6 +41,7 @@ class LanService {
         this.myUserId = null;
         this.socket = null;
         this.keepAliveInterval = null;
+        this._announceInterval = null;
 
         // Map<peerId (user_id string), { pc: RTCPeerConnection, dc: RTCDataChannel, state: 'connecting'|'open'|'closed' }>
         this.peers = new Map();
@@ -64,11 +66,20 @@ class LanService {
         this.socket = socket;
         this._listenSignaling();
         
-        // Start LAN discovery
+        // Start LAN discovery (mDNS / ZeroConf / UDP broadcast)
         this.startDiscovery();
         this.publishPresence();
         this._startKeepAlive();
         this._startDesktopDiscovery(); // For Electron
+
+        // ── Smart Auto-Reconnect ──────────────────────────────────
+        // 1. Immediately try to connect to known conversation partners
+        //    using their last-cached LAN IP (works even offline)
+        this._autoConnectKnownPeers();
+
+        // 2. Announce our LAN IP to the backend every 30s (when online)
+        //    → backend fires dm:lan_peer_ready to matched partners
+        this._startAnnounceLoop();
 
         console.log('[LAN] Service initialised for user', this.myUserId);
     }
@@ -282,6 +293,23 @@ class LanService {
                 await peer.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
             } catch (e) {
                 console.warn('[LAN] ICE candidate error:', e);
+            }
+        });
+
+        // ── Smart Rendezvous: backend confirmed both peers on same subnet ─
+        // Server fires this when two users who have conversed both announce
+        // from the same /24 subnet. No QR scan needed — fully automatic.
+        this.socket.on('dm:lan_peer_ready', (data) => {
+            const peerId = String(data.peer_user_id || '');
+            if (!peerId || peerId === this.myUserId) return;
+            console.log('[LAN] Rendezvous: auto-connecting to', peerId, '(', data.peer_username, ')');
+            // Silently initiate WebRTC if not already connected
+            if (!this.peers.has(peerId) || this.peers.get(peerId).state !== 'open') {
+                this.connectToPeer(peerId);
+            }
+            // Cache peer IP for future offline reconnects
+            if (data.peer_ip) {
+                updatePeerLanInfo(peerId, { last_resolved_ip: data.peer_ip });
             }
         });
 
@@ -615,12 +643,85 @@ class LanService {
     }
 
     // ─────────────────────────────────────────────
+    //  Smart Auto-Reconnect: connect to all known
+    //  conversation partners that have a cached IP
+    //  (works completely offline — no internet needed)
+    // ─────────────────────────────────────────────
+    async _autoConnectKnownPeers() {
+        try {
+            const [conversations, peerInfoList] = await Promise.all([
+                getOfflineConversations(),
+                getAllPeerInfo()
+            ]);
+
+            const peerMap = {};
+            peerInfoList.forEach(p => { peerMap[String(p.user_id)] = p; });
+
+            for (const conv of conversations) {
+                const peerId = String(conv.user_id);
+                if (peerId === this.myUserId) continue;
+
+                const info = peerMap[peerId];
+                if (info?.last_resolved_ip) {
+                    // We have a last-known IP → try connecting directly
+                    console.log('[LAN] Auto-reconnect attempt →', peerId, 'at', info.last_resolved_ip);
+                    if (!this.peers.has(peerId) || this.peers.get(peerId).state !== 'open') {
+                        // Small stagger so we don't hammer the network
+                        await new Promise(r => setTimeout(r, 300));
+                        this.connectToPeer(peerId);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[LAN] _autoConnectKnownPeers error:', e);
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    //  Announce our LAN IP to the backend every 30s
+    //  (When internet is available)
+    //  Backend cross-checks conversation history and
+    //  fires dm:lan_peer_ready to matched partners.
+    // ─────────────────────────────────────────────
+    async _startAnnounceLoop() {
+        if (this._announceInterval) clearInterval(this._announceInterval);
+
+        const announce = async () => {
+            if (!navigator.onLine || !this.myUserId) return;
+            try {
+                const { getLocalIP } = await import('./lanSignaling.js');
+                const localIP = await getLocalIP();
+                if (!localIP) return;
+
+                await api.post('/api/lan/announce', {
+                    userId:   this.myUserId,
+                    username: this._myUsername || this.myUserId,
+                    localIP
+                });
+
+                // Also cache our own IP for self-identification
+                console.log('[LAN] Announced presence at', localIP);
+            } catch (_) {
+                // Silently fail when offline
+            }
+        };
+
+        // First announce immediately, then every 30s
+        announce();
+        this._announceInterval = setInterval(announce, 30_000);
+    }
+
+    // ─────────────────────────────────────────────
     //  Close all peer connections (on logout)
     // ─────────────────────────────────────────────
     destroy() {
         if (this.keepAliveInterval) {
             clearInterval(this.keepAliveInterval);
             this.keepAliveInterval = null;
+        }
+        if (this._announceInterval) {
+            clearInterval(this._announceInterval);
+            this._announceInterval = null;
         }
         if (this._localHubServer) {
             try { this._localHubServer.close(); } catch (_) {}

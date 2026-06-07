@@ -1,5 +1,10 @@
+const PRIMARY_BACKEND = 'https://nexfiapi.ddns.net';
+const SECONDARY_BACKEND = 'https://nex-back-3-stoz.onrender.com';
+
 const config = {
   api: {
+    primaryBaseURL: PRIMARY_BACKEND,
+    secondaryBaseURL: SECONDARY_BACKEND,
     baseURL: (() => {
       const envUrl = import.meta.env.VITE_API_URL;
       const pageHost = window.location.hostname;
@@ -31,33 +36,18 @@ const config = {
         apiUrl = envUrl;
         console.log('🔧 Using VITE_API_URL from environment:', envUrl);
       }
-      // Priority 2: For Electron apps, use production backend
-      else if (isElectron) {
-        apiUrl = 'https://nexfiapi.ddns.net';
-        console.log('🖥️ Electron app detected, using production backend');
-      }
-      // Priority 3: For local development, use local backend if available (localhost:5000)
+      // Priority 2: For local development, use local backend if available (localhost:5000)
       else if (isPageLocal) {
         apiUrl = ''; // Use relative path so Vite proxy handles it
         console.log('💻 Local development detected, using Vite Proxy');
       }
-      // Priority 3: For Capacitor apps, always use production backend
-      else if (isNative) {
-        apiUrl = 'https://nexfiapi.ddns.net';
-        console.log('📱 Capacitor app detected, using production backend');
-      }
-      // Priority 4: Default to production backend
+      // Priority 3: Default to production primary backend
       else {
-        apiUrl = 'https://nexfiapi.ddns.net';
-        console.log('🌐 Using production backend');
+        apiUrl = PRIMARY_BACKEND;
+        console.log('🌐 Using production primary backend:', PRIMARY_BACKEND);
       }
 
       console.log('📡 Final API baseURL:', apiUrl);
-      console.log('🖥️  Page hostname:', pageHost);
-      console.log('🔌 Protocol:', pageProtocol);
-      console.log('📱 Is Native App:', isNative);
-      console.log('💻 Is Local Dev:', isPageLocal);
-
       return apiUrl;
     })(),
     timeout: 300000, // 5 minutes (to support 50MB media uploads)

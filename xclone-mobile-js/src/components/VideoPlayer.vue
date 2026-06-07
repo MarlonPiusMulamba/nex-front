@@ -36,11 +36,11 @@
     <!-- Feed mode: muted badge + "tap to watch" overlay -->
     <template v-if="feedMode">
       <!-- Muted badge (always shown in feed mode) -->
-      <div class="feed-muted-badge">
-        <ion-icon :icon="volumeMute"></ion-icon>
+      <div class="feed-muted-badge" @click.stop="toggleMute">
+        <ion-icon :icon="isMuted ? volumeMute : volumeHigh"></ion-icon>
       </div>
       <!-- "Tap to watch" hint shown when paused or as persistent overlay -->
-      <div class="feed-tap-overlay">
+      <div class="feed-tap-overlay" @click="handleContainerClick">
         <div class="feed-tap-hint">
           <ion-icon :icon="play" class="feed-tap-icon"></ion-icon>
           <span>Tap to watch</span>
@@ -113,7 +113,8 @@ export default {
       volumeMute,
       play,
       pause,
-      observer: null
+      observer: null,
+      storageHandler: null
     };
   },
   computed: {
@@ -151,14 +152,26 @@ export default {
     this.$nextTick(() => {
       const video = this.$refs.video;
       if (video) {
-        video.muted = true;
-        this.isMuted = true;
+        // Load initial state from localStorage
+        const savedMute = localStorage.getItem('nexfi_video_muted');
+        this.isMuted = savedMute !== 'false'; // default to true if not set
+        video.muted = this.isMuted;
       }
     });
+
+    // Listen for storage changes from other components
+    this.storageHandler = (e) => {
+      if (e.key === 'nexfi_video_muted') {
+        this.isMuted = e.newValue !== 'false';
+        if (this.$refs.video) this.$refs.video.muted = this.isMuted;
+      }
+    };
+    window.addEventListener('storage', this.storageHandler);
   },
   beforeUnmount() {
     if (this.observer) this.observer.disconnect();
     if (this.rippleTimer) clearTimeout(this.rippleTimer);
+    if (this.storageHandler) window.removeEventListener('storage', this.storageHandler);
   },
   methods: {
     initObserver() {
@@ -177,9 +190,11 @@ export default {
     playVideo() {
       const video = this.$refs.video;
       if (!video) return;
-      // Force muted — required for autoplay policy in all browsers
-      video.muted = true;
-      this.isMuted = true;
+      // Load current mute state
+      const savedMute = localStorage.getItem('nexfi_video_muted');
+      this.isMuted = savedMute !== 'false';
+      video.muted = this.isMuted;
+      
       const promise = video.play();
       if (promise !== undefined) {
         promise.catch(() => {
@@ -202,8 +217,9 @@ export default {
     onLoadedData() {
       const video = this.$refs.video;
       if (!video) return;
-      video.muted = true;
-      this.isMuted = true;
+      const savedMute = localStorage.getItem('nexfi_video_muted');
+      this.isMuted = savedMute !== 'false';
+      video.muted = this.isMuted;
       if (this.isVisible && video.paused) {
         video.play().catch(() => { this.isPlaying = false; });
       }
@@ -234,8 +250,16 @@ export default {
     toggleMute() {
       const video = this.$refs.video;
       if (!video) return;
-      video.muted = !video.muted;
-      this.isMuted = video.muted;
+      const newState = !this.isMuted;
+      video.muted = newState;
+      this.isMuted = newState;
+      // Save globally
+      localStorage.setItem('nexfi_video_muted', newState);
+      // Manually trigger event for same-window instances
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'nexfi_video_muted',
+        newValue: String(newState)
+      }));
     },
     seekTo(event) {
       const video = this.$refs.video;
@@ -499,7 +523,12 @@ export default {
   z-index: 15;
   backdrop-filter: blur(4px);
   border: 1px solid rgba(255,255,255,0.15);
-  pointer-events: none;
+  pointer-events: auto;
+  transition: transform 0.1s;
+}
+
+.feed-muted-badge:active {
+  transform: scale(0.9);
 }
 
 /* "Tap to watch" gradient overlay — always visible in feed mode */

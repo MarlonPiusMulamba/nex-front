@@ -64,22 +64,38 @@ api.interceptors.response.use(
   async (error) => {
     const requestConfig = error.config;
 
-    // ── Auto-retry logic ─────────────────────────────────────────────────────
-    // Track how many times we have already retried this specific request
+    // ── Auto-retry & Failover logic ───────────────────────────────────────────
     requestConfig._retryCount = requestConfig._retryCount || 0;
 
     if (shouldRetry(error) && requestConfig._retryCount < MAX_RETRIES) {
       requestConfig._retryCount += 1;
+      
+      const isPrimary = api.defaults.baseURL === config.api.primaryBaseURL;
+      const shouldFailover = isPrimary && requestConfig._retryCount >= 2; // Failover on 2nd retry if primary is down
+
+      if (shouldFailover && config.api.secondaryBaseURL) {
+        console.error('🚨 Primary backend appears down. Switching to Secondary (Render) failover...');
+        config.api.baseURL = config.api.secondaryBaseURL;
+        api.defaults.baseURL = config.api.secondaryBaseURL;
+        requestConfig.baseURL = config.api.secondaryBaseURL; // Update current request too
+        
+        // Notify other services (like Socket.IO) that we've switched backends
+        window.dispatchEvent(new CustomEvent('backend:failover', { 
+          detail: { baseURL: config.api.secondaryBaseURL } 
+        }));
+      }
+
       const delay = RETRY_BASE_DELAY_MS * Math.pow(2, requestConfig._retryCount - 1);
       console.warn(
         `⚠️ Request failed (${error.response?.status || 'network error'}). ` +
-        `Retrying ${requestConfig._retryCount}/${MAX_RETRIES} in ${delay}ms...`,
+        `Retrying ${requestConfig._retryCount}/${MAX_RETRIES} in ${delay}ms using ${requestConfig.baseURL || api.defaults.baseURL}...`,
         requestConfig.url
       );
+      
       await wait(delay);
       return api(requestConfig); // Re-issue the exact same request
     }
-    // ── End retry logic ──────────────────────────────────────────────────────
+    // ── End failover logic ────────────────────────────────────────────────────
 
     // All retries exhausted — log and handle normally
     console.error('❌ API Error (all retries failed):', {

@@ -108,6 +108,10 @@
               <div class="conv-username-row">
                 <span class="conv-username">{{ conv.username }}</span>
                 <VerificationBadge :tier="conv.verification_tier" />
+                <div v-if="isLanReachable(conv.user_id)" class="lan-badge list-badge">
+                  <ion-icon :icon="flash" class="lan-icon"></ion-icon>
+                  LAN
+                </div>
               </div>
               <span class="conv-time">{{ formatTime(conv.last_message_time) }}</span>
             </div>
@@ -559,6 +563,7 @@ import {
   saveLocalMessage
 } from '@/utils/offlineDb.js';
 import lanService from '@/utils/lanService.js';
+import { autoDiscoverAndConnect } from '@/utils/lanSignaling.js';
 import { startSyncWatcher } from '@/utils/syncService.js';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 // Removed uuid import as it might be missing
@@ -765,7 +770,7 @@ export default {
 
       try {
         this.searchingUsers = true;
-        console.log('ðŸ“¡ Searching users with query:', rawQuery);
+        console.log('📡 Searching users with query:', rawQuery);
         const res = await api.get('/api/search/users', {
           params: { 
             q: rawQuery,
@@ -779,9 +784,9 @@ export default {
         const users = res.users || res.data?.users || res?.data || [];
         this.searchResults = Array.isArray(users) ? users : [];
         
-        console.log(`âœ… Search results: ${this.searchResults.length} users`, res);
+        console.log(`✅ Search results: ${this.searchResults.length} users`, res);
       } catch (err) {
-        console.error('âŒ Search error:', err);
+        console.error('❌ Search error:', err);
         console.error('Error response:', err.response?.data);
         this.searchResults = [];
       } finally {
@@ -947,7 +952,7 @@ export default {
 
         this.$nextTick(() => this.scrollToBottom());
       } catch (err) {
-        console.error('â Œ Load messages error:', err);
+        console.error('❌ Load messages error:', err);
         // Fallback to offline on error
         const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
         if (cachedMessages) this.messages = cachedMessages;
@@ -1161,7 +1166,7 @@ export default {
       this.audioChunks = [];
       this.voiceDropTranscript = '';
       this.voiceDropMood = null;
-      console.log('ðŸŽ™ï¸ Recording cancelled');
+      console.log('🎙️ Recording cancelled');
     },
 
     async sendVoiceNote() {
@@ -1462,10 +1467,10 @@ export default {
           user_id: this.userId,
           other_user_id: otherUserId
         });
-        console.log('âœ… Messages marked as read');
+        console.log('✅ Messages marked as read');
         window.dispatchEvent(new Event('dm-refresh'));
       } catch (err) {
-        console.error('âŒ Mark read error:', err);
+        console.error('❌ Mark read error:', err);
       }
     },
 
@@ -1501,11 +1506,11 @@ export default {
     async loadConversations() {
       try {
         this.isLoading = true;
-        console.log('ðŸ“¡ Loading conversations for user:', this.userId);
+        console.log('📡 Loading conversations for user:', this.userId);
         
         // Handle offline
         if (isNetworkOffline()) {
-           console.log('ðŸ“¡ OFFLINE: Loading conversations from IndexedDB');
+           console.log('📡 OFFLINE: Loading conversations from IndexedDB');
            const cachedConv = await getOfflineConversations();
            if (cachedConv && cachedConv.length > 0) {
              this.conversations = cachedConv;
@@ -1520,7 +1525,7 @@ export default {
         
         this.conversations = res.conversations || [];
         this.filteredConversations = [...this.conversations];
-        console.log(`âœ… Loaded ${this.conversations.length} conversations`);
+        console.log(`✅ Loaded ${this.conversations.length} conversations`);
 
         // Update online status for all
         const allIds = this.conversations.map(c => c.user_id);
@@ -1541,7 +1546,7 @@ export default {
 
         window.dispatchEvent(new Event('dm-refresh'));
       } catch (err) {
-        console.error('âŒ Load conversations error:', err);
+        console.error('❌ Load conversations error:', err);
         // Fallback to offline on error
         const cachedConv = await getOfflineConversations();
         if (cachedConv) {
@@ -1884,12 +1889,12 @@ export default {
 
   mounted() {
     if (!this.userId) {
-      console.error('âŒ No userId found in localStorage!');
+      console.error('❌ No userId found in localStorage!');
       this.$router.push('/login');
       return;
     }
-    console.log('âœ… DMPage mounted, userId:', this.userId);
-    console.log('âœ… User type:', typeof this.userId);
+    console.log('✅ DMPage mounted, userId:', this.userId);
+    console.log('✅ User type:', typeof this.userId);
 
     // Realtime DM updates via Socket.IO
     try {
@@ -1957,6 +1962,8 @@ export default {
 
     this.loadConversations().then(() => {
       this.autoOpenFromQuery();
+      // ── Trigger master LAN auto-discovery ──
+      autoDiscoverAndConnect(lanService);
     });
 
     // Load pending invitations
@@ -1999,14 +2006,14 @@ export default {
     });
   },
   ionViewDidEnter() {
-    console.log('âœ… DMPage ionViewDidEnter');
+    console.log('✅ DMPage ionViewDidEnter');
     this.autoOpenFromQuery();
   },
   watch: {
     '$route.query': {
       handler(newQuery) {
         if (newQuery && (newQuery.userId || newQuery.username)) {
-          console.log('ðŸ“¡ Route query changed, auto-opening chat...', newQuery);
+          console.log('📡 Route query changed, auto-opening chat...', newQuery);
           this.autoOpenFromQuery();
         }
       },
@@ -2035,11 +2042,11 @@ export default {
 
 <style scoped>
 /* ================================================
-   NEXFI DM â€” Premium Chat Design System
-   Deep black Â· Gold Â· Floating cards Â· Mood glow
+   NEXFI DM — Premium Chat Design System
+   Deep black · Gold · Floating cards · Mood glow
    ================================================ */
 
-/* â”€â”€ Conversation List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Conversation List ────────────────────────────────── */
 .gold-btn {
   --background: linear-gradient(135deg, #daa520 0%, #ffd700 100%);
   --background-activated: #b8860b;
@@ -2092,7 +2099,7 @@ export default {
   padding: 2px 8px; border-radius: 12px; min-width: 20px; text-align: center;
 }
 
-/* â”€â”€ Chat Area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Chat Area ────────────────────────────────────────── */
 .chat-header-content { display: flex; align-items: center; gap: 10px; }
 .header-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1.5px solid rgba(218,165,32,0.4); }
 .header-info { display: flex; flex-direction: column; }
@@ -2119,6 +2126,12 @@ export default {
   border: 1px solid rgba(218,165,32,0.3);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.lan-badge.list-badge {
+  padding: 0px 4px;
+  font-size: 8px;
+  margin-left: 2px;
 }
 
 .lan-icon {
