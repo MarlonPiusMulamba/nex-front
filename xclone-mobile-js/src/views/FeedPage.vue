@@ -298,9 +298,8 @@
         </div>
 
         <ion-infinite-scroll
-          v-if="hasMorePosts"
-          :disabled="loadingMore"
-          threshold="120px"
+          :disabled="!hasMorePosts || loadingMore"
+          threshold="200px"
           @ionInfinite="loadMorePosts">
           <ion-infinite-scroll-content loading-spinner="crescent" loading-text="Loading more posts..."></ion-infinite-scroll-content>
         </ion-infinite-scroll>
@@ -1280,6 +1279,7 @@ export default {
 
       try {
         this.loadingMore = true;
+        this.retryCount = 0; // Reset retry count for each loadMore call
         const nextOffset = this.pageOffset + this.pageLimit;
         const result = await this.fetchFeedUltraFast(nextOffset, this.pageLimit);
 
@@ -1295,12 +1295,21 @@ export default {
         } else {
           const existing = new Set(this.posts.map(p => p.post_id));
           const deduped = nextPosts.filter(p => !existing.has(p.post_id));
-          this.posts = this.posts.concat(deduped);
+          if (deduped.length > 0) {
+            this.posts = this.posts.concat(deduped);
+          }
+          // Always advance offset based on what we fetched
           this.pageOffset = nextOffset;
-          if (nextPosts.length < this.pageLimit) this.hasMorePosts = false;
+          // Use server's has_more if available, else fall back to batch size check
+          if (result?.has_more === false) {
+            this.hasMorePosts = false;
+          } else if (nextPosts.length < this.pageLimit) {
+            this.hasMorePosts = false;
+          }
         }
       } catch (err) {
         console.error('Failed to load more posts:', err);
+        // Don't set hasMorePosts=false on error — let user try scrolling again
       } finally {
         this.loadingMore = false;
         if (ev?.target) ev.target.complete();
@@ -1604,7 +1613,7 @@ export default {
             if (this.activeTab === 'following' && offset === 0 && res.data.posts.length === 0) {
                 this.fetchSuggestedUsers();
             }
-          return { success: true, posts: res.data.posts };
+          return { success: true, posts: res.data.posts, has_more: res.data.has_more };
         } else {
           return { success: false, error: 'Invalid response' };
         }
