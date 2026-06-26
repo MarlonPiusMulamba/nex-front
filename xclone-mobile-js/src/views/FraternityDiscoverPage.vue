@@ -40,6 +40,9 @@
         <div v-for="i in 6" :key="i" class="skeleton-card"></div>
       </div>
 
+      <!-- Nearby Peers (LAN) -->
+      <NearbyPeersWidget />
+
       <!-- My Fraternities -->
       <div v-if="activeFilter === 'mine' && myFraternities.length > 0" class="section">
         <h2 class="section-title">Your Spaces</h2>
@@ -205,6 +208,7 @@ import FraternityCard from '@/components/FraternityCard.vue';
 import ContactDiscovery from '@/components/ContactDiscovery.vue';
 import axios from 'axios';
 import config from '@/config/index.js';
+import NearbyPeersWidget from '@/components/NearbyPeersWidget.vue';
 
 export default {
   name: 'FraternityDiscoverPage',
@@ -212,7 +216,7 @@ export default {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
     IonButton, IonButtons, IonIcon, IonSearchbar,
     IonModal, IonItem, IonLabel, IonInput, IonTextarea,
-    IonToggle, FraternityCard, ContactDiscovery
+    IonToggle, FraternityCard, ContactDiscovery, NearbyPeersWidget
   },
   data() {
     return {

@@ -14,6 +14,9 @@ import FraternityPage from '../views/FraternityPage.vue';
 import VerificationPortal from '../views/VerificationPortal.vue';
 import VideoFeedPage from '../views/VideoFeedPage.vue';
 
+import NoticeBoardPage from '../views/NoticeBoardPage.vue';
+import OrgBoardPage from '../views/OrgBoardPage.vue';
+
 const routes = [
   {
     path: '/',
@@ -81,6 +84,16 @@ const routes = [
       {
         path: 'fraternity/:slug',
         component: FraternityPage,
+        meta: { requiresAuth: false }
+      },
+      {
+        path: 'notices',
+        component: NoticeBoardPage,
+        meta: { requiresAuth: false }
+      },
+      {
+        path: 'notices/:slug',
+        component: OrgBoardPage,
         meta: { requiresAuth: false }
       },
       {

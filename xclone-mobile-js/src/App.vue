@@ -100,6 +100,33 @@ export default {
     } catch (_) {}
     this.applyTheme(saved === 'dark' ? 'dark' : 'light');
 
+    // Initialize LAN P2P Service globally
+    const lanSocket = this.$socketService?.socket || this.$socket || null;
+    const currentUsername = localStorage.getItem('username') || userId;
+    if (userId && lanSocket) {
+      const { default: lanService } = await import('./utils/lanService.js');
+      const { autoDiscoverAndConnect } = await import('./utils/lanSignaling.js');
+      
+      lanService.init(lanSocket, userId, currentUsername);
+      
+      // Initial discovery burst
+      autoDiscoverAndConnect(lanService);
+      
+      // Global listeners for LAN events
+      lanService.onMessage((msg) => {
+        // If not on DM page, show notification
+        if (this.$route.path !== '/tabs/dm') {
+          notificationService.handleIncomingNotification({
+            title: `LAN Message: ${msg.username || msg.from_user_id}`,
+            message: msg.text || '📸 Shared a media file',
+            type: 'message'
+          });
+        }
+      });
+      
+      console.log('✓ Global LAN Service initialized');
+    }
+
     // Service Worker Message Listener for Background Actions
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', (event) => {

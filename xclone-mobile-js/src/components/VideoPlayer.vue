@@ -3,19 +3,38 @@
     class="video-container"
     :class="{ 'is-playing': isPlaying, 'is-portrait': isPortrait, 'is-landscape': !isPortrait, 'feed-mode': feedMode }"
     ref="container"
+    @mouseenter="feedMode && onHoverStart()"
+    @mouseleave="feedMode && onHoverEnd()"
     @click="handleContainerClick"
   >
+    <!-- Poster thumbnail shown before/when not playing in feed mode -->
+    <div
+      v-if="feedMode && poster && !isPlaying"
+      class="feed-poster"
+      :style="{ backgroundImage: `url(${poster})` }"
+    >
+      <!-- Play icon overlay on poster -->
+      <div class="feed-poster-play">
+        <div class="feed-poster-play-circle">
+          <ion-icon :icon="play" class="feed-poster-play-icon"></ion-icon>
+        </div>
+      </div>
+      <!-- Video duration badge -->
+      <div v-if="duration > 0" class="feed-duration-badge">{{ durationFormatted }}</div>
+    </div>
+
     <video
       ref="video"
       :src="videoSrc"
       :poster="poster"
       class="video-player"
+      :class="{ 'video-hidden': feedMode && !isPlaying && poster }"
       playsinline
       webkit-playsinline
-      autoplay
+      :autoplay="!feedMode"
       muted
       loop
-      preload="auto"
+      :preload="feedMode ? 'metadata' : 'auto'"
       @playing="onPlaying"
       @pause="onPause"
       @timeupdate="onTimeUpdate"
@@ -33,17 +52,17 @@
       </div>
     </transition>
 
-    <!-- Feed mode: muted badge + "tap to watch" overlay -->
-    <template v-if="feedMode">
-      <!-- Muted badge (always shown in feed mode) -->
+    <!-- Feed mode playing: muted badge + gradient -->
+    <template v-if="feedMode && isPlaying">
+      <!-- Muted badge — top-right -->
       <div class="feed-muted-badge" @click.stop="toggleMute">
         <ion-icon :icon="isMuted ? volumeMute : volumeHigh"></ion-icon>
       </div>
-      <!-- "Tap to watch" hint shown when paused or as persistent overlay -->
-      <div class="feed-tap-overlay" @click="handleContainerClick">
-        <div class="feed-tap-hint">
-          <ion-icon :icon="play" class="feed-tap-icon"></ion-icon>
-          <span>Tap to watch</span>
+      <!-- Bottom gradient with "Click to watch" hint -->
+      <div class="feed-hover-overlay">
+        <div class="feed-hover-hint">
+          <ion-icon :icon="play" class="feed-hint-icon"></ion-icon>
+          <span>Click to watch</span>
         </div>
       </div>
     </template>
@@ -92,7 +111,7 @@ export default {
       type: String,
       default: ''
     },
-    // When true: video autoplays muted in feed; tapping navigates to video feed
+    // When true: video plays on hover muted in feed; clicking navigates to video feed
     feedMode: {
       type: Boolean,
       default: false
@@ -104,6 +123,7 @@ export default {
       isMuted: true,
       isVisible: false,
       isPortrait: false,
+      isHovering: false,
       currentTime: 0,
       duration: 0,
       showRipple: false,
@@ -114,12 +134,12 @@ export default {
       play,
       pause,
       observer: null,
-      storageHandler: null
+      storageHandler: null,
+      hoverTimeout: null
     };
   },
   computed: {
     videoSrc() {
-      // Do NOT append #t= — it blocks autoplay in Chrome/Safari
       return this.src || '';
     },
     progressPercent() {
@@ -134,12 +154,11 @@ export default {
     }
   },
   watch: {
-    // Re-attempt play when src changes (e.g., lazy-loaded)
     src(newSrc) {
       if (!newSrc) return;
       this.$nextTick(() => {
         const video = this.$refs.video;
-        if (video && this.isVisible) {
+        if (video && this.isVisible && !this.feedMode) {
           video.load();
           this.playVideo();
         }
@@ -148,14 +167,12 @@ export default {
   },
   mounted() {
     this.initObserver();
-    // Ensure muted state is synced on mount
+    // Sync muted state
     this.$nextTick(() => {
       const video = this.$refs.video;
       if (video) {
-        // Load initial state from localStorage
-        const savedMute = localStorage.getItem('nexfi_video_muted');
-        this.isMuted = savedMute !== 'false'; // default to true if not set
-        video.muted = this.isMuted;
+        video.muted = true; // always start muted
+        this.isMuted = true;
       }
     });
 
@@ -171,9 +188,56 @@ export default {
   beforeUnmount() {
     if (this.observer) this.observer.disconnect();
     if (this.rippleTimer) clearTimeout(this.rippleTimer);
+    if (this.hoverTimeout) clearTimeout(this.hoverTimeout);
     if (this.storageHandler) window.removeEventListener('storage', this.storageHandler);
+    // Clean up hover playback
+    if (this.feedMode && this.$refs.video) {
+      this.$refs.video.pause();
+    }
   },
   methods: {
+    // ─── Feed-mode hover handlers ───────────────────────────
+    onHoverStart() {
+      this.isHovering = true;
+      const video = this.$refs.video;
+      if (!video) return;
+      video.muted = true; // always muted on hover
+      this.isMuted = true;
+
+      const savedMute = localStorage.getItem('nexfi_video_muted');
+      // Keep muted on hover for browser autoplay compat
+      // But reflect saved pref after play starts
+      if (video.readyState >= 2) {
+        this._doHoverPlay(video);
+      } else {
+        // Pre-load and play when ready
+        video.load();
+        const onReady = () => {
+          video.removeEventListener('canplay', onReady);
+          if (this.isHovering) this._doHoverPlay(video);
+        };
+        video.addEventListener('canplay', onReady);
+      }
+    },
+
+    _doHoverPlay(video) {
+      video.muted = true;
+      video.currentTime = 0;
+      video.play().catch(() => {
+        // Autoplay blocked — silently fail, user must click
+      });
+    },
+
+    onHoverEnd() {
+      this.isHovering = false;
+      const video = this.$refs.video;
+      if (video && !video.paused) {
+        video.pause();
+        video.currentTime = 0;
+      }
+    },
+
+    // ─── Non-feedMode auto-play on scroll-into-view ───────────────────────────
     initObserver() {
       this.observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
@@ -187,36 +251,42 @@ export default {
       }, { threshold: 0.3, rootMargin: '0px' });
       this.observer.observe(this.$refs.container);
     },
+
     playVideo() {
       const video = this.$refs.video;
       if (!video) return;
-      // Load current mute state
-      const savedMute = localStorage.getItem('nexfi_video_muted');
-      this.isMuted = savedMute !== 'false';
-      video.muted = this.isMuted;
-      
+      if (this.feedMode) {
+        // Feed mode autoplay is always muted initially
+        video.muted = true;
+        this.isMuted = true;
+      } else {
+        const savedMute = localStorage.getItem('nexfi_video_muted');
+        this.isMuted = savedMute !== 'false';
+        video.muted = this.isMuted;
+      }
       const promise = video.play();
       if (promise !== undefined) {
         promise.catch(() => {
-          // Autoplay blocked — video stays paused, user must tap
           this.isPlaying = false;
         });
       }
     },
-    // Called when enough data is buffered to start playing
+
     onCanPlay() {
       const video = this.$refs.video;
       if (!video) return;
+      if (this.feedMode) return; // Don't auto-play in feed mode
       video.muted = true;
       this.isMuted = true;
       if (this.isVisible && video.paused) {
         video.play().catch(() => { this.isPlaying = false; });
       }
     },
-    // Fired after first frame is decoded — last resort retry
+
     onLoadedData() {
       const video = this.$refs.video;
       if (!video) return;
+      if (this.feedMode) return; // Defer to hover
       const savedMute = localStorage.getItem('nexfi_video_muted');
       this.isMuted = savedMute !== 'false';
       video.muted = this.isMuted;
@@ -224,10 +294,12 @@ export default {
         video.play().catch(() => { this.isPlaying = false; });
       }
     },
+
     pauseVideo() {
       const video = this.$refs.video;
       if (video) video.pause();
     },
+
     togglePlay() {
       const video = this.$refs.video;
       if (!video) return;
@@ -239,7 +311,8 @@ export default {
         this.flashRipple(pause);
       }
     },
-    // Unified click handler: in feedMode emit event; otherwise toggle play
+
+    // Unified click handler
     handleContainerClick() {
       if (this.feedMode) {
         this.$emit('open-in-feed');
@@ -247,20 +320,20 @@ export default {
         this.togglePlay();
       }
     },
+
     toggleMute() {
       const video = this.$refs.video;
       if (!video) return;
       const newState = !this.isMuted;
       video.muted = newState;
       this.isMuted = newState;
-      // Save globally
       localStorage.setItem('nexfi_video_muted', newState);
-      // Manually trigger event for same-window instances
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'nexfi_video_muted',
         newValue: String(newState)
       }));
     },
+
     seekTo(event) {
       const video = this.$refs.video;
       const track = this.$refs.progressTrack;
@@ -269,12 +342,9 @@ export default {
       const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
       video.currentTime = ratio * this.duration;
     },
-    onPlaying() {
-      this.isPlaying = true;
-    },
-    onPause() {
-      this.isPlaying = false;
-    },
+
+    onPlaying() { this.isPlaying = true; },
+    onPause() { this.isPlaying = false; },
     onTimeUpdate() {
       const video = this.$refs.video;
       if (video) this.currentTime = video.currentTime;
@@ -286,12 +356,14 @@ export default {
         this.isPortrait = video.videoHeight > video.videoWidth;
       }
     },
+
     flashRipple(icon) {
       this.rippleIcon = icon;
       this.showRipple = true;
       if (this.rippleTimer) clearTimeout(this.rippleTimer);
       this.rippleTimer = setTimeout(() => { this.showRipple = false; }, 600);
     },
+
     formatTime(secs) {
       if (!secs || isNaN(secs)) return '0:00';
       const m = Math.floor(secs / 60);
@@ -315,7 +387,6 @@ export default {
   background-color: #0b0f14;
   cursor: pointer;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  /* Prevent collapse in grid layouts */
   min-height: 180px;
   max-height: 480px;
 }
@@ -325,15 +396,153 @@ export default {
 }
 
 .video-container.is-landscape {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 16 / 9;
 }
 
 .video-player {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
   background: #000;
+  transition: opacity 0.2s ease;
+}
+
+/* Hide video element when poster is showing */
+.video-player.video-hidden {
+  opacity: 0;
+  position: absolute;
+  pointer-events: none;
+}
+
+/* ── Feed mode: Poster thumbnail ── */
+.feed-poster {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+}
+
+.feed-poster::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.feed-poster-play {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.feed-poster-play-circle {
+  width: 52px;
+  height: 52px;
+  background: rgba(0, 0, 0, 0.65);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.video-container:hover .feed-poster-play-circle {
+  transform: scale(1.1);
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.feed-poster-play-icon {
+  font-size: 24px;
+  color: #fff;
+  margin-left: 3px; /* optical center for play triangle */
+}
+
+.feed-duration-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  z-index: 10;
+  letter-spacing: 0.3px;
+}
+
+/* ── Feed mode hovering overlays ── */
+.feed-muted-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.65);
+  color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  z-index: 20;
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  pointer-events: auto;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.feed-muted-badge:hover {
+  background: rgba(0, 0, 0, 0.85);
+  transform: scale(1.1);
+}
+
+.feed-muted-badge:active {
+  transform: scale(0.9);
+}
+
+.feed-hover-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 10px 12px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, transparent 50%);
+  z-index: 12;
+  pointer-events: none;
+}
+
+.feed-hover-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  letter-spacing: 0.3px;
+  animation: hintFadeIn 0.2s ease;
+}
+
+@keyframes hintFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.feed-hint-icon {
+  font-size: 13px;
 }
 
 /* ── Play/Pause ripple ── */
@@ -378,7 +587,7 @@ export default {
   to   { transform: scale(1.4); opacity: 0; }
 }
 
-/* ── Paused big play button ── */
+/* ── Paused big play button (non-feed mode) ── */
 .play-indicator {
   position: absolute;
   inset: 0;
@@ -400,7 +609,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
   transition: transform 0.2s ease;
 }
 
@@ -409,14 +618,14 @@ export default {
   margin-left: 4px;
 }
 
-/* ── Bottom controls bar ── */
+/* ── Bottom controls bar (non-feed mode) ── */
 .controls-bar {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   padding: 0 10px 8px;
-  background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.75) 0%, transparent 100%);
   z-index: 10;
   opacity: 0;
   transition: opacity 0.25s ease;
@@ -427,7 +636,6 @@ export default {
   opacity: 1;
 }
 
-/* always show controls when paused */
 .video-container:not(.is-playing) .controls-bar {
   opacity: 1;
 }
@@ -435,7 +643,7 @@ export default {
 .progress-track {
   width: 100%;
   height: 4px;
-  background: rgba(255,255,255,0.25);
+  background: rgba(255, 255, 255, 0.25);
   border-radius: 2px;
   cursor: pointer;
   margin-bottom: 6px;
@@ -462,7 +670,7 @@ export default {
 
 .time-display {
   font-size: 11px;
-  color: rgba(255,255,255,0.85);
+  color: rgba(255, 255, 255, 0.85);
   font-variant-numeric: tabular-nums;
   user-select: none;
 }
@@ -478,7 +686,7 @@ export default {
   justify-content: center;
   cursor: pointer;
   backdrop-filter: blur(6px);
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   transition: all 0.2s ease;
   flex-shrink: 0;
 }
@@ -497,65 +705,7 @@ export default {
 }
 
 .mute-btn.is-muted {
-  border-color: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.6);
-}
-
-/* ── Feed mode styles ── */
-.video-container.feed-mode {
-  cursor: pointer;
-}
-
-/* Muted badge — top-right corner in feed mode */
-.feed-muted-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(0, 0, 0, 0.6);
-  color: rgba(255, 255, 255, 0.85);
-  border-radius: 50%;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  z-index: 15;
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255,255,255,0.15);
-  pointer-events: auto;
-  transition: transform 0.1s;
-}
-
-.feed-muted-badge:active {
-  transform: scale(0.9);
-}
-
-/* "Tap to watch" gradient overlay — always visible in feed mode */
-.feed-tap-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-start;
-  padding: 10px 12px;
-  background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 50%);
-  z-index: 12;
-  pointer-events: none;
-}
-
-.feed-tap-hint {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 12px;
-  font-weight: 600;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.7);
-  letter-spacing: 0.3px;
-}
-
-.feed-tap-icon {
-  font-size: 14px;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
 }
 </style>

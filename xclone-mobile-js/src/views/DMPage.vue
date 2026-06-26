@@ -1962,17 +1962,13 @@ export default {
 
     this.loadConversations().then(() => {
       this.autoOpenFromQuery();
-      // ── Trigger master LAN auto-discovery ──
-      autoDiscoverAndConnect(lanService);
     });
 
     // Load pending invitations
     this.loadPendingInvitations();
 
-    // Initialise P2P LAN Service
-    const lanSocket = this.$socketService?.socket || this.$socket || null;
-    if (this.userId && lanSocket) {
-      lanService.init(lanSocket, this.userId, this.currentUsername || this.userId);
+    // Initialise P2P LAN Service Handlers
+    if (this.userId) {
       lanService.onMessage((msg) => {
         // If currently in chat with sender, push message
         if (this.selectedChat && String(this.selectedChat.user_id) === String(msg.from_user_id)) {
@@ -1992,6 +1988,13 @@ export default {
 
       lanService.onStatusChange((peerId, status) => {
         this.lanConnectedPeers[String(peerId)] = (status === 'open');
+      });
+
+      // Populate currently connected peers from lanService
+      lanService.peers.forEach((p, id) => {
+        if (p.state === 'open') {
+          this.lanConnectedPeers[String(id)] = true;
+        }
       });
     }
 

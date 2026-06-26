@@ -523,12 +523,26 @@ class LanService {
 
     _onPeerDiscovered(userId, ip, name) {
         if (userId === this.myUserId) return;
+        if (this.discoveredPeers.has(userId) && this.discoveredPeers.get(userId).ip === ip) return; // Skip if no change
+
         console.log(`[LAN] Discovered peer: ${userId} at ${ip}`);
-        this.discoveredPeers.set(userId, { ip, port: LAN_SERVICE_PORT, name });
+        this.discoveredPeers.set(userId, { 
+            userId, 
+            ip, 
+            port: LAN_SERVICE_PORT, 
+            name,
+            lastSeen: Date.now() 
+        });
+        
         updatePeerLanInfo(userId, { last_resolved_ip: ip, zeroconf_name: name });
         
-        // Notify UI if needed
+        // Notify UI via status change callback
         if (this._onStatusChange) this._onStatusChange(userId, 'discovered');
+
+        // Global event for UI widgets (NearbyPeersWidget.vue)
+        window.dispatchEvent(new CustomEvent('lan-peer-discovered', { 
+            detail: { userId, ip, name } 
+        }));
     }
 
     _startDesktopDiscovery() {

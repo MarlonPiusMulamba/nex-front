@@ -30,8 +30,27 @@
             <span>Following</span>
             <div class="tab-indicator"></div>
           </div>
+          <div 
+            class="feed-tab"
+            @click="$router.push('/tabs/notices')">
+            <span>Notices</span>
+            <div class="tab-indicator"></div>
+          </div>
         </div>
       </ion-toolbar>
+
+      <!-- Sticky Urgent Notice Ticker -->
+      <div v-if="urgentNotice" class="urgent-ticker-banner" @click="openUrgentNotice">
+        <div class="ticker-inner">
+          <ion-icon :icon="alertCircle" class="ticker-icon"></ion-icon>
+          <div class="ticker-text-container">
+            <span class="ticker-text">
+              <strong>URGENT:</strong> {{ urgentNotice.title }}
+            </span>
+          </div>
+        </div>
+        <ion-icon :icon="chevronForwardOutline" class="ticker-arrow"></ion-icon>
+      </div>
     </ion-header>
 
     <ion-content :fullscreen="true" ref="content" :scroll-events="true" @ionScroll="onFeedScroll">
@@ -41,6 +60,13 @@
           refreshing-spinner="crescent">
         </ion-refresher-content>
       </ion-refresher>
+
+      <!-- Notice Carousel -->
+      <NoticeCarousel 
+        v-if="activeTab === 'foryou'"
+        ref="noticeCarousel"
+        @notices-updated="handleNoticesUpdated"
+      />
 
       <div v-if="showNewPostsBanner" class="new-posts-banner" @click="viewNewPosts">
         Click to view new posts
@@ -821,7 +847,8 @@ import {
 import { 
   add, heart, heartOutline, chatbubbleOutline, shareOutline, sunny, moon, 
   ellipsisHorizontal, ellipsisVertical, repeat, refresh, image, close, chatbubbles, logOut,
-  alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline
+  alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline,
+  chevronForwardOutline
 } from 'ionicons/icons';
 import axios from 'axios';
 import VideoPlayer from '@/components/VideoPlayer.vue';
@@ -836,6 +863,7 @@ import AudioSpaceCard from '@/components/AudioSpaceCard.vue';
 import AudioSpaceModal from '@/components/AudioSpaceModal.vue';
 import AudioSpaceRecordingModal from '@/components/AudioSpaceRecordingModal.vue';
 import VerificationBadge from '@/components/VerificationBadge.vue';
+import NoticeCarousel from '@/components/NoticeCarousel.vue';
 
 export default {
   name: 'FeedPage',
@@ -844,7 +872,8 @@ export default {
     IonContent, IonFab, IonFabButton, IonIcon, IonModal, IonTextarea, 
     IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent,
     IonActionSheet, VideoPlayer, PollDisplay, EmojiPicker, PostComposerModal, AMACard,
-    AudioSpaceCard, AudioSpaceModal, AudioSpaceRecordingModal, VerificationBadge
+    AudioSpaceCard, AudioSpaceModal, AudioSpaceRecordingModal, VerificationBadge,
+    NoticeCarousel
   },
   data() {
     const API_URL = config.api.baseURL;
@@ -860,8 +889,11 @@ export default {
       add, heart, heartOutline, chatbubbleOutline, shareOutline, sunny, moon, 
       ellipsisHorizontal, ellipsisVertical, repeat, refresh, image, close, chatbubbles, logOut,
       alertCircle, remove, arrowBack, notificationsCircleOutline, downloadOutline, phonePortraitOutline,
+      chevronForwardOutline,
       theme: window.theme || 'light',
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
+      recentNotices: [],
+      urgentNotice: null,
       lastFetchTime: 0,
       CACHE_DURATION: 120000,  // 2 minutes cache (matches backend)
       retryCount: 0,
@@ -1018,6 +1050,20 @@ export default {
     }
   },
   methods: {
+    handleNoticesUpdated(notices) {
+      this.recentNotices = notices || [];
+      const urgent = notices.find(n => n.category === 'Urgent');
+      this.urgentNotice = urgent || null;
+    },
+    openUrgentNotice() {
+      if (this.urgentNotice) {
+        if (this.$refs.noticeCarousel) {
+          this.$refs.noticeCarousel.openNoticeDetail(this.urgentNotice);
+        } else {
+          this.$router.push(`/tabs/notices/${this.urgentNotice.org_slug}`);
+        }
+      }
+    },
     handleJoinSpace(space) {
         console.log('Joining space:', space);
         if (space.status !== 'live' && space.recording_url) {
@@ -1392,13 +1438,21 @@ export default {
       if (!this.ensureAuthenticated()) return;
       this.$router.push('/tabs/profile');
     },
+    // Only used for resolving /static/ relative paths.
+    // Full http/https URLs are left as-is since the file physically lives there.
+    _resolveStaticUrl(path) {
+      if (!path || typeof path !== 'string') return path;
+      if (path.startsWith('/static/')) return `${this.API_URL}${path}`;
+      return path;
+    },
+
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
       if (typeof imageData !== 'string') return this.defaultAvatar;
-      // Already a full URL (Supabase CDN, http, https)
-      if (imageData.startsWith('http')) return imageData;
       // Already a data URI (legacy base64 thumbnails)
       if (imageData.startsWith('data:')) return imageData;
+      // Full URL — return as-is (file lives on that server)
+      if (imageData.startsWith('http')) return imageData;
       // Local static path — prepend API base URL
       if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
       return this.defaultAvatar;
@@ -1408,9 +1462,10 @@ export default {
       if (!mediaItem) return '';
       const data = mediaItem.data || '';
       if (!data) return '';
+      // Full URL — return as-is
       if (data.startsWith('http')) return data;
       if (data.startsWith('/static/')) return `${this.API_URL}${data}`;
-      // Legacy bare base64 — shouldn't exist in new uploads but handle gracefully
+      // Legacy bare base64
       if (data.startsWith('data:')) return data;
       return '';
     },
@@ -1421,12 +1476,15 @@ export default {
     },
 
     handleMediaError(event) {
-      // Premium fallback: hide broken post media so it doesn't leave an ugly blank card or stretched avatar
-      event.target.style.display = 'none';
-      const parent = event.target.closest('.media-item');
-      if (parent) {
-        parent.style.display = 'none';
-      }
+      // Log the failure to help debug
+      const img = event.target;
+      const src = img.src || '';
+      console.warn('[Media Error] Failed to load:', src.substring(0, 120));
+      // Show a subtle placeholder instead of hiding entirely
+      img.style.minHeight = '80px';
+      img.style.background = 'rgba(255,255,255,0.04)';
+      img.style.display = 'block';
+      img.removeAttribute('src');
     },
 
     
@@ -3736,5 +3794,66 @@ ion-toolbar {
     height: 30px;
     font-size: 12px;
     width: 100%;
+}
+
+/* Sticky Urgent Notice Ticker */
+.urgent-ticker-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(239, 68, 68, 0.08);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.15);
+  padding: 10px 16px;
+  cursor: pointer;
+  animation: urgentPulse 3s infinite ease-in-out;
+}
+
+@keyframes urgentPulse {
+  0% { background-color: rgba(239, 68, 68, 0.08); }
+  50% { background-color: rgba(239, 68, 68, 0.14); }
+  100% { background-color: rgba(239, 68, 68, 0.08); }
+}
+
+.ticker-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ticker-icon {
+  font-size: 1.25rem;
+  color: #ef4444;
+  animation: flashIcon 1s infinite alternate ease-in-out;
+  flex-shrink: 0;
+}
+
+@keyframes flashIcon {
+  from { opacity: 0.6; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1.05); }
+}
+
+.ticker-text-container {
+  min-width: 0;
+  flex: 1;
+}
+
+.ticker-text {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #b91c1c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.ticker-arrow {
+  font-size: 1.2rem;
+  color: #ef4444;
+  opacity: 0.8;
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 </style>

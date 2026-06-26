@@ -15,6 +15,12 @@
             <span class="nav-label">Home</span>
           </router-link>
 
+          <router-link to="/tabs/notices" class="nav-item">
+            <ion-icon :icon="megaphoneOutline" class="nav-icon"></ion-icon>
+            <span class="nav-label">Notices</span>
+            <span v-if="unreadNoticeCount > 0" class="nav-badge">{{ unreadNoticeCount }}</span>
+          </router-link>
+
           <router-link to="/tabs/follow" class="nav-item">
             <ion-icon :icon="search" class="nav-icon"></ion-icon>
             <span class="nav-label">Search</span>
@@ -46,6 +52,7 @@
             <ion-icon :icon="shieldOutline" class="nav-icon"></ion-icon>
             <span class="nav-label">Fraternity</span>
           </router-link>
+
 
           <!-- Logout Button (Desktop only) -->
           <div class="nav-item logout-item" @click="logout">
@@ -80,10 +87,21 @@
               <ion-icon :icon="home"></ion-icon>
               <ion-label>Home</ion-label>
             </ion-tab-button>
+
+            <ion-tab-button tab="notices" href="/tabs/notices">
+              <ion-icon :icon="megaphoneOutline"></ion-icon>
+              <ion-badge v-if="unreadNoticeCount > 0" class="notif-badge">{{ unreadNoticeCount }}</ion-badge>
+              <ion-label>Notices</ion-label>
+            </ion-tab-button>
             
             <ion-tab-button tab="follow" href="/tabs/follow">
               <ion-icon :icon="search"></ion-icon>
               <ion-label>Search</ion-label>
+            </ion-tab-button>
+
+            <ion-tab-button tab="videos" href="/tabs/videos">
+              <ion-icon :icon="playCircleOutline"></ion-icon>
+              <ion-label>Videos</ion-label>
             </ion-tab-button>
 
             <ion-tab-button tab="dm" href="/tabs/dm">
@@ -109,11 +127,15 @@
               <ion-icon :icon="shieldOutline"></ion-icon>
               <ion-label>Fraternity</ion-label>
             </ion-tab-button>
+
           </ion-tab-bar>
         </ion-tabs>
 
-        <!-- Mobile Floating Post Button -->
-        <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="mobile-only" style="margin-bottom: 70px; margin-right: 8px; z-index: 99999;">
+        <!-- Mobile Floating Post Button (hidden on notice board pages) -->
+        <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="mobile-only"
+          style="margin-bottom: 70px; margin-right: 8px; z-index: 99999;"
+          v-if="!hideGlobalFab"
+        >
           <ion-fab-button class="gold-fab" @click="triggerGlobalPost">
             <ion-icon :icon="add" class="post-icon" style="font-size: 32px; font-weight: bold; color: black;"></ion-icon>
           </ion-fab-button>
@@ -123,6 +145,7 @@
 
       <!-- Right Sidebar (Desktop only) -->
       <aside class="right-sidebar desktop-only">
+        <NoticeWidget />
         <TrendingWidget />
         <SuggestedUsersWidget />
       </aside>
@@ -150,11 +173,12 @@ import {
   IonPage, IonTabs, IonRouterOutlet, IonTabBar, IonTabButton, 
   IonIcon, IonLabel, IonBadge, IonFab, IonFabButton 
 } from '@ionic/vue';
-import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline, add, shieldOutline, playCircleOutline } from 'ionicons/icons';
+import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline, add, shieldOutline, playCircleOutline, megaphoneOutline } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config/index.js';
 import TrendingWidget from '@/components/TrendingWidget.vue';
 import SuggestedUsersWidget from '@/components/SuggestedUsersWidget.vue';
+import NoticeWidget from '@/components/NoticeWidget.vue';
 import notificationService from '@/utils/notificationService.js';
 import PostComposerModal from '@/components/PostComposerModal.vue';
 import PostTypeSelectorModal from '@/components/PostTypeSelectorModal.vue';
@@ -166,6 +190,7 @@ export default {
     IonIcon, IonLabel, IonBadge, IonFab, IonFabButton,
     TrendingWidget,
     SuggestedUsersWidget,
+    NoticeWidget,
     PostComposerModal,
     PostTypeSelectorModal
   },
@@ -181,10 +206,12 @@ export default {
       add,
       shieldOutline,
       playCircleOutline,
+      megaphoneOutline,
       unreadCount: 0,
       prevUnreadCount: 0,
       unreadNotifCount: 0,
       prevUnreadNotifCount: 0,
+      unreadNoticeCount: 0,
       userId: localStorage.getItem('userId'),
       username: localStorage.getItem('username'),
       userAvatar: localStorage.getItem('userAvatar') || '',
@@ -198,8 +225,15 @@ export default {
       showTypeSelector: false,
       selectedPostType: 'text',
       targetFraternity: null,
+      hideGlobalFab: false,
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E'
     };
+  },
+  watch: {
+    $route(to) {
+      // Hide the global post FAB on specific notice board pages
+      this.hideGlobalFab = /^\/tabs\/notices\/.+/.test(to.path);
+    }
   },
   methods: {
     async unlockAudio() {
@@ -242,9 +276,7 @@ export default {
       } catch (err) {
         console.error('Failed to fetch unread count:', err);
       }
-    }
-
-    ,
+    },
 
     async fetchUnreadNotifCount() {
       if (!this.userId) return;
@@ -262,6 +294,18 @@ export default {
         this.prevUnreadNotifCount = nextCount;
       } catch (err) {
         console.error('Failed to fetch unread notifications count:', err);
+      }
+    },
+
+    async fetchUnreadNoticeCount() {
+      if (!this.userId) return;
+      try {
+        const res = await axios.get(`${this.API_URL}/api/boards/unread-count`, {
+          params: { user_id: this.userId }
+        });
+        this.unreadNoticeCount = res.data?.count || 0;
+      } catch (err) {
+        console.error('Failed to fetch unread notices count:', err);
       }
     },
     
@@ -298,9 +342,13 @@ export default {
     }
   },
   mounted() {
+    // Set FAB visibility based on initial route
+    this.hideGlobalFab = /^\/tabs\/notices\/.+/.test(this.$route?.path || '');
+
     // Fetch unread count immediately
     this.fetchUnreadCount();
     this.fetchUnreadNotifCount();
+    this.fetchUnreadNoticeCount();
     
     // Listen for custom events to refresh count
     window.addEventListener('dm-refresh', this.fetchUnreadCount);
@@ -345,14 +393,24 @@ export default {
       if (document.visibilityState === 'visible') {
         this.fetchUnreadCount();
         this.fetchUnreadNotifCount();
+        this.fetchUnreadNoticeCount();
       }
     };
     this._onFocus = () => {
       this.fetchUnreadCount();
       this.fetchUnreadNotifCount();
+      this.fetchUnreadNoticeCount();
     };
     document.addEventListener('visibilitychange', this._onVisibilityChange);
     window.addEventListener('focus', this._onFocus);
+
+    // Socket listeners for real-time notice count
+    if (window.appSocket) {
+      window.appSocket.on('notice:new', () => {
+        this.fetchUnreadNoticeCount();
+        this.playNotificationSound();
+      });
+    }
 
     // Listen for global post trigger
     window.addEventListener('open-post-modal', this.triggerGlobalPost);
@@ -418,6 +476,7 @@ ion-page {
   align-items: center;
   justify-content: center;
   z-index: 10;
+  animation: badgePulse 2s infinite;
 }
 
 .gold-fab {
@@ -450,6 +509,13 @@ ion-page {
   align-items: center;
   justify-content: center;
   z-index: 10;
+  animation: badgePulse 2s infinite ease-in-out;
+}
+
+@keyframes badgePulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { transform: scale(1.08); box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
 /* Ensure main content doesn't overflow on desktop */

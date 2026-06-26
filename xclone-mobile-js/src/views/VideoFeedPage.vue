@@ -1,36 +1,74 @@
 <template>
   <ion-page class="video-feed-page">
-    <div class="video-scroll-container" ref="scrollContainer" @touchstart="onTouchStart" @touchend="onTouchEnd">
+    <!-- Loading overlay -->
+    <div v-if="loading" class="video-loading">
+      <div class="loading-spinner-wrap">
+        <ion-spinner name="crescent" color="light"></ion-spinner>
+      </div>
+      <p>Loading videos...</p>
+    </div>
+
+    <!-- Empty state -->
+    <div v-else-if="!loading && videos.length === 0" class="empty-state">
+      <ion-icon :icon="videocam" class="empty-icon"></ion-icon>
+      <p>No videos yet</p>
+      <p class="empty-sub">Videos posted by users will appear here</p>
+    </div>
+
+    <!-- Main video scroll container -->
+    <div
+      v-show="!loading && videos.length > 0"
+      class="video-scroll-container"
+      ref="scrollContainer"
+      @scroll.passive="onScroll"
+    >
       <div
         v-for="(video, index) in videos"
         :key="video.post_id"
         class="video-slide"
         :data-index="index"
-        :ref="el => videoSlides[index] = el"
+        :ref="el => setSlideRef(el, index)"
       >
-        <!-- Full-screen video -->
+        <!-- Video element -->
         <video
-          :ref="el => videoRefs[index] = el"
+          :ref="el => setVideoRef(el, index)"
           :src="getVideoSrc(video)"
-          :poster="getVideoPoster(video)"
           class="fullscreen-video"
           playsinline
           webkit-playsinline
           loop
           muted
-          preload="metadata"
+          :preload="index === 0 ? 'auto' : 'metadata'"
           @ended="onVideoEnded(index)"
           @click="togglePlay(index)"
           @error="onVideoError(index, $event)"
+          @loadedmetadata="onVideoMeta(index)"
         ></video>
 
         <!-- Gradient overlay -->
         <div class="video-gradient"></div>
 
-        <!-- Bottom: post caption + author info -->
+        <!-- Play/Pause indicator (shown briefly on toggle) -->
+        <transition name="play-fade">
+          <div class="play-pause-indicator" v-if="showPlayIndicator[index]" key="play">
+            <div class="play-indicator-circle">
+              <ion-icon :icon="playingStates[index] ? pause : play" class="play-icon"></ion-icon>
+            </div>
+          </div>
+        </transition>
+
+        <!-- Progress bar -->
+        <div class="video-progress-bar" v-if="videoDurations[index]">
+          <div
+            class="video-progress-fill"
+            :style="{ width: getProgressPercent(index) + '%' }"
+          ></div>
+        </div>
+
+        <!-- Bottom: author + caption -->
         <div class="video-bottom-overlay">
-          <div class="video-author" @click="goToProfile(video)">
-            <img :src="getImageUrl(video.profile_pic)" class="author-avatar" alt="Avatar" />
+          <div class="video-author" @click.stop="goToProfile(video)">
+            <img :src="getImageUrl(video.profile_pic)" class="author-avatar" alt="Avatar" @error="handleAvatarError" />
             <div class="author-info">
               <span class="author-name">
                 {{ video.first_name || video.last_name ? `${video.first_name} ${video.last_name}`.trim() : video.username }}
@@ -46,50 +84,43 @@
           <div class="video-caption" v-if="video.content">{{ video.content }}</div>
         </div>
 
-        <!-- Right: action buttons (TikTok-style) -->
+        <!-- Right: action buttons -->
         <div class="video-actions">
-          <button class="action-btn" @click="likeVideo(video)">
+          <button class="action-btn" @click.stop="likeVideo(video)">
             <ion-icon :icon="video.is_liked ? heart : heartOutline" :class="['action-icon', { liked: video.is_liked }]"></ion-icon>
             <span class="action-count">{{ formatCount(video.likes) }}</span>
           </button>
-          <button class="action-btn" @click="openComments(video)">
+          <button class="action-btn" @click.stop="openComments(video)">
             <ion-icon :icon="chatbubbleOutline" class="action-icon"></ion-icon>
             <span class="action-count">{{ formatCount(video.comments_count) }}</span>
           </button>
-          <button class="action-btn" @click="shareVideo(video)">
+          <button class="action-btn" @click.stop="shareVideo(video)">
             <ion-icon :icon="shareOutline" class="action-icon"></ion-icon>
             <span class="action-count">Share</span>
           </button>
         </div>
 
-        <!-- Play/Pause indicator -->
-        <div class="play-pause-indicator" v-if="!playingStates[index]" @click="togglePlay(index)">
-          <ion-icon :icon="play" class="play-icon"></ion-icon>
+        <!-- Error state for individual video -->
+        <div v-if="videoErrors[index]" class="video-error-overlay">
+          <ion-icon :icon="alertCircleOutline" class="error-icon"></ion-icon>
+          <p>Video unavailable</p>
         </div>
       </div>
 
-      <!-- Loading more indicator -->
+      <!-- Load more indicator -->
       <div v-if="loadingMore" class="loading-more">
-        <ion-spinner name="crescent"></ion-spinner>
-      </div>
-
-      <!-- Empty state -->
-      <div v-if="!loading && videos.length === 0" class="empty-state">
-        <ion-icon :icon="videocam" class="empty-icon"></ion-icon>
-        <p>No videos yet</p>
-        <p class="empty-sub">Videos posted by verified or popular accounts will appear here</p>
+        <ion-spinner name="crescent" color="light"></ion-spinner>
       </div>
     </div>
 
-    <!-- Loading overlay -->
-    <div v-if="loading" class="video-loading">
-      <ion-spinner name="crescent" color="light"></ion-spinner>
-      <p>Loading videos...</p>
-    </div>
-
-    <!-- Mute button -->
-    <button class="global-mute-btn" @click="toggleGlobalMute">
+    <!-- Global mute button -->
+    <button class="global-mute-btn" @click="toggleGlobalMute" v-if="!loading && videos.length > 0">
       <ion-icon :icon="isMuted ? volumeMute : volumeHigh"></ion-icon>
+    </button>
+
+    <!-- Back button -->
+    <button class="back-btn" @click="goBack">
+      <ion-icon :icon="arrowBack"></ion-icon>
     </button>
   </ion-page>
 </template>
@@ -98,7 +129,7 @@
 import { IonPage, IonIcon, IonSpinner } from '@ionic/vue';
 import {
   heart, heartOutline, chatbubbleOutline, shareOutline, play, pause,
-  volumeHigh, volumeMute, shieldCheckmark, star, videocam
+  volumeHigh, volumeMute, shieldCheckmark, star, videocam, alertCircleOutline, arrowBack
 } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config/index.js';
@@ -115,18 +146,24 @@ export default {
       currentIndex: 0,
       playingStates: {},
       videoRefs: {},
-      videoSlides: {},
+      slideRefs: {},
+      videoErrors: {},
+      videoDurations: {},
+      videoCurrentTimes: {},
+      showPlayIndicator: {},
+      playIndicatorTimers: {},
       observer: null,
       offset: 0,
       hasMore: true,
-      touchStartY: 0,
       userId: localStorage.getItem('userId'),
       API_URL: config.api.baseURL,
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
       // icons
       heart, heartOutline, chatbubbleOutline, shareOutline, play, pause,
-      volumeHigh, volumeMute, shieldCheckmark, star, videocam,
-      currentPlayStartTime: null
+      volumeHigh, volumeMute, shieldCheckmark, star, videocam, alertCircleOutline, arrowBack,
+      currentPlayStartTime: null,
+      _progressInterval: null,
+      _scrollEndTimer: null
     };
   },
   mounted() {
@@ -144,37 +181,54 @@ export default {
   },
   beforeUnmount() {
     this.pauseAll();
-    if (this.observer) this.observer.disconnect();
+    this.disconnectObserver();
     if (this.storageHandler) window.removeEventListener('storage', this.storageHandler);
+    if (this._progressInterval) clearInterval(this._progressInterval);
+    Object.values(this.playIndicatorTimers).forEach(t => clearTimeout(t));
   },
   activated() {
-    this.initObserver();
-    // Re-load if start_post_id doesn't match current first video
-    const startPostId = this.$route.query.start_post_id;
-    if (startPostId && (!this.videos.length || String(this.videos[0].post_id) !== String(startPostId))) {
-      this.loadVideos();
-    }
+    // Re-init when coming back via keep-alive
+    this.$nextTick(() => {
+      const startPostId = this.$route.query.start_post_id;
+      if (startPostId && (!this.videos.length || String(this.videos[0].post_id) !== String(startPostId))) {
+        this.loadVideos();
+      } else if (this.videos.length > 0) {
+        this.initObserver();
+        this.playVideoAt(this.currentIndex);
+      }
+    });
   },
   deactivated() {
-    if (this.currentPlayStartTime) {
-      this.reportVideoDwell(this.currentIndex);
-    }
+    if (this.currentPlayStartTime) this.reportVideoDwell(this.currentIndex);
     this.pauseAll();
+    this.disconnectObserver();
   },
   watch: {
     '$route.query.start_post_id'(newId) {
-      if (newId) {
-        this.loadVideos();
-      }
+      if (newId) this.loadVideos();
     }
   },
   methods: {
+    setVideoRef(el, index) {
+      this.videoRefs[index] = el;
+    },
+    setSlideRef(el, index) {
+      this.slideRefs[index] = el;
+    },
+
     async loadVideos() {
       if (this.loading) return;
       this.loading = true;
-      
+      this.videos = [];
+      this.videoRefs = {};
+      this.slideRefs = {};
+      this.videoErrors = {};
+      this.playingStates = {};
+      this.videoDurations = {};
+      this.videoCurrentTimes = {};
+
       const startPostId = this.$route.query.start_post_id;
-      
+
       try {
         let seedPost = null;
         if (startPostId) {
@@ -183,9 +237,7 @@ export default {
             const seedRes = await axios.get(`${this.API_URL}/api/posts/${startPostId}`, {
               params: { user_id: this.userId || 0 }
             });
-            if (seedRes.data.success) {
-              seedPost = seedRes.data.post;
-            }
+            if (seedRes.data.success) seedPost = seedRes.data.post;
           } catch (e) {
             console.error('Failed to load seed post:', e);
           }
@@ -194,11 +246,10 @@ export default {
         const res = await axios.get(`${this.API_URL}/api/videos`, {
           params: { user_id: this.userId || 0, limit: 20, offset: 0 }
         });
-        
+
         let feedVideos = res.data.videos || [];
-        
+
         if (seedPost) {
-          // Put seed post first, filter out if it exists in feed
           this.videos = [seedPost, ...feedVideos.filter(v => String(v.post_id) !== String(startPostId))];
         } else {
           this.videos = feedVideos;
@@ -206,22 +257,242 @@ export default {
 
         this.offset = feedVideos.length;
         this.hasMore = feedVideos.length >= 20;
-        this.$nextTick(() => {
-          if (this.$refs.scrollContainer) {
-            this.$refs.scrollContainer.scrollTop = 0;
-          }
-          // Wait two ticks: first for DOM update, second for :ref callbacks to fire
-          this.$nextTick(() => {
-            this.initObserver();
-            // Extra safety: retry after a short delay for slow renders
-            setTimeout(() => this.initObserver(), 300);
-          });
-        });
+
+        await this.$nextTick();
+        // One more tick to ensure :ref callbacks have fired
+        await this.$nextTick();
+        this.loadVideoSources();
+        this.initObserver();
+
+        // Scroll to top
+        if (this.$refs.scrollContainer) {
+          this.$refs.scrollContainer.scrollTop = 0;
+        }
+
+        // Start progress tracking
+        this.startProgressTracking();
       } catch (e) {
         console.error('Video feed error:', e);
       } finally {
         this.loading = false;
       }
+    },
+
+    loadVideoSources() {
+      // Handled reactively by the template :src binding
+    },
+
+    initObserver() {
+      this.disconnectObserver();
+
+      this.observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const index = parseInt(entry.target.dataset.index);
+          if (isNaN(index)) return;
+
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+            this.onSlideVisible(index);
+          } else if (!entry.isIntersecting) {
+            this.onSlideHidden(index);
+          }
+        });
+      }, {
+        threshold: [0, 0.6, 1.0],
+        root: this.$refs.scrollContainer || null
+      });
+
+      Object.values(this.slideRefs).forEach(slide => {
+        if (slide) this.observer.observe(slide);
+      });
+
+      // Play first video immediately
+      if (this.slideRefs[0] && this.videoRefs[0]) {
+        this.onSlideVisible(0);
+      }
+    },
+
+    disconnectObserver() {
+      if (this.observer) {
+        this.observer.disconnect();
+        this.observer = null;
+      }
+    },
+
+    onSlideVisible(index) {
+      // Pause all others
+      Object.keys(this.videoRefs).forEach(i => {
+        if (parseInt(i) !== index) this.pauseVideoAt(parseInt(i));
+      });
+
+      this.currentIndex = index;
+      this.playVideoAt(index);
+
+      // Load more when approaching the end
+      if (index >= this.videos.length - 3) this.loadMore();
+    },
+
+    onSlideHidden(index) {
+      if (this.playingStates[index]) {
+        this.reportVideoDwell(index);
+      }
+      this.pauseVideoAt(index);
+    },
+
+    playVideoAt(index) {
+      const video = this.videoRefs[index];
+      const videoData = this.videos[index];
+      if (!video) return;
+
+      // Ensure src is set
+      const src = this.getVideoSrc(videoData);
+      if (src && video.src !== src) {
+        video.src = src;
+        video.load();
+      }
+
+      this.currentPlayStartTime = Date.now();
+
+      const doPlay = () => {
+        video.muted = this.isMuted;
+        video.play().catch(() => {
+          // Autoplay blocked — try muted
+          video.muted = true;
+          this.isMuted = true;
+          video.play().catch(() => {});
+        });
+        this.playingStates[index] = true;
+      };
+
+      if (video.readyState >= 2) {
+        doPlay();
+      } else {
+        const onReady = () => {
+          video.removeEventListener('canplay', onReady);
+          doPlay();
+        };
+        video.addEventListener('canplay', onReady);
+        if (video.networkState === HTMLMediaElement.NETWORK_EMPTY || !video.src) {
+          if (src) { video.src = src; }
+          video.load();
+        }
+      }
+    },
+
+    pauseVideoAt(index) {
+      const video = this.videoRefs[index];
+      if (video && !video.paused) video.pause();
+      this.playingStates[index] = false;
+    },
+
+    pauseAll() {
+      Object.keys(this.videoRefs).forEach(i => this.pauseVideoAt(parseInt(i)));
+    },
+
+    togglePlay(index) {
+      const video = this.videoRefs[index];
+      if (!video) return;
+
+      if (video.paused) {
+        this.playVideoAt(index);
+      } else {
+        this.pauseVideoAt(index);
+      }
+
+      // Show play/pause indicator briefly
+      this.flashPlayIndicator(index);
+    },
+
+    flashPlayIndicator(index) {
+      this.showPlayIndicator[index] = true;
+      if (this.playIndicatorTimers[index]) clearTimeout(this.playIndicatorTimers[index]);
+      this.playIndicatorTimers[index] = setTimeout(() => {
+        this.showPlayIndicator[index] = false;
+      }, 800);
+    },
+
+    onVideoMeta(index) {
+      const video = this.videoRefs[index];
+      if (video) {
+        this.videoDurations[index] = video.duration || 0;
+      }
+    },
+
+    startProgressTracking() {
+      if (this._progressInterval) clearInterval(this._progressInterval);
+      this._progressInterval = setInterval(() => {
+        const video = this.videoRefs[this.currentIndex];
+        if (video) {
+          this.videoCurrentTimes[this.currentIndex] = video.currentTime;
+        }
+      }, 200);
+    },
+
+    getProgressPercent(index) {
+      const dur = this.videoDurations[index];
+      const cur = this.videoCurrentTimes[index] || 0;
+      if (!dur) return 0;
+      return Math.min((cur / dur) * 100, 100);
+    },
+
+    reportVideoDwell(index) {
+      const video = this.videoRefs[index];
+      const post = this.videos[index];
+      if (!video || !post || !this.currentPlayStartTime) return;
+
+      const dwellMs = Date.now() - this.currentPlayStartTime;
+      const seconds = dwellMs / 1000;
+      if (seconds < 1) return;
+
+      const completionRate = video.duration ? video.currentTime / video.duration : 0;
+
+      axios.post(`${this.API_URL}/api/posts/dwell`, {
+        user_id: this.userId,
+        post_id: post.post_id,
+        seconds: seconds,
+        completion_rate: completionRate
+      }).catch(() => {});
+
+      this.currentPlayStartTime = null;
+    },
+
+    onVideoEnded(index) {
+      this.reportVideoDwell(index);
+      // Auto-advance to next video
+      const nextIndex = index + 1;
+      if (nextIndex < this.videos.length) {
+        const nextSlide = this.slideRefs[nextIndex];
+        if (nextSlide) {
+          nextSlide.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    },
+
+    onVideoError(index, event) {
+      const video = this.videoRefs[index];
+      const post = this.videos[index];
+      console.error(`❌ Video error at index ${index}:`, {
+        src: video?.src?.substring(0, 100),
+        post_id: post?.post_id,
+        error: event?.target?.error
+      });
+      this.videoErrors[index] = true;
+    },
+
+    onScroll() {
+      // Debounce scroll end detection
+      if (this._scrollEndTimer) clearTimeout(this._scrollEndTimer);
+      this._scrollEndTimer = setTimeout(() => {
+        // Snap to nearest slide after scroll settles
+        const container = this.$refs.scrollContainer;
+        if (!container) return;
+        const slideHeight = container.clientHeight;
+        const scrolled = container.scrollTop;
+        const nearestIndex = Math.round(scrolled / slideHeight);
+        if (nearestIndex !== this.currentIndex) {
+          // Observer should handle this, but as safety net:
+          this.currentIndex = nearestIndex;
+        }
+      }, 150);
     },
 
     async loadMore() {
@@ -232,10 +503,18 @@ export default {
           params: { user_id: this.userId || 0, limit: 20, offset: this.offset }
         });
         const newVideos = res.data.videos || [];
+        const prevLen = this.videos.length;
         this.videos.push(...newVideos);
         this.offset += newVideos.length;
         this.hasMore = newVideos.length >= 20;
-        this.$nextTick(() => this.refreshObserver());
+
+        await this.$nextTick();
+        // Observe new slides (src binding is handled reactively by template)
+        newVideos.forEach((video, i) => {
+          const index = prevLen + i;
+          const slide = this.slideRefs[index];
+          if (slide && this.observer) this.observer.observe(slide);
+        });
       } catch (e) {
         console.error('Load more error:', e);
       } finally {
@@ -243,139 +522,9 @@ export default {
       }
     },
 
-    initObserver() {
-      if (this.observer) this.observer.disconnect();
-      this.observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          const index = parseInt(entry.target.dataset.index);
-          const videoEl = this.videoRefs[index];
-          if (!videoEl) return;
-          if (entry.isIntersecting && entry.intersectionRatio > 0.75) {
-            this.playVideoAt(index);
-            // Load more when near end
-            if (index >= this.videos.length - 3) this.loadMore();
-          } else {
-            if (this.playingStates[index]) {
-               this.reportVideoDwell(index);
-            }
-            this.pauseVideoAt(index);
-          }
-        });
-      }, { threshold: 0.75 });
-
-      const slides = Object.values(this.videoSlides).filter(Boolean);
-      slides.forEach(slide => this.observer.observe(slide));
-
-      // If first slide is already in view (normal case on load), play it directly
-      if (slides.length > 0 && this.videoRefs[0]) {
-        this.playVideoAt(0);
-      }
-    },
-
-    refreshObserver() {
-      Object.values(this.videoSlides).forEach(slide => {
-        if (slide && this.observer) this.observer.observe(slide);
-      });
-    },
-
-    playVideoAt(index) {
-      const video = this.videoRefs[index];
-      if (!video) return;
-      
-      this.currentPlayStartTime = Date.now();
-      this.currentIndex = index;
-      
-      // Always muted on first play attempt — required by browser autoplay policy
-      video.muted = true;
-      // Then honour the user's mute preference (only matters if isMuted was toggled off)
-      // We keep muted=true initially to guarantee autoplay, then sync after canplay
-      
-      const doPlay = () => {
-        video.muted = this.isMuted;
-        video.play().catch(() => {
-          // Autoplay blocked without mute — force muted and retry
-          video.muted = true;
-          video.play().catch(() => {});
-        });
-        this.playingStates[index] = true;
-      };
-
-      if (video.readyState >= 2) {
-        // HAVE_CURRENT_DATA or better — play immediately
-        doPlay();
-      } else {
-        // Not loaded yet — wait for canplay
-        const onReady = () => {
-          video.removeEventListener('canplay', onReady);
-          doPlay();
-        };
-        video.addEventListener('canplay', onReady);
-        // Also kick off loading if not started
-        if (video.networkState === HTMLMediaElement.NETWORK_EMPTY) {
-          video.load();
-        }
-      }
-    },
-
-    onVideoError(index, event) {
-      const video = this.videoRefs[index];
-      const post = this.videos[index];
-      const src = video?.src || 'unknown';
-      console.error(`❌ Video error at index ${index}:`, {
-        src: src.substring(0, 120),
-        post_id: post?.post_id,
-        error: event?.target?.error
-      });
-    },
-
-    pauseVideoAt(index) {
-      const video = this.videoRefs[index];
-      if (video) video.pause();
-      this.playingStates[index] = false;
-    },
-
-    reportVideoDwell(index) {
-      const video = this.videoRefs[index];
-      const post = this.videos[index];
-      if (!video || !post || !this.currentPlayStartTime) return;
-      
-      const dwellMs = Date.now() - this.currentPlayStartTime;
-      const seconds = dwellMs / 1000;
-      if (seconds < 1) return;
-      
-      const completionRate = video.duration ? video.currentTime / video.duration : 0;
-      
-      console.log(`📊 Reporting video dwell: ${seconds.toFixed(1)}s, ${Math.round(completionRate*100)}% complete`);
-
-      axios.post(`${this.API_URL}/api/posts/dwell`, {
-        user_id: this.userId,
-        post_id: post.post_id,
-        seconds: seconds,
-        completion_rate: completionRate
-      }).catch(e => console.error('Dwell report error:', e));
-      
-      this.currentPlayStartTime = null;
-    },
-
-    pauseAll() {
-      Object.keys(this.videoRefs).forEach(i => this.pauseVideoAt(parseInt(i)));
-    },
-
-    togglePlay(index) {
-      const video = this.videoRefs[index];
-      if (!video) return;
-      if (video.paused) {
-        this.playVideoAt(index);
-      } else {
-        this.pauseVideoAt(index);
-      }
-    },
-
     toggleGlobalMute() {
       this.isMuted = !this.isMuted;
-      // Apply to all loaded video elements
       Object.values(this.videoRefs).forEach(v => { if (v) v.muted = this.isMuted; });
-      // Save globally
       localStorage.setItem('nexfi_video_muted', this.isMuted);
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'nexfi_video_muted',
@@ -388,37 +537,11 @@ export default {
       this.isMuted = savedMute !== 'false';
     },
 
-    onVideoEnded(index) {
-      this.reportVideoDwell(index);
-      const nextIndex = index + 1;
-      if (nextIndex < this.videos.length) {
-        const nextSlide = this.videoSlides[nextIndex];
-        if (nextSlide) {
-          nextSlide.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }
-    },
-
-    onTouchStart(e) {
-      this.touchStartY = e.changedTouches[0].clientY;
-    },
-    onTouchEnd(e) {
-      const deltaY = this.touchStartY - e.changedTouches[0].clientY;
-      if (Math.abs(deltaY) > 50) {
-        const dir = deltaY > 0 ? 1 : -1;
-        const next = this.currentIndex + dir;
-        if (next >= 0 && next < this.videos.length) {
-          const slide = this.videoSlides[next];
-          if (slide) slide.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }
-    },
-
     async likeVideo(video) {
       if (!this.userId) return;
       const wasLiked = video.is_liked;
       video.is_liked = !wasLiked;
-      video.likes = wasLiked ? video.likes - 1 : video.likes + 1;
+      video.likes = wasLiked ? (video.likes || 1) - 1 : (video.likes || 0) + 1;
       try {
         await axios.post(`${this.API_URL}/api/${wasLiked ? 'unlike' : 'like'}`, {
           user_id: this.userId, post_id: video.post_id
@@ -434,17 +557,21 @@ export default {
     },
 
     async shareVideo(video) {
-      const url = `${this.API_URL.replace('/api', '')}/share/post/${video.post_id}`;
+      const url = `${window.location.origin}/share/post/${video.post_id}`;
       if (navigator.share) {
-        await navigator.share({ title: `Video by @${video.username}`, url });
+        await navigator.share({ title: `Video by @${video.username}`, url }).catch(() => {});
       } else {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(url).catch(() => {});
         alert('Link copied!');
       }
     },
 
     goToProfile(video) {
       this.$router.push(`/tabs/profile/${video.username}`);
+    },
+
+    goBack() {
+      this.$router.back();
     },
 
     getVideoSrc(video) {
@@ -454,17 +581,7 @@ export default {
       if (!src) return '';
       if (src.startsWith('http')) return src;
       if (src.startsWith('/static/')) return `${this.API_URL}${src}`;
-      if (src.startsWith('data:')) return src; // legacy base64
-      return '';
-    },
-
-    getVideoPoster(video) {
-      const item = video.media?.[0];
-      if (!item?.thumbnail) return '';
-      const t = item.thumbnail;
-      if (t.startsWith('http')) return t;
-      if (t.startsWith('/static/')) return `${this.API_URL}${t}`;
-      if (t.startsWith('data:')) return t; // legacy base64 thumbnail
+      if (src.startsWith('data:')) return src;
       return '';
     },
 
@@ -474,6 +591,10 @@ export default {
       if (imageData.startsWith('data:')) return imageData;
       if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
       return this.defaultAvatar;
+    },
+
+    handleAvatarError(event) {
+      event.target.src = this.defaultAvatar;
     },
 
     formatCount(n) {
@@ -492,18 +613,23 @@ export default {
   --background: #000;
   height: 100vh;
   overflow: hidden;
+  position: relative;
 }
 
+/* ── Main scroll container ── */
 .video-scroll-container {
   height: 100vh;
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
   -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
   position: relative;
 }
 
 .video-scroll-container::-webkit-scrollbar { display: none; }
+.video-scroll-container { scrollbar-width: none; }
 
+/* ── Each video slide ── */
 .video-slide {
   width: 100%;
   height: 100vh;
@@ -517,65 +643,92 @@ export default {
   justify-content: center;
 }
 
+/* ── Full-screen video ── */
 .fullscreen-video {
   position: absolute;
-  top: 0; left: 0;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  background: #000;
+  cursor: pointer;
 }
 
+/* ── Gradient overlay ── */
 .video-gradient {
   position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 60%;
-  background: linear-gradient(transparent, rgba(0,0,0,0.85));
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 65%;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── Progress bar ── */
+.video-progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.25);
+  z-index: 15;
+}
+
+.video-progress-fill {
+  height: 100%;
+  background: #fff;
+  transition: width 0.2s linear;
+  border-radius: 0 2px 2px 0;
+}
+
+/* ── Play/Pause indicator ── */
+.play-pause-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
   pointer-events: none;
 }
 
-/* Right side action buttons */
-.video-actions {
-  position: absolute;
-  right: 12px;
-  bottom: 120px;
+.play-indicator-circle {
+  width: 72px;
+  height: 72px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 20px;
-  z-index: 10;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
 }
 
-.action-btn {
-  background: none;
-  border: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  padding: 0;
-  gap: 4px;
+.play-icon {
+  font-size: 36px;
+  color: rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
 }
 
-.action-icon {
-  font-size: 32px;
-  color: #fff;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
-  transition: transform 0.15s ease, color 0.15s ease;
+.play-fade-enter-active {
+  animation: piFadeIn 0.15s ease;
+}
+.play-fade-leave-active {
+  animation: piFadeOut 0.5s ease forwards;
+}
+@keyframes piFadeIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes piFadeOut {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
 }
 
-.action-icon.liked {
-  color: #ff2d55;
-  transform: scale(1.2);
-}
-
-.action-count {
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
-}
-
-/* Bottom info overlay */
+/* ── Bottom info overlay ── */
 .video-bottom-overlay {
   position: absolute;
   bottom: 80px;
@@ -590,14 +743,16 @@ export default {
   gap: 10px;
   margin-bottom: 8px;
   cursor: pointer;
+  tap-highlight-color: transparent;
 }
 
 .author-avatar {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  border: 2px solid #fff;
+  border: 2px solid rgba(255, 255, 255, 0.9);
   object-fit: cover;
+  flex-shrink: 0;
 }
 
 .author-info {
@@ -609,7 +764,7 @@ export default {
   font-size: 15px;
   font-weight: 700;
   color: #fff;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -621,82 +776,186 @@ export default {
 .badge-icon.gold { color: #FFD700; }
 
 .author-handle {
-  font-size: 12px;
-  color: rgba(255,255,255,0.8);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 1px;
 }
 
 .video-caption {
   font-size: 14px;
-  color: #fff;
-  line-height: 1.4;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
-  max-height: 60px;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.45;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  max-height: 72px;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
 
-/* Play/pause indicator */
-.play-pause-indicator {
+/* ── Right side action buttons ── */
+.video-actions {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 20;
-  pointer-events: none;
-  animation: fadeOut 0.8s ease forwards;
-  animation-delay: 0.5s;
+  right: 12px;
+  bottom: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  z-index: 10;
 }
 
-@keyframes fadeOut {
-  from { opacity: 1; }
-  to { opacity: 0; }
+.action-btn {
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px;
+  gap: 4px;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease;
 }
 
-.play-icon {
-  font-size: 72px;
-  color: rgba(255,255,255,0.9);
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+.action-btn:active {
+  transform: scale(0.9);
 }
 
-/* Global mute button */
+.action-icon {
+  font-size: 32px;
+  color: #fff;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.action-icon.liked {
+  color: #ff2d55;
+  transform: scale(1.2);
+}
+
+.action-count {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* ── Global mute button ── */
 .global-mute-btn {
   position: fixed;
-  top: 50px;
+  top: 52px;
   right: 16px;
   z-index: 100;
-  background: rgba(0,0,0,0.6);
-  border: 1.5px solid rgba(255,255,255,0.3);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.65);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
   color: #fff;
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   font-size: 20px;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.global-mute-btn:active { transform: scale(0.9); }
+.global-mute-btn:hover {
+  background: rgba(0, 0, 0, 0.85);
+  transform: scale(1.05);
+}
 
-/* Loading */
+.global-mute-btn:active {
+  transform: scale(0.9);
+}
+
+/* ── Back button ── */
+.back-btn {
+  position: fixed;
+  top: 52px;
+  left: 16px;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 22px;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.back-btn:hover {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.back-btn:active {
+  transform: scale(0.9);
+}
+
+/* ── Video error overlay ── */
+.video-error-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+  color: rgba(255, 255, 255, 0.7);
+  gap: 12px;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.video-error-overlay .error-icon {
+  font-size: 48px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.video-error-overlay p {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ── Loading overlay ── */
 .video-loading {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.9);
+  background: #000;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 200;
-  color: #fff;
+  color: rgba(255, 255, 255, 0.7);
   gap: 16px;
 }
 
+.loading-spinner-wrap {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-loading p {
+  font-size: 14px;
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+
+/* ── Load more indicator ── */
 .loading-more {
   height: 100px;
   display: flex;
@@ -704,18 +963,21 @@ export default {
   justify-content: center;
 }
 
-/* Empty state */
+/* ── Empty state ── */
 .empty-state {
-  height: 100vh;
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: rgba(255, 255, 255, 0.7);
   gap: 12px;
   text-align: center;
   padding: 32px;
+  background: #000;
 }
-.empty-icon { font-size: 64px; color: rgba(255,255,255,0.3); }
-.empty-sub { font-size: 14px; color: rgba(255,255,255,0.5); }
+
+.empty-icon { font-size: 64px; color: rgba(255, 255, 255, 0.25); }
+.empty-sub { font-size: 14px; color: rgba(255, 255, 255, 0.45); }
 </style>

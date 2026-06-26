@@ -64,21 +64,21 @@
             <div class="action-buttons">
               <ion-button 
                 v-if="profile && String(profile.user_id) === String(userId) && !profile.is_verified"
-                fill="solid" 
-                color="primary"
+                fill="outline" 
                 size="small"
                 class="verify-inline-btn"
                 @click="getVerified">
-                ✓ Get Verified
+                <ion-icon :icon="checkmarkCircle" slot="start"></ion-icon>
+                Get Verified
               </ion-button>
               <ion-button 
                 v-if="profile && String(profile.user_id) === String(userId) && profile.is_verified && profile.verification_tier !== 'gold'"
-                fill="solid" 
-                color="primary"
+                fill="outline" 
                 size="small"
                 class="verify-inline-btn"
                 @click="getVerified">
-                🚀 Upgrade
+                <ion-icon :icon="colorWand" slot="start"></ion-icon>
+                Upgrade
               </ion-button>
               <ion-button 
                 v-if="profile && String(profile.user_id) === String(userId)"
@@ -227,74 +227,164 @@
             <ion-button fill="clear" size="small" @click="loadUserPosts">Refresh Posts</ion-button>
           </div>
           
-          <div v-else v-for="post in userPosts" :key="post.post_id" class="post-item">
-            <div class="repost-badge" v-if="post.item_type === 'repost'">
-              <ion-icon :icon="grid" class="repost-icon"></ion-icon>
-              <span>Reposted by {{ post.reposted_by_username || profile.username }}</span>
+          <div v-else v-for="post in userPosts" :key="post.post_id" class="post-item post-card-container">
+            <!-- Left: Avatar -->
+            <div class="post-avatar" @click="openProfile(post)">
+              <img
+                :src="getImageUrl(post.profile_pic || profile.profile_pic)"
+                class="avatar-img"
+                alt="Profile"
+                @error="handleImageError"
+              />
             </div>
-            <div class="post-header">
-              <span class="post-time">{{ formatPostTime(post.timestamp) }}</span>
-            </div>
-            <div 
-              class="post-content" 
-              v-if="post.content || post.quote_text"
-              @click="onPostTextClick($event, post)"
-              v-html="formatPostContent(post.quote_text || post.content)">
-            </div>
-            
-            <!-- Handle multiple media items -->
-            <div v-if="post.media && post.media.length" class="post-media-container">
-              <div class="post-media-grid" :class="'count-' + Math.min(post.media.length, 4)">
-                <div v-for="(m, idx) in post.media.slice(0, 4)" :key="idx" class="media-wrapper" @click="viewMedia(m)">
-                  <img v-if="m.type === 'image'" :src="getImageUrl(m.data)" class="post-media-img" />
-                  <div v-else-if="m.type === 'video'" class="video-preview">
-                    <VideoPlayer :src="getImageUrl(m.data)" />
+
+            <!-- Right: Content wrapper -->
+            <div class="post-content-wrapper">
+              <!-- Repost Context -->
+              <div v-if="post.item_type === 'repost'" class="repost-context">
+                <ion-icon :icon="repeat" class="repost-icon"></ion-icon>
+                <span class="repost-text">Reposted by @{{ truncateUsername(post.reposted_by_username || profile.username) }}</span>
+              </div>
+
+              <!-- Quote Container (if quote repost) -->
+              <div v-if="post.item_type === 'repost' && (post.quote_text || (post.quote_media && post.quote_media.length))" class="quote-container">
+                <div v-if="post.quote_text" class="quote-text" v-html="formatPostContent(post.quote_text)"></div>
+                <div v-if="post.quote_media && post.quote_media.length" class="quote-media">
+                  <div class="media-grid" :class="`count-${Math.min(post.quote_media.length, 4)}`">
+                    <div
+                      v-for="(item, index) in post.quote_media.slice(0, 4)"
+                      :key="index"
+                      class="media-item"
+                      @click="viewMedia(item)"
+                    >
+                      <img
+                        v-if="item.type === 'image'"
+                        :src="getImageUrl(item.data)"
+                        class="media-img"
+                        alt="Quote media"
+                        @error="handleImageError"
+                      />
+                      <VideoPlayer
+                        v-else-if="item.type === 'video'"
+                        :src="getVideoUrl(item)"
+                        :poster="item.thumbnail ? getImageUrl(item.thumbnail) : ''"
+                        @click.stop
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            
-            <!-- Poll Display -->
-            <PollDisplay 
-              v-if="post.poll" 
-              :poll="post.poll" 
-              :postId="post.post_id"
-              @poll-updated="handlePollUpdate"
-            />
-            
-            <img 
-              v-else-if="post.image" 
-              :src="getImageUrl(post.image)" 
-              class="post-image"
-              alt="Post"
-              @click="viewMedia({type: 'image', data: post.image})"
-            />
 
-            <div class="post-actions">
-              <ion-button fill="clear" size="small" class="action-btn">
-                <ion-icon :icon="chatbubbleOutline"></ion-icon>
-                <span v-if="post.comments_count || post.comments">{{ post.comments_count || post.comments }}</span>
-              </ion-button>
-              
-              <ion-button
-                fill="clear"
-                size="small"
-                :class="['action-btn', 'retweet-btn', { 'reposted': post.is_reposted_by_me }]"
+              <!-- Post Header (User Info + More Option) -->
+              <div class="post-header">
+                <div class="post-user-info" @click="openProfile(post)">
+                  <span class="display-name">
+                    {{ (post.first_name || post.last_name) ? (post.first_name + ' ' + post.last_name).trim() : post.username }}
+                  </span>
+                  <VerificationBadge :tier="post.verification_tier || (post.item_type !== 'repost' ? profile.verification_tier : 'none')" />
+                  <span class="handle">@{{ truncateUsername(post.username) }}</span>
+                  <span class="separator">·</span>
+                  <span class="timestamp">{{ formatPostTime(post.timestamp) }}</span>
+                </div>
+                <ion-button 
+                  fill="clear" 
+                  size="small" 
+                  class="more-btn"
+                  @click.stop="openPostMoreOptions(post)">
+                  <ion-icon :icon="ellipsisHorizontal"></ion-icon>
+                </ion-button>
+              </div>
+
+              <!-- Post Content Text -->
+              <div 
+                class="post-text" 
+                v-if="post.content" 
+                @click="onPostTextClick($event, post)"
+                v-html="formatPostContent(getPostDisplayContent(post.content, post.post_id))">
+              </div>
+              <div v-if="post.content && post.content.length > 500" class="show-more-toggle" @click.stop="toggleExpandPost(post.post_id)">
+                {{ isExpanded(post.post_id) ? 'Show less' : 'Show more' }}
+              </div>
+
+              <!-- Handle media items -->
+              <div 
+                class="post-media" 
+                v-if="post.media && post.media.length"
               >
-                <ion-icon :icon="repeat"></ion-icon>
-              </ion-button>
-              
-              <ion-button 
-                fill="clear" 
-                size="small" 
-                :class="['action-btn', 'like-btn', { 'liked': post.liked }]">
-                <ion-icon :icon="post.liked ? heart : heartOutline"></ion-icon>
-                <span v-if="(post.likes || 0) > 0">{{ post.likes }}</span>
-              </ion-button>
-              
-              <ion-button fill="clear" size="small" class="action-btn">
-                <ion-icon :icon="shareOutline"></ion-icon>
-              </ion-button>
+                <div 
+                  class="media-grid" 
+                  :class="`count-${Math.min(post.media.length, 4)}`"
+                >
+                  <div
+                    v-for="(item, index) in post.media.slice(0, 4)"
+                    :key="index"
+                    class="media-item"
+                    @click="viewMedia(item)"
+                  >
+                    <img
+                      v-if="item.type === 'image'"
+                      :src="getImageUrl(item.data)"
+                      class="media-img"
+                      alt="Post media"
+                      @error="handleImageError"
+                    />
+                    <VideoPlayer
+                      v-else-if="item.type === 'video'"
+                      :src="getVideoUrl(item)"
+                      :poster="item.thumbnail ? getImageUrl(item.thumbnail) : ''"
+                      @click.stop
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Legacy single image -->
+              <div v-else-if="post.image" class="post-media">
+                <img 
+                  :src="getImageUrl(post.image)" 
+                  class="post-image"
+                  alt="Post"
+                  @click="viewMedia({type: 'image', data: post.image})"
+                />
+              </div>
+
+              <!-- Poll Display -->
+              <PollDisplay 
+                v-if="post.poll" 
+                :poll="post.poll" 
+                :postId="post.post_id"
+                @poll-updated="handlePollUpdate"
+              />
+
+              <!-- Actions row -->
+              <div class="post-actions">
+                <ion-button fill="clear" size="small" @click="openComments(post)" class="action-btn">
+                  <ion-icon :icon="chatbubbleOutline"></ion-icon>
+                  <span v-if="post.comments">{{ post.comments }}</span>
+                </ion-button>
+                
+                <ion-button
+                  fill="clear"
+                  size="small"
+                  @click="retweet(post.post_id)"
+                  :class="['action-btn', 'retweet-btn', { 'reposted': post.is_reposted_by_me }]"
+                >
+                  <ion-icon :icon="repeat"></ion-icon>
+                </ion-button>
+                
+                <ion-button 
+                  fill="clear" 
+                  size="small" 
+                  @click="toggleLike(post.post_id, post.liked)" 
+                  :class="['action-btn', 'like-btn', { 'liked': post.liked }]">
+                  <ion-icon :icon="post.liked ? heart : heartOutline"></ion-icon>
+                  <span v-if="post.likes > 0">{{ post.likes }}</span>
+                </ion-button>
+                
+                <ion-button fill="clear" size="small" @click="share(post)" class="action-btn">
+                  <ion-icon :icon="shareOutline"></ion-icon>
+                </ion-button>
+              </div>
             </div>
           </div>
         </div>
@@ -313,7 +403,7 @@
             @click="viewMedia(item)">
             <img v-if="item.type === 'image'" :src="getImageUrl(item.data)" alt="Media" />
             <div v-else-if="item.type === 'video'" class="video-item-preview">
-              <VideoPlayer :src="getImageUrl(item.data)" />
+              <VideoPlayer :src="getVideoUrl(item)" />
             </div>
           </div>
         </div>
@@ -485,6 +575,13 @@
         </div>
       </ion-content>
     </ion-modal>
+
+    <!-- Post Options Action Sheet -->
+    <ion-action-sheet
+      :is-open="showPostMoreSheet"
+      @didDismiss="showPostMoreSheet = false"
+      :buttons="postMoreButtons"
+    ></ion-action-sheet>
   </ion-page>
 </template>
 
@@ -493,13 +590,13 @@
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
   IonButtons, IonIcon, IonSpinner, IonRefresher, IonRefresherContent,
-  IonModal, IonList, IonItem, IonLabel, IonInput
+  IonModal, IonList, IonItem, IonLabel, IonInput, IonActionSheet
 } from '@ionic/vue';
 import {
   checkmark, personAdd, mail, camera, 
-  images, calendar, arrowBack, person, logOut, sunny, moon, ellipsisVertical,
+  images, calendar, arrowBack, person, logOut, sunny, moon, ellipsisVertical, ellipsisHorizontal,
   grid, heart, heartOutline, chatbubbleOutline, repeat, documentText, chatbubble, alertCircle,
-  shareOutline, checkmarkCircle, skull, colorWand, happy, add, remove, settingsOutline
+  shareOutline, checkmarkCircle, skull, colorWand, happy, add, remove, settingsOutline, close, notificationsCircleOutline
 } from 'ionicons/icons';
 import api from '@/utils/api';
 import config from '@/config/index.js';
@@ -514,7 +611,7 @@ export default {
   components: {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
     IonButtons, IonIcon, IonSpinner, IonRefresher, IonRefresherContent,
-    IonModal, IonList, IonItem, IonLabel, IonInput, VideoPlayer, PollDisplay, LanModePanel, VerificationBadge
+    IonModal, IonList, IonItem, IonLabel, IonInput, IonActionSheet, VideoPlayer, PollDisplay, LanModePanel, VerificationBadge
   },
   data() {
     return {
@@ -529,6 +626,11 @@ export default {
       sunny,
       moon,
       ellipsisVertical,
+      ellipsisHorizontal,
+      showPostMoreSheet: false,
+      postMoreButtons: [],
+      activeMorePost: null,
+      expandedPosts: {},
       calendar,
       grid,
       heart,
@@ -596,17 +698,38 @@ export default {
       if (post) updatePost(post);
     },
 
+    _normalizeMediaUrl(url) {
+      if (!url || typeof url !== 'string') return url;
+      const STATIC_MARKER = '/static/';
+      const idx = url.indexOf(STATIC_MARKER);
+      if (url.startsWith('http') && idx !== -1) {
+        return `${this.API_URL}${url.substring(idx)}`;
+      }
+      return url;
+    },
+
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
       if (typeof imageData !== 'string') return this.defaultAvatar;
-      if (imageData.startsWith('http')) return imageData;
-      if (imageData.startsWith('data:image')) return imageData;
+      if (imageData.startsWith('data:')) return imageData;
+      // Normalize full URLs to local API (avoids DDNS/CORS issues)
+      if (imageData.startsWith('http')) return this._normalizeMediaUrl(imageData);
       if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
       // Fix: Handle base64 images properly
-      if (imageData.length > 100 && !imageData.startsWith('http') && !imageData.startsWith('data:image') && !imageData.startsWith('/static/')) {
+      if (imageData.length > 100) {
         return `data:image/png;base64,${imageData}`;
       }
       return imageData;
+    },
+
+    getVideoUrl(mediaItem) {
+      if (!mediaItem) return '';
+      const data = mediaItem.data || '';
+      if (!data) return '';
+      if (data.startsWith('http')) return this._normalizeMediaUrl(data);
+      if (data.startsWith('/static/')) return `${this.API_URL}${data}`;
+      if (data.startsWith('data:')) return data;
+      return '';
     },
 
     formatPostContent(text) {
@@ -784,7 +907,12 @@ export default {
         console.log('📥 Posts response:', res.posts?.length, 'posts');
         
         if (res.posts) {
-          this.userPosts = res.posts;
+          this.userPosts = res.posts.map(p => ({
+            ...p,
+            liked: !!p.is_liked,
+            likes: p.likes_count ?? p.likes ?? 0,
+            comments: p.comments_count || 0
+          }));
           
           // Extract media items for the media tab
           const items = [];
@@ -1097,31 +1225,208 @@ export default {
       }
     },
 
-    async toggleLike(postId, isLiked) {
-       console.log('Toggled like:', postId);
-       // Simple immediate UI update
-       const post = this.userPosts.find(p => p.post_id === postId);
-       if (post) {
-         post.liked = !post.liked;
-         post.likes += post.liked ? 1 : -1;
-       }
+    async toggleLike(postId, liked) {
+      if (!this.userId) {
+        this.$router.push('/login');
+        return;
+      }
+      const post = this.userPosts.find(p => p.post_id === postId);
+      if (!post) return;
+
+      const previousLiked = post.liked;
+      const previousLikes = post.likes;
+
+      // Optimistic update
+      post.liked = !liked;
+      post.likes = (post.likes || 0) + (liked ? -1 : 1);
+
+      try {
+        const res = await api.post('/api/like', {
+          post_id: postId,
+          user_id: this.userId
+        });
+        if (res.success) {
+          post.liked = res.liked;
+          post.likes = res.likes;
+        }
+      } catch (err) {
+        post.liked = previousLiked;
+        post.likes = previousLikes;
+        console.error('Like error:', err);
+      }
     },
 
     openComments(post) {
-       console.log('Open comments for', post.post_id);
+      this.$router.push({ path: '/tabs/feed', query: { post: post.post_id } });
     },
 
-    retweet(postId) {
-       console.log('Retweet', postId);
-       // Simple immediate UI update
-       const post = this.userPosts.find(p => p.post_id === postId);
-       if (post) {
-         post.is_reposted_by_me = !post.is_reposted_by_me;
-       }
+    async retweet(postId) {
+      if (!this.userId) {
+        this.$router.push('/login');
+        return;
+      }
+      const post = this.userPosts.find(p => p.post_id === postId);
+      if (!post) return;
+      
+      const wasReposted = post.is_reposted_by_me;
+      post.is_reposted_by_me = !wasReposted;
+      
+      try {
+        const endpoint = wasReposted ? '/api/repost/undo' : '/api/repost';
+        const res = await api.post(endpoint, {
+          user_id: this.userId,
+          post_id: postId
+        });
+        if (res.success) {
+          // If undoing repost, and we are viewing our own profile's reposts, remove it from list
+          if (wasReposted && String(this.profile?.user_id) === String(this.userId)) {
+            this.userPosts = this.userPosts.filter(p => p.post_id !== postId);
+          }
+        }
+      } catch (err) {
+        post.is_reposted_by_me = wasReposted;
+        console.error('Repost error:', err);
+      }
     },
 
-    share(post) {
-       console.log('Share post', post.post_id);
+    async share(post) {
+      if (!post) return;
+      const isNative = window?.location?.protocol === 'capacitor:' || window?.location?.protocol === 'ionic:' || typeof window.Capacitor !== 'undefined';
+      const frontendBase = isNative ? 'https://nex-front.vercel.app' : window.location.origin;
+      const frontendUrl = `${frontendBase}/tabs/feed?post=${post.post_id}`;
+      
+      const shareData = {
+        title: `NexFi - Post by @${post.username}`,
+        text: post.content || 'Check out this post on NexFi!',
+        url: frontendUrl
+      };
+
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData);
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            console.error('Share failed:', err);
+          }
+        }
+      } else {
+        try {
+          await navigator.clipboard.writeText(frontendUrl);
+          alert('🔗 Link copied to clipboard!');
+        } catch (err) {
+          console.error('Failed to copy link:', err);
+        }
+      }
+    },
+
+    isExpanded(postId) {
+      return !!this.expandedPosts[postId];
+    },
+
+    toggleExpandPost(postId) {
+      this.expandedPosts[postId] = !this.expandedPosts[postId];
+    },
+
+    getPostDisplayContent(content, postId) {
+      if (!content) return '';
+      if (this.isExpanded(postId) || content.length <= 500) {
+        return content;
+      }
+      return content.slice(0, 500) + '...';
+    },
+
+    truncateUsername(username) {
+      if (!username) return '';
+      if (username.length <= 15) return username;
+      return username.slice(0, 15) + '...';
+    },
+
+    getVideoUrl(mediaItem) {
+      if (!mediaItem) return '';
+      const data = mediaItem.data || '';
+      if (!data) return '';
+      if (data.startsWith('http')) return data;
+      if (data.startsWith('/static/')) return `${this.API_URL}${data}`;
+      if (data.startsWith('data:')) return data;
+      return '';
+    },
+
+    openProfile(post) {
+      if (!post || !post.username) return;
+      if (this.username === post.username) return;
+      this.$router.push(`/tabs/profile/${post.username}`);
+    },
+
+    async deletePost(postId) {
+      if (!confirm('Delete this post?')) return;
+      
+      try {
+        const res = await api.post('/api/delete_post', { 
+          post_id: postId, 
+          user_id: this.userId 
+        });
+        
+        if (res.success) {
+          this.userPosts = this.userPosts.filter(p => p.post_id !== postId);
+        } else {
+          alert(res.message || 'Failed to delete post');
+        }
+      } catch (err) {
+        console.error('Delete error:', err);
+        alert('Failed to delete post');
+      }
+    },
+
+    openPostMoreOptions(post) {
+      this.activeMorePost = post;
+      const buttons = [];
+      
+      if (post.user_id === this.userId) {
+        buttons.push({
+          text: 'Delete Post',
+          role: 'destructive',
+          icon: close,
+          handler: () => { this.deletePost(post.post_id); }
+        });
+      } else {
+        buttons.push({
+          text: 'Not Interested',
+          icon: notificationsCircleOutline,
+          handler: () => {
+            api.post('/api/posts/dislike', {
+              user_id: this.userId,
+              target_type: 'post',
+              target_id: post.post_id
+            }).then(() => {
+              this.userPosts = this.userPosts.filter(p => p.post_id !== post.post_id);
+            }).catch(console.error);
+          }
+        });
+        buttons.push({
+          text: `Mute @${post.username}`,
+          icon: notificationsCircleOutline,
+          role: 'destructive',
+          handler: () => {
+            if (confirm(`Mute @${post.username}?`)) {
+              api.post('/api/posts/dislike', {
+                user_id: this.userId,
+                target_type: 'user',
+                target_id: post.user_id
+              }).then(() => {
+                this.userPosts = this.userPosts.filter(p => p.user_id !== post.user_id);
+              }).catch(console.error);
+            }
+          }
+        });
+      }
+      
+      buttons.push({
+        text: 'Cancel',
+        role: 'cancel'
+      });
+      
+      this.postMoreButtons = buttons;
+      this.showPostMoreSheet = true;
     }
   },
 
@@ -1290,7 +1595,7 @@ export default {
   display: block;
 }
 
-.edit-profile-btn, .follow-btn, .unfollow-btn {
+.edit-profile-btn, .follow-btn, .unfollow-btn, .verify-inline-btn {
   --border-radius: 20px;
   height: 36px;
   font-weight: 700;
@@ -1308,6 +1613,23 @@ export default {
 .follow-btn:hover {
   --background: var(--ion-color-primary-tint, #deae36);
   box-shadow: 0 4px 12px rgba(218, 165, 32, 0.3);
+}
+
+.verify-inline-btn {
+  --background: transparent;
+  --color: #daa520;
+  --border-color: #daa520;
+  --border-width: 1px;
+  transition: all 0.2s ease-in-out;
+}
+
+.verify-inline-btn:hover {
+  --background: rgba(218, 165, 32, 0.05);
+}
+
+.verify-inline-btn:active {
+  --background: rgba(218, 165, 32, 0.1);
+  transform: scale(0.96);
 }
 
 .unfollow-btn {
