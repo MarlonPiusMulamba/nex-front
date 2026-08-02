@@ -59,19 +59,19 @@ export default {
   async mounted() {
     console.log('✅ App mounted successfully');
     
-    // Initialize notification service if user is logged in
-    const userId = localStorage.getItem('userId');
-    if (userId) {
-      try {
-        await notificationService.initialize(userId);
-        console.log('✓ Notification service initialized');
-      } catch (error) {
-        console.error('Error initializing notifications:', error);
-      }
+    // Initialize notification service for all users (logged-in or guest)
+    const userId = localStorage.getItem('userId') || '1';
+    try {
+      await notificationService.initialize(userId);
+      console.log('✓ Notification service initialized');
+    } catch (error) {
+      console.error('Error initializing notifications:', error);
     }
 
+    window.appRouter = this.$router;
+
     // Global Socket Listeners for notifications
-    const socket = this.$socket;
+    const socket = this.$socketService?.socket || this.$socket;
     if (socket) {
       socket.on('dm:new_message', (payload) => {
         const currentUserId = localStorage.getItem('userId');
@@ -90,6 +90,11 @@ export default {
           message: payload.message || 'You have a new notification',
           type: payload.type || 'general'
         });
+      });
+
+      socket.on('notice:new', (payload) => {
+        console.log('📢 App received global notice:new event:', payload);
+        notificationService.triggerNoticeNotification(payload);
       });
     }
 
@@ -213,5 +218,45 @@ export default {
   justify-content: center;
   gap: 8px;
   z-index: 9999;
+}
+
+/* 🌐 Global Clickable Blue Links for Posts, Notices, Comments, and Messages */
+.post-link,
+.notice-link,
+.notice-text a,
+.post-text a,
+.post-content a,
+.msg-text a,
+.comment-text a,
+.notice-snippet a,
+.notice-detail-body a {
+  color: #2563eb !important;
+  text-decoration: underline !important;
+  font-weight: 600 !important;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: color 0.15s ease, text-decoration 0.15s ease;
+}
+
+.post-link:hover,
+.notice-link:hover,
+.notice-text a:hover,
+.post-text a:hover,
+.post-content a:hover,
+.msg-text a:hover,
+.comment-text a:hover,
+.notice-snippet a:hover,
+.notice-detail-body a:hover {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+}
+
+.post-link:focus,
+.notice-link:focus,
+.notice-text a:focus,
+.post-text a:focus {
+  outline: 2px auto #2563eb;
+  outline-offset: 2px;
 }
 </style>

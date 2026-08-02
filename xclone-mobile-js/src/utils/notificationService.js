@@ -1,5 +1,9 @@
 import axios from 'axios';
 import config from '../config/index.js';
+import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 // We will dynamically import firebaseConfig to avoid build errors if file is missing, 
 // but usually it's better to catch it in the method.
 
@@ -10,6 +14,9 @@ class NotificationService {
         this.audio = null;
         this.isInitialized = false;
         this.userId = null;
+        if (typeof window !== 'undefined') {
+            window.notificationService = this;
+        }
     }
 
     async initialize(userId) {
@@ -60,10 +67,9 @@ class NotificationService {
             console.warn('⚠️ Notifications disabled because this is not a secure context (HTTPS required)');
         }
 
-        // Initialize mobile push if on a native platform
-        const isNative = window.location.protocol === 'capacitor:' ||
-            window.location.protocol === 'ionic:' ||
-            typeof window.Capacitor !== 'undefined';
+        // Initialize mobile push if on a native platform (Android/iOS APK)
+        const isNative = Capacitor.isNativePlatform();
+        console.log('📱 Capacitor isNativePlatform:', isNative);
 
         if (isNative) {
             this.initializeMobilePush();
@@ -245,82 +251,108 @@ class NotificationService {
     }
 
     async initializeMobilePush() {
-        // ... (rest of your initializeMobilePush method remains the same)
         try {
-            // Only load if Capacitor plugins are available
-            let PushNotifications;
-            let LocalNotifications;
-            try {
-                const pnModule = await import(/* @vite-ignore */ '@capacitor/push-notifications');
-                PushNotifications = pnModule.PushNotifications;
-                const lnModule = await import(/* @vite-ignore */ '@capacitor/local-notifications');
-                LocalNotifications = lnModule.LocalNotifications;
-            } catch (importError) {
-                console.log('Push/Local notifications plugins not available');
-                return;
+            console.log('📱 Initializing mobile push & local notifications...');
+
+            // 1. Create Notification Channels unconditionally (Android)
+            const noticesChannel = {
+                id: 'notices',
+                name: 'Notice Board Announcements',
+                description: 'Notifications for new official notices and announcements',
+                importance: 5, // 5 = High/Max (sound and banner pop-up on screen)
+                visibility: 1, // 1 = Public
+                vibration: true
+            };
+
+            await PushNotifications.createChannel({
+                id: 'calls',
+                name: 'Incoming Calls',
+                description: 'Notifications for incoming video and voice calls',
+                importance: 5,
+                visibility: 1,
+                sound: 'call-ton.mp3',
+                vibration: true
+            }).catch(() => {});
+
+            await PushNotifications.createChannel({
+                id: 'messages',
+                name: 'Messages',
+                description: 'Notifications for new messages',
+                importance: 4,
+                visibility: 1,
+                vibration: true
+            }).catch(() => {});
+
+            await PushNotifications.createChannel(noticesChannel).catch(() => {});
+            if (LocalNotifications && LocalNotifications.createChannel) {
+                await LocalNotifications.createChannel(noticesChannel).catch(() => {});
             }
 
-            // Request permission
+            // 2. Attach Notification Event Listeners unconditionally
+            PushNotifications.removeAllListeners().catch(() => {});
+
+            PushNotifications.addListener('registration', async (token) => {
+                console.log('Push registration success, token:', token.value);
+                await this.registerToken(token.value, 'fcm-mobile');
+            });
+
+            PushNotifications.addListener('registrationError', (error) => {
+                console.error('Push registration error:', error);
+            });
+
+            PushNotifications.addListener('pushNotificationReceived', (notification) => {
+                console.log('Push notification received:', notification);
+                this.playSound();
+                LocalNotifications.schedule({
+                    notifications: [{
+                        title: notification.title || 'NexFi Notice',
+                        body: notification.body || '',
+                        id: Math.floor(Date.now() % 1000000),
+                        schedule: { at: new Date(Date.now() + 100) },
+                        channelId: 'notices',
+                        extra: notification.data || notification.extra || {}
+                    }]
+                }).catch(() => {});
+            });
+
+            PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+                console.log('Push notification action performed:', action);
+                const data = action.notification?.data || action.notification?.extra;
+                if (data && data.org_slug) {
+                    const targetPath = `/tabs/notices/${data.org_slug}`;
+                    if (window.appRouter) {
+                        window.appRouter.push(targetPath);
+                    } else {
+                        window.location.href = targetPath;
+                    }
+                }
+            });
+
+            if (LocalNotifications && LocalNotifications.addListener) {
+                LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+                    console.log('📱 Local tray notification tapped:', action);
+                    const extra = action.notification?.extra || action.notification?.data;
+                    if (extra && extra.org_slug) {
+                        const targetPath = `/tabs/notices/${extra.org_slug}`;
+                        if (window.appRouter) {
+                            window.appRouter.push(targetPath);
+                        } else {
+                            window.location.href = targetPath;
+                        }
+                    }
+                });
+            }
+
+            // 3. Request permissions & trigger registration
+            if (LocalNotifications && LocalNotifications.requestPermissions) {
+                await LocalNotifications.requestPermissions().catch(() => {});
+            }
+
             const permResult = await PushNotifications.requestPermissions();
+            console.log('📱 Push permission result:', permResult);
 
             if (permResult.receive === 'granted') {
-                // Create Notification Channels (Android)
-                await PushNotifications.createChannel({
-                    id: 'calls',
-                    name: 'Incoming Calls',
-                    description: 'Notifications for incoming video and voice calls',
-                    importance: 5, // 5 = High (make sound and pop up)
-                    visibility: 1, // 1 = Public
-                    sound: 'call-ton.mp3', // Using the custom call sound file
-                    vibration: true
-                });
-
-                await PushNotifications.createChannel({
-                    id: 'messages',
-                    name: 'Messages',
-                    description: 'Notifications for new messages',
-                    importance: 4, // 4 = Default (make sound)
-                    visibility: 1,
-                    sound: 'msg_ton.mp3',
-                    vibration: true
-                });
-
-                // Register with FCM/APNs
-                await PushNotifications.register();
-
-                // Listen for registration
-                PushNotifications.addListener('registration', async (token) => {
-                    console.log('Push registration success, token:', token.value);
-                    await this.registerToken(token.value, 'fcm-mobile'); // Changed deviceType to 'fcm-mobile'
-                });
-
-                // Listen for registration errors
-                PushNotifications.addListener('registrationError', (error) => {
-                    console.error('Push registration error:', error);
-                });
-
-                // Listen for push notifications received
-                PushNotifications.addListener('pushNotificationReceived', (notification) => {
-                    console.log('Push notification received:', notification);
-                    this.playSound();
-
-                    // Show a local notification for better visibility in foreground
-                    LocalNotifications.schedule({
-                        notifications: [{
-                            title: notification.title || 'NexFi',
-                            body: notification.body || '',
-                            id: Date.now(),
-                            schedule: { at: new Date(Date.now() + 100) },
-                            sound: 'msg-ton.mp3',
-                            attachments: notification.largeIcon ? [{ id: 'img', url: notification.largeIcon }] : []
-                        }]
-                    });
-                });
-
-                // Listen for notification taps
-                PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-                    console.log('Push notification action performed:', notification);
-                });
+                await PushNotifications.register().catch(e => console.warn('Push register warn:', e));
             }
         } catch (error) {
             console.error('Error initializing mobile push:', error);
@@ -372,12 +404,13 @@ class NotificationService {
                         })
                         .catch(err => {
                             console.warn('Sound play blocked (user interaction required):', err);
-                            // On mobile browsers, sound might be blocked until user interaction
                         });
                 }
 
-                // Add vibration for mobile devices
-                if ('vibrate' in navigator) {
+                // Native Android vibration via Capacitor Haptics plugin
+                if (Capacitor.isNativePlatform()) {
+                    Haptics.vibrate({ duration: 500 }).catch(() => {});
+                } else if ('vibrate' in navigator) {
                     navigator.vibrate([200, 100, 200, 100, 200]); // Strong vibration pattern
                 }
             } catch (err) {
@@ -391,8 +424,8 @@ class NotificationService {
         return Notification.permission;
     }
 
-    async showWebNotification(title, body, icon = '/logo.png') {
-        console.log('📢 showWebNotification called:', { title, body });
+    async showWebNotification(title, body, icon = '/logo.png', extraData = {}) {
+        console.log('📢 showWebNotification called:', { title, body, extraData });
 
         if (!('Notification' in window)) {
             console.error('❌ Notifications not supported');
@@ -407,20 +440,22 @@ class NotificationService {
         }
 
         try {
+            const targetUrl = extraData.url || window.location.origin;
+
             // Priority: Try using Service Worker registration (more reliable for tray)
             if ('serviceWorker' in navigator) {
                 const registration = await navigator.serviceWorker.ready;
-                if (registration) {
-                    console.log('✅ Showing notification via Service Worker registration');
+                if (registration && registration.showNotification) {
+                    console.log('✅ Showing tray notification via Service Worker registration');
                     await registration.showNotification(title, {
                         body: body,
                         icon: icon,
                         badge: icon,
                         vibrate: [300, 100, 300, 100, 300],
                         requireInteraction: true,
-                        tag: `nexfi-${Date.now()}`,
+                        tag: `nexfi-notice-${Date.now()}`,
                         renotify: true,
-                        data: { url: window.location.origin }
+                        data: { ...extraData, url: targetUrl }
                     });
                     this.playSound();
                     return;
@@ -433,17 +468,113 @@ class NotificationService {
                 body: body,
                 icon: icon,
                 requireInteraction: true,
-                vibrate: [300, 100, 300, 100, 300]
+                vibrate: [300, 100, 300, 100, 300],
+                data: { ...extraData, url: targetUrl }
             });
             this.playSound();
 
             notification.onclick = () => {
                 window.focus();
+                if (targetUrl && targetUrl !== '#') {
+                    if (window.appRouter) {
+                        window.appRouter.push(targetUrl);
+                    } else {
+                        window.location.href = targetUrl;
+                    }
+                }
                 notification.close();
             };
         } catch (err) {
             console.error('❌ Error showing notification:', err);
             this.playSound();
+        }
+    }
+
+    async triggerNoticeNotification(payload) {
+        if (!payload) return;
+
+        const orgName = payload.org_name || 'Notice Board';
+        const deptName = payload.dept_name || payload.notice?.dept_name || 'General Office';
+        const title = payload.title || payload.notice?.title || 'New Announcement';
+        const rawBody = payload.body || payload.notice?.body || '';
+
+        // Clean HTML tags and create brief intro snippet
+        const cleanBody = rawBody.replace(/<[^>]*>/g, '').trim();
+        const briefSnippet = cleanBody.length > 120 ? cleanBody.slice(0, 117) + '...' : cleanBody;
+
+        const notifTitle = `📢 ${orgName} • ${deptName}`;
+        const notifBody = briefSnippet ? `${title}\n${briefSnippet}` : title;
+        const targetUrl = `/tabs/notices/${payload.org_slug || 'bugema'}`;
+
+        console.log('🔔 Triggering Notice System Tray Notification:', { notifTitle, notifBody, targetUrl });
+
+        // Vibration via Haptics (works regardless of audio policy)
+        const isNative = Capacitor.isNativePlatform();
+        if (isNative) {
+            Haptics.vibrate({ duration: 600 }).catch(() => {});
+        } else if ('vibrate' in navigator) {
+            navigator.vibrate([200, 100, 200, 100, 200]);
+        }
+
+        // 1. Mobile Native Tray / Pop-up Notification (Android / iOS via Capacitor)
+        if (isNative) {
+            try {
+                // Always ensure the channel exists right before scheduling
+                const noticesChannel = {
+                    id: 'notices',
+                    name: 'Notice Board Announcements',
+                    description: 'Notifications for new official notices and announcements',
+                    importance: 5,
+                    visibility: 1,
+                    vibration: true
+                };
+                await LocalNotifications.createChannel(noticesChannel).catch(() => {});
+
+                // Check / request permissions before scheduling
+                let permStatus = await LocalNotifications.checkPermissions().catch(() => ({ display: 'denied' }));
+                console.log('📱 LocalNotifications permission:', permStatus.display);
+
+                if (permStatus.display !== 'granted') {
+                    const req = await LocalNotifications.requestPermissions().catch(() => ({ display: 'denied' }));
+                    permStatus = req;
+                }
+
+                if (permStatus.display === 'granted') {
+                    const notifId = Math.floor(Date.now() % 2000000) + 1; // avoid 0
+                    await LocalNotifications.schedule({
+                        notifications: [{
+                            title: notifTitle,
+                            body: notifBody,
+                            id: notifId,
+                            schedule: { at: new Date(Date.now() + 500) },
+                            channelId: 'notices',
+                            smallIcon: 'ic_stat_icon_config_sample',
+                            extra: {
+                                url: targetUrl,
+                                org_slug: payload.org_slug,
+                                notice_id: payload.notice_id
+                            }
+                        }]
+                    });
+                    console.log('📱 ✅ Scheduled native mobile local tray notification id:', notifId);
+                } else {
+                    console.warn('📱 ⛔ LocalNotifications permission NOT granted — cannot show tray notification');
+                }
+            } catch (err) {
+                console.warn('📱 LocalNotifications plugin error:', err?.message || err);
+            }
+        }
+
+        // 2. Play audio sound (web-compatible; native sound is driven by the tray notification channel)
+        this.playSound();
+
+        // 3. Web & Desktop Tray / Pop-up Notification
+        if (!isNative) {
+            this.showWebNotification(notifTitle, notifBody, '/logo.png', {
+                url: targetUrl,
+                org_slug: payload.org_slug,
+                notice_id: payload.notice_id
+            });
         }
     }
 

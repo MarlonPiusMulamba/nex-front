@@ -3,6 +3,7 @@ import App from './App.vue';
 import router from './router/index.js';
 import { IonicVue } from '@ionic/vue';
 import { io } from 'socket.io-client';
+import { Capacitor } from '@capacitor/core';
 
 // Ionic CSS
 import '@ionic/vue/css/core.css';
@@ -100,22 +101,23 @@ try {
   app.config.globalProperties.$socketService = socketService;
   window.socketService = socketService;
 
-  // Auto-connect if user is logged in
-  const userId = localStorage.getItem('userId');
-  if (userId) {
-    socketService.connect(userId);
-  }
+  // Auto-connect socket for real-time updates & notifications
+  const userId = localStorage.getItem('userId') || '1';
+  socketService.connect(userId);
+  window.appSocket = socketService.socket;
 
   // Listen for login events to connect socket
   window.addEventListener('user:login', (event) => {
     if (event.detail && event.detail.userId) {
       socketService.connect(event.detail.userId);
+      window.appSocket = socketService.socket;
     }
   });
 
   // Listen for logout events to disconnect socket
   window.addEventListener('user:logout', () => {
     socketService.disconnect();
+    window.appSocket = null;
   });
 
   // Listen for backend failover to reconnect socket to the new URL
@@ -125,6 +127,7 @@ try {
     const userId = localStorage.getItem('userId');
     if (userId) {
       socketService.connectToUrl(newUrl, userId);
+      window.appSocket = socketService.socket;
     }
   });
 
@@ -160,8 +163,9 @@ router.isReady()
     app.mount('#app');
     console.log('✅ Step 7: App mounted successfully! 🎉');
 
-    // Register Service Worker for full offline PWA caching
-    if ('serviceWorker' in navigator) {
+    // Register Service Worker only in browser (NOT in Capacitor native)
+    // SW can interfere with Capacitor WebView's request handling causing white screen
+    if ('serviceWorker' in navigator && !Capacitor.isNativePlatform()) {
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .then((registration) => {
           console.log('[SW] Registered, scope:', registration.scope);
@@ -169,6 +173,8 @@ router.isReady()
         .catch((error) => {
           console.warn('[SW] Registration failed:', error);
         });
+    } else if (Capacitor.isNativePlatform()) {
+      console.log('[SW] Skipping service worker registration in Capacitor native');
     }
   })
   .catch((error) => {

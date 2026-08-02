@@ -1,6 +1,6 @@
 <template>
   <div v-if="latestNotice" class="banner-container">
-    <div class="banner-card" @click="openNoticeDetail(latestNotice)">
+    <div class="banner-card" @click="goToBoard(latestNotice.org_slug)">
       <div class="banner-header">
         <div class="org-info">
           <img :src="latestNotice.org_logo || defaultLogo" class="org-logo" />
@@ -23,109 +23,38 @@
           <ion-icon :icon="megaphoneOutline" class="announcement-icon"></ion-icon>
           <h3 class="notice-title">{{ latestNotice.title }}</h3>
         </div>
-        <p class="notice-snippet">{{ truncateText(latestNotice.body, 120) }}</p>
+        <p class="notice-snippet" v-html="formatNoticeBody(truncateText(latestNotice.body, 120))"></p>
       </div>
 
       <div class="banner-footer">
         <span class="notice-date">{{ formatDate(latestNotice.created_at) }}</span>
-        <button class="action-btn" @click.stop="goToNotices">
-          See All Notices
+        <button class="action-btn" @click.stop="goToBoard(latestNotice.org_slug)">
+          View Board
           <ion-icon :icon="chevronForwardOutline"></ion-icon>
         </button>
       </div>
     </div>
-
-    <!-- Notice Detail Modal -->
-    <ion-modal :is-open="isModalOpen" @didDismiss="closeNoticeDetail">
-      <ion-header class="ion-no-border">
-        <ion-toolbar class="modal-toolbar">
-          <ion-buttons slot="start">
-            <ion-button @click="closeNoticeDetail" class="modal-close-btn">
-              <ion-icon :icon="closeOutline"></ion-icon>
-            </ion-button>
-          </ion-buttons>
-          <ion-title class="modal-title">Official Announcement</ion-title>
-        </ion-toolbar>
-      </ion-header>
-
-      <ion-content class="modal-content ion-padding" v-if="selectedNotice">
-        <div class="modal-body-container">
-          <div class="notice-org-banner">
-            <img :src="selectedNotice.org_logo || defaultLogo" class="modal-org-logo" />
-            <div class="modal-org-info">
-              <h2>{{ selectedNotice.org_name }}</h2>
-              <p v-if="selectedNotice.dept_name">{{ selectedNotice.dept_name }} Department</p>
-            </div>
-            <span class="modal-cat-badge" :style="getBadgeStyle(selectedNotice.category)">
-              {{ selectedNotice.category }}
-            </span>
-          </div>
-
-          <div class="notice-main-content">
-            <h1 class="notice-detail-title">{{ selectedNotice.title }}</h1>
-            
-            <div class="author-meta">
-              <img :src="selectedNotice.author_avatar || defaultAvatar" class="author-avatar" />
-              <div class="author-info-text">
-                <span class="author-name">Posted by {{ selectedNotice.author_username }}</span>
-                <span class="post-time">{{ formatDate(selectedNotice.created_at) }}</span>
-              </div>
-            </div>
-
-            <div class="notice-detail-body">
-              {{ selectedNotice.body }}
-            </div>
-
-            <div v-if="selectedNotice.attachment_url" class="attachment-box" @click="openAttachment(selectedNotice.attachment_url)">
-              <div class="attachment-info">
-                <ion-icon :icon="attachOutline" class="attachment-icon"></ion-icon>
-                <div class="attachment-text">
-                  <span class="attachment-title">View Attachment Document</span>
-                  <span class="attachment-subtitle">Tap to open in new window</span>
-                </div>
-              </div>
-              <ion-icon :icon="chevronForwardOutline" class="attachment-arrow"></ion-icon>
-            </div>
-          </div>
-        </div>
-      </ion-content>
-    </ion-modal>
   </div>
 </template>
 
 <script>
-import { 
-  IonIcon, IonModal, IonHeader, IonToolbar, IonTitle, 
-  IonContent, IonButtons, IonButton 
-} from '@ionic/vue';
-import { 
-  megaphoneOutline, chevronForwardOutline, closeOutline, 
-  attachOutline, pushOutline 
-} from 'ionicons/icons';
+import { IonIcon } from '@ionic/vue';
+import { megaphoneOutline, chevronForwardOutline } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config';
 
 export default {
   name: 'NoticeCarousel', // Keep same component registration name to prevent routing breakages
-  components: { 
-    IonIcon, IonModal, IonHeader, IonToolbar, IonTitle, 
-    IonContent, IonButtons, IonButton 
-  },
+  components: { IonIcon },
   data() {
     return {
       megaphoneOutline,
       chevronForwardOutline,
-      closeOutline,
-      attachOutline,
-      pushOutline,
       notices: [],
       loading: true,
       userId: localStorage.getItem('userId'),
       API_URL: config.api.baseURL,
       defaultLogo: 'https://images.unsplash.com/photo-1562564055-71e051d33c19?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80',
-      defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
-      selectedNotice: null,
-      isModalOpen: false
     };
   },
   computed: {
@@ -134,6 +63,48 @@ export default {
     }
   },
   methods: {
+    formatNoticeBody(text) {
+      if (!text) return '';
+
+      const escapeHtml = (str) =>
+        str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+
+      const parts = text.split(/(\s+)/);
+
+      return parts
+        .map((part) => {
+          if (/\s+/.test(part)) return part.replace(/\n/g, '<br>');
+
+          let mainToken = part;
+          let trailingPunct = '';
+          const punctMatch = part.match(/^(.+?)([.,!?:;)\\]]+)$/);
+          if (punctMatch) {
+            const candidate = punctMatch[1];
+            if (/^(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)$/i.test(candidate)) {
+              mainToken = candidate;
+              trailingPunct = punctMatch[2];
+            }
+          }
+
+          const urlRegex = /^(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)$/i;
+
+          if (urlRegex.test(mainToken) && !mainToken.startsWith('@') && !mainToken.startsWith('#')) {
+            const href = mainToken.startsWith('http://') || mainToken.startsWith('https://') ? mainToken : `https://${mainToken}`;
+            const escapedUrl = escapeHtml(mainToken);
+            const escapedHref = escapeHtml(href);
+            const escapedPunct = escapeHtml(trailingPunct);
+            return `<a href="${escapedHref}" class="post-link notice-link" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${escapedUrl}</a>${escapedPunct}`;
+          }
+
+          return escapeHtml(part).replace(/\n/g, '<br>');
+        })
+        .join('');
+    },
     async fetchRecentNotices() {
       this.loading = true;
       try {
@@ -152,8 +123,12 @@ export default {
         this.loading = false;
       }
     },
-    goToNotices() {
-      this.$router.push('/tabs/notices');
+    goToBoard(slug) {
+      if (slug) {
+        this.$router.push(`/tabs/notices/${slug}`);
+      } else {
+        this.$router.push('/tabs/notices');
+      }
     },
     truncateText(text, limit) {
       if (!text) return '';
@@ -162,7 +137,16 @@ export default {
     formatDate(date) {
       if (!date) return '';
       const d = new Date(date);
-      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const now = new Date();
+      const diff = now - d;
+      const mins = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+      if (mins < 1) return 'Just now';
+      if (mins < 60) return `${mins}m ago`;
+      if (hours < 24) return `${hours}h ago`;
+      if (days < 7) return `${days}d ago`;
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     },
     getBadgeStyle(cat) {
       const colors = {
@@ -177,17 +161,6 @@ export default {
         backgroundColor: match.bg,
         color: match.text
       };
-    },
-    openNoticeDetail(notice) {
-      this.selectedNotice = notice;
-      this.isModalOpen = true;
-    },
-    closeNoticeDetail() {
-      this.isModalOpen = false;
-      this.selectedNotice = null;
-    },
-    openAttachment(url) {
-      window.open(url, '_blank');
     }
   },
   mounted() {

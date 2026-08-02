@@ -1,25 +1,28 @@
-const PRIMARY_BACKEND = 'https://nexfiapi.ddns.net';
-const SECONDARY_BACKEND = 'https://nex-back-3-stoz.onrender.com';
+import { Capacitor } from '@capacitor/core';
+
+// ── Production backend (Bugema University) ────────────────────────────────────
+const PRODUCTION_BACKEND = 'https://ssp.bugemauniv.ac.ug';
+
+// ── Local LAN backend (development only) ─────────────────────────────────────
+const LOCAL_BACKEND = 'http://10.129.128.215:5000';
 
 const config = {
   api: {
-    primaryBaseURL: PRIMARY_BACKEND,
-    secondaryBaseURL: SECONDARY_BACKEND,
+    localBaseURL: LOCAL_BACKEND,
+    primaryBaseURL: PRODUCTION_BACKEND,
+    secondaryBaseURL: PRODUCTION_BACKEND, // single source of truth — no Render fallback
+    candidateURLs: [
+      import.meta.env.VITE_API_URL,
+      PRODUCTION_BACKEND,
+    ].filter(Boolean),
     baseURL: (() => {
       const envUrl = import.meta.env.VITE_API_URL;
-      const pageHost = window.location.hostname;
-      const pageProtocol = window.location?.protocol;
-
-      // Detect if running in Electron desktop app
+      const pageHost = typeof window !== 'undefined' ? window.location.hostname : '';
       const isElectron = typeof window !== 'undefined' && window.process && window.process.type;
-      
-      // Detect if running in Capacitor/Ionic native app
-      const isNative =
-        pageProtocol === 'capacitor:' ||
-        pageProtocol === 'ionic:' ||
-        typeof window.Capacitor !== 'undefined';
+      const isNative = Capacitor.isNativePlatform();
 
-      // Detect if running on local development server
+      // Only treat the page as "local dev" if explicitly running a Vite dev server
+      // (never treat Vercel / SSG as local)
       const isPageLocal =
         !isNative &&
         !isElectron &&
@@ -31,26 +34,24 @@ const config = {
 
       let apiUrl;
 
-      // Priority 1: Use VITE_API_URL if set
       if (envUrl) {
+        // Always respect the build-time env var first
+        // .env.production sets this to https://ssp.bugemauniv.ac.ug for all prod builds
         apiUrl = envUrl;
         console.log('🔧 Using VITE_API_URL from environment:', envUrl);
-      }
-      // Priority 2: For local development, use local backend if available (localhost:5000)
-      else if (isPageLocal) {
-        apiUrl = ''; // Use relative path so Vite proxy handles it
+      } else if (isPageLocal) {
+        apiUrl = ''; // Vite proxy handles it in local dev
         console.log('💻 Local development detected, using Vite Proxy');
-      }
-      // Priority 3: Default to production primary backend
-      else {
-        apiUrl = PRIMARY_BACKEND;
-        console.log('🌐 Using production primary backend:', PRIMARY_BACKEND);
+      } else {
+        // All production clients: Android APK, iOS, Windows exe, Vercel web
+        apiUrl = PRODUCTION_BACKEND;
+        console.log('🌐 Using production backend:', PRODUCTION_BACKEND);
       }
 
       console.log('📡 Final API baseURL:', apiUrl);
       return apiUrl;
     })(),
-    timeout: 300000, // 5 minutes (to support 50MB media uploads)
+    timeout: 30000, // 30 seconds for standard calls
   },
   app: {
     name: import.meta.env.VITE_APP_TITLE || 'NexFi',

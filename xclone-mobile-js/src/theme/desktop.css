@@ -352,3 +352,23 @@
     background-color: rgba(218, 165, 32, 0.15);
   }
 }
+
+/* ============================================
+   STANDALONE NOTICE BOARD FULL-WIDTH OVERRIDES
+   ============================================ */
+
+.desktop-layout.full-width-layout {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  grid-template-columns: 1fr !important;
+}
+
+.main-content.standalone-main {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
+}

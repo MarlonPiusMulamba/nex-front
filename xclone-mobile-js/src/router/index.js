@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from '@ionic/vue-router';
+import { createRouter, createWebHistory, createWebHashHistory } from '@ionic/vue-router';
 import { Capacitor } from '@capacitor/core';
 import LoginPage from '../views/LoginPage.vue';
 import RegisterPage from '../views/RegisterPage.vue';
@@ -16,11 +16,14 @@ import VideoFeedPage from '../views/VideoFeedPage.vue';
 
 import NoticeBoardPage from '../views/NoticeBoardPage.vue';
 import OrgBoardPage from '../views/OrgBoardPage.vue';
+import OrgAuthPage from '../views/OrgAuthPage.vue';
+
+const standaloneOrg = import.meta.env.VITE_STANDALONE_ORG || null;
 
 const routes = [
   {
     path: '/',
-    redirect: '/tabs/feed'
+    redirect: () => standaloneOrg ? `/notices/${standaloneOrg}` : '/tabs/feed'
   },
   {
     path: '/login',
@@ -30,6 +33,21 @@ const routes = [
   {
     path: '/register',
     component: RegisterPage,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/notices/:slug/login',
+    component: OrgAuthPage,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/notices/:slug/register',
+    component: OrgAuthPage,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/notices/:slug',
+    component: OrgBoardPage,
     meta: { requiresAuth: false }
   },
   {
@@ -97,6 +115,16 @@ const routes = [
         meta: { requiresAuth: false }
       },
       {
+        path: 'notices/:slug/login',
+        component: OrgAuthPage,
+        meta: { requiresAuth: false }
+      },
+      {
+        path: 'notices/:slug/register',
+        component: OrgAuthPage,
+        meta: { requiresAuth: false }
+      },
+      {
         path: 'verify',
         component: VerificationPortal,
         meta: { requiresAuth: true }
@@ -110,14 +138,29 @@ const routes = [
   }
 ];
 
+// Use hash history for Capacitor native (Android/iOS) to prevent white screen
+// Web history works great in browsers but can fail in Android WebView
+const history = Capacitor.isNativePlatform()
+  ? createWebHashHistory()
+  : createWebHistory(import.meta.env.BASE_URL);
+
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history,
   routes
 });
 
 // Navigation guard
 router.beforeEach((to, from, next) => {
   console.log('🧭 Navigating to:', to.path);
+
+  if (standaloneOrg) {
+    // In standalone mode, only allow the org notice board and its login/register pages
+    const allowedPrefixes = [`/notices/${standaloneOrg}`, `/tabs/notices/${standaloneOrg}`];
+    const isAllowed = allowedPrefixes.some(p => to.path.startsWith(p));
+    if (!isAllowed) {
+      return next(`/notices/${standaloneOrg}`);
+    }
+  }
 
   const userId = localStorage.getItem('userId');
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);

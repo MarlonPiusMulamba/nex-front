@@ -93,6 +93,15 @@ class SocketService {
             }
         });
 
+        // Listen for new notice board announcements
+        this.socket.on('notice:new', (data) => {
+            console.log('📢 New notice board announcement:', data);
+            if (window.notificationService) {
+                window.notificationService.triggerNoticeNotification(data);
+            }
+            window.dispatchEvent(new CustomEvent('notice:new', { detail: data }));
+        });
+
         // Listen for feed updates
         this.socket.on('feed:new_post', (data) => {
             console.log('📰 New post in feed:', data);

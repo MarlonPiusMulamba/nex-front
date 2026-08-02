@@ -1,8 +1,8 @@
 <template>
   <ion-page>
-    <div class="desktop-layout">
+    <div class="desktop-layout" :class="{ 'full-width-layout': isStandaloneNotice }">
       <!-- Left Sidebar (Desktop/Tablet only) -->
-      <aside class="left-sidebar desktop-only">
+      <aside class="left-sidebar desktop-only" v-if="!isStandaloneNotice">
         <!-- Logo -->
         <div class="sidebar-logo">
           <img src="/logo.png" alt="NexFi" class="sidebar-logo-img" />
@@ -77,55 +77,53 @@
       </aside>
 
       <!-- Main Content -->
-      <main class="main-content">
+      <main class="main-content" :class="{ 'standalone-main': isStandaloneNotice }">
         <ion-tabs>
           <ion-router-outlet></ion-router-outlet>
           
           <!-- Bottom Tab Bar (Mobile only) -->
-          <ion-tab-bar slot="bottom" class="mobile-tab-bar mobile-only">
-            <ion-tab-button tab="feed" href="/tabs/feed">
+          <ion-tab-bar slot="bottom" class="mobile-tab-bar mobile-only" v-if="!isStandaloneNotice">
+            <ion-tab-button tab="feed" href="/tabs/feed" class="tab-btn">
               <ion-icon :icon="home"></ion-icon>
-              <ion-label>Home</ion-label>
+              <ion-label class="tab-lbl">Home</ion-label>
             </ion-tab-button>
 
-            <ion-tab-button tab="notices" href="/tabs/notices">
+            <ion-tab-button tab="notices" href="/tabs/notices" class="tab-btn">
               <ion-icon :icon="megaphoneOutline"></ion-icon>
               <ion-badge v-if="unreadNoticeCount > 0" class="notif-badge">{{ unreadNoticeCount }}</ion-badge>
-              <ion-label>Notices</ion-label>
+              <ion-label class="tab-lbl">Notices</ion-label>
             </ion-tab-button>
             
-            <ion-tab-button tab="follow" href="/tabs/follow">
+            <ion-tab-button tab="follow" href="/tabs/follow" class="tab-btn">
               <ion-icon :icon="search"></ion-icon>
-              <ion-label>Search</ion-label>
+              <ion-label class="tab-lbl">Search</ion-label>
             </ion-tab-button>
 
-            <ion-tab-button tab="videos" href="/tabs/videos">
+            <ion-tab-button tab="videos" href="/tabs/videos" class="tab-btn">
               <ion-icon :icon="playCircleOutline"></ion-icon>
-              <ion-label>Videos</ion-label>
+              <ion-label class="tab-lbl">Videos</ion-label>
             </ion-tab-button>
 
-            <ion-tab-button tab="dm" href="/tabs/dm">
+            <ion-tab-button tab="dm" href="/tabs/dm" class="tab-btn">
               <ion-icon :icon="mail"></ion-icon>
               <ion-badge v-if="unreadCount > 0" class="dm-badge">{{ unreadCount }}</ion-badge>
-              <ion-label>DM</ion-label>
+              <ion-label class="tab-lbl">DM</ion-label>
             </ion-tab-button>
 
-            <!-- Mobile Post Button Removed in favor of FAB -->
-
-            <ion-tab-button tab="notifications" href="/tabs/notifications">
+            <ion-tab-button tab="notifications" href="/tabs/notifications" class="tab-btn">
               <ion-icon :icon="notificationsOutline"></ion-icon>
               <ion-badge v-if="unreadNotifCount > 0" class="notif-badge">{{ unreadNotifCount }}</ion-badge>
-              <ion-label>Alerts</ion-label>
+              <ion-label class="tab-lbl">Alerts</ion-label>
             </ion-tab-button>
             
-            <ion-tab-button tab="profile" href="/tabs/profile">
+            <ion-tab-button tab="profile" href="/tabs/profile" class="tab-btn">
               <ion-icon :icon="person"></ion-icon>
-              <ion-label>Profile</ion-label>
+              <ion-label class="tab-lbl">Profile</ion-label>
             </ion-tab-button>
 
-            <ion-tab-button tab="fraternity" href="/tabs/fraternity">
+            <ion-tab-button tab="fraternity" href="/tabs/fraternity" class="tab-btn">
               <ion-icon :icon="shieldOutline"></ion-icon>
-              <ion-label>Fraternity</ion-label>
+              <ion-label class="tab-lbl">Club</ion-label>
             </ion-tab-button>
 
           </ion-tab-bar>
@@ -134,7 +132,7 @@
         <!-- Mobile Floating Post Button (hidden on notice board pages) -->
         <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="mobile-only"
           style="margin-bottom: 70px; margin-right: 8px; z-index: 99999;"
-          v-if="!hideGlobalFab"
+          v-if="!hideGlobalFab && !isStandaloneNotice"
         >
           <ion-fab-button class="gold-fab" @click="triggerGlobalPost">
             <ion-icon :icon="add" class="post-icon" style="font-size: 32px; font-weight: bold; color: black;"></ion-icon>
@@ -144,7 +142,7 @@
 
 
       <!-- Right Sidebar (Desktop only) -->
-      <aside class="right-sidebar desktop-only">
+      <aside class="right-sidebar desktop-only" v-if="!isStandaloneNotice">
         <NoticeWidget />
         <TrendingWidget />
         <SuggestedUsersWidget />
@@ -232,7 +230,13 @@ export default {
   watch: {
     $route(to) {
       // Hide the global post FAB on specific notice board pages
-      this.hideGlobalFab = /^\/tabs\/notices\/.+/.test(to.path);
+      this.hideGlobalFab = /^\/tabs\/notices\/.+/.test(to.path) || /^\/notices\/.+/.test(to.path);
+    }
+  },
+  computed: {
+    isStandaloneNotice() {
+      const path = this.$route?.path || '';
+      return /^\/tabs\/notices\/.+/.test(path) || /^\/notices\/.+/.test(path);
     }
   },
   methods: {
@@ -459,24 +463,67 @@ ion-page {
   width: 100%;
 }
 
+/* ─── Mobile Tab Bar ──────────────────────────────────────── */
+.mobile-tab-bar {
+  --background: #ffffff;
+  --border: 0 none;
+  box-shadow: 0 -1px 0 rgba(0,0,0,0.07), 0 -4px 16px rgba(0,0,0,0.06);
+}
+
+/* Each tab button — force equal width so all 8 fit */
+.tab-btn {
+  --padding-top: 6px;
+  --padding-bottom: 6px;
+  min-width: 0;
+  flex: 1 1 0;
+  max-width: none;
+}
+
+.tab-btn ion-icon {
+  font-size: 22px;
+}
+
+/* Labels shown normally when there's room */
+.tab-lbl {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  margin-top: 2px;
+}
+
+/* On very small screens hide labels entirely so icons all fit */
+@media (max-width: 400px) {
+  .tab-btn {
+    --padding-top: 8px;
+    --padding-bottom: 8px;
+  }
+  .tab-lbl {
+    display: none !important;
+  }
+  .tab-btn ion-icon {
+    font-size: 20px;
+  }
+}
+
 /* Badge styles for mobile tabs */
-.dm-badge {
+.dm-badge,
+.notif-badge {
   position: absolute;
   top: 4px;
-  right: calc(50% - 20px);
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
+  right: calc(50% - 18px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
   background: #ef4444;
   color: white;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10;
-  animation: badgePulse 2s infinite;
+  animation: badgePulse 2s infinite ease-in-out;
 }
 
 .gold-fab {
@@ -493,29 +540,10 @@ ion-page {
   font-weight: bold;
 }
 
-.notif-badge {
-  position: absolute;
-  top: 4px;
-  right: calc(50% - 20px);
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
-  background: #ef4444;
-  color: white;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  animation: badgePulse 2s infinite ease-in-out;
-}
-
 @keyframes badgePulse {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-  70% { transform: scale(1.08); box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0   rgba(239, 68, 68, 0.4); }
+  70%  { transform: scale(1.08); box-shadow: 0 0 0 4px rgba(239, 68, 68, 0);   }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0   rgba(239, 68, 68, 0);   }
 }
 
 /* Ensure main content doesn't overflow on desktop */

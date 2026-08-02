@@ -3,7 +3,8 @@
   "appName": "NexFi",
   "webDir": "dist",
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "cleartext": false
   },
   "plugins": {
     "SplashScreen": {
@@ -13,7 +14,7 @@
     }
   },
   "android": {
-    "allowMixedContent": true
+    "allowMixedContent": false
   },
   "ios": {
     "contentInset": "always"

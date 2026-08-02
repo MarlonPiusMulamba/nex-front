@@ -223,7 +223,7 @@
                 <EmojiPicker v-if="showEmojiPicker" @select="addEmoji" class="composer-emoji-picker" />
               </div>
 
-              <button v-if="canAddMoreMedia && !showPollCreator && !showAMACreator && !showAudioSpaceCreator" type="button" class="toolbar-btn btn-media" @click="$refs.fileInput.click()" title="Add Media">
+              <button v-if="canAddMoreMedia && !showPollCreator && !showAMACreator && !showAudioSpaceCreator" type="button" class="toolbar-btn btn-media" @click="$refs.fileInput?.click()" title="Add Media">
                 <ion-icon :icon="image"></ion-icon>
                 <span>Media</span>
               </button>

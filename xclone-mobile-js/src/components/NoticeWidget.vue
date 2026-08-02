@@ -73,7 +73,12 @@ export default {
       }
     },
     goToNotices() {
-      this.$router.push('/tabs/notices');
+      // Navigate directly to the board of the first/most-recent notice if available
+      if (this.notices.length > 0 && this.notices[0].org_slug) {
+        this.$router.push(`/tabs/notices/${this.notices[0].org_slug}`);
+      } else {
+        this.$router.push('/tabs/notices');
+      }
     },
     goToNoticeBoard(slug) {
       this.$router.push(`/tabs/notices/${slug}`);

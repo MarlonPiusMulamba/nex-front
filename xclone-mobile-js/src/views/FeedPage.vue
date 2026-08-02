@@ -4,7 +4,7 @@
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button @click="goToProfile">
-            <img src="/logo.png" class="header-logo-img" alt="Logo" />
+            <img src="/nexfi-logo.png" class="header-logo-img" alt="NexFi" style="border-radius: 8px; object-fit: cover;" />
           </ion-button>
         </ion-buttons>
         <ion-title class="feed-title">NexFi</ion-title>

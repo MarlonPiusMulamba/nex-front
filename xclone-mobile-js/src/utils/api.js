@@ -1,5 +1,4 @@
 import axios from 'axios';
-
 import config from '../config/index.js';
 
 // Create axios instance
@@ -13,17 +12,14 @@ const api = axios.create({
 
 console.log('📡 API baseURL:', api.defaults.baseURL, '(VITE_API_URL:', import.meta.env.VITE_API_URL || 'not set', ')');
 
-// ─── Retry Configuration ────────────────────────────────────────────────────
-// Silently retries failed requests caused by Render cold-starts (502/503/504)
-// or transient network blips, so the user never sees a failed request.
 const MAX_RETRIES = 3;
-const RETRY_BASE_DELAY_MS = 1500; // doubles each attempt: 1.5s, 3s, 6s
+const RETRY_BASE_DELAY_MS = 1000;
 
 function shouldRetry(error) {
-  // Retry on network errors (no response at all — server asleep)
+  // Retry on network errors (no response at all — server asleep / IP unreachable)
   if (!error.response) return true;
-  // Retry on Render cold-start / overload HTTP codes
-  const retryableCodes = [502, 503, 504];
+  // Retry on Render cold-start / server error codes
+  const retryableCodes = [500, 502, 503, 504];
   return retryableCodes.includes(error.response.status);
 }
 
@@ -33,18 +29,15 @@ function wait(ms) {
 
 // Request interceptor
 api.interceptors.request.use(
-  (config) => {
-    // Log requests in development
+  (reqConfig) => {
     if (import.meta.env.DEV) {
-      console.log('🌐 API Request:', config.method?.toUpperCase(), config.url);
+      console.log('🌐 API Request:', reqConfig.method?.toUpperCase(), reqConfig.url);
     }
-
-    // Add auth tokens here if needed
     const token = localStorage.getItem('token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      reqConfig.headers.Authorization = `Bearer ${token}`;
     }
-    return config;
+    return reqConfig;
   },
   (error) => {
     console.error('❌ Request Error:', error);
@@ -52,67 +45,60 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor
+// Response interceptor with candidate backend failover
 api.interceptors.response.use(
   (response) => {
-    // Log responses in development
     if (import.meta.env.DEV) {
       console.log('✅ API Response:', response.config.url, response.status);
     }
-    return response.data;
+    return response;
   },
   async (error) => {
     const requestConfig = error.config;
+    if (!requestConfig) return Promise.reject(error);
 
-    // ── Auto-retry & Failover logic ───────────────────────────────────────────
     requestConfig._retryCount = requestConfig._retryCount || 0;
 
     if (shouldRetry(error) && requestConfig._retryCount < MAX_RETRIES) {
       requestConfig._retryCount += 1;
-      
-      const isPrimary = api.defaults.baseURL === config.api.primaryBaseURL;
-      const shouldFailover = isPrimary && requestConfig._retryCount >= 2; // Failover on 2nd retry if primary is down
 
-      if (shouldFailover && config.api.secondaryBaseURL) {
-        console.error('🚨 Primary backend appears down. Switching to Secondary (Render) failover...');
-        config.api.baseURL = config.api.secondaryBaseURL;
-        api.defaults.baseURL = config.api.secondaryBaseURL;
-        requestConfig.baseURL = config.api.secondaryBaseURL; // Update current request too
-        
-        // Notify other services (like Socket.IO) that we've switched backends
-        window.dispatchEvent(new CustomEvent('backend:failover', { 
-          detail: { baseURL: config.api.secondaryBaseURL } 
+      // Failover to next candidate backend URL if request failed
+      const candidates = config.api.candidateURLs || [];
+      if (candidates.length > 1) {
+        const currentIdx = candidates.indexOf(api.defaults.baseURL);
+        const nextIdx = (currentIdx + 1) % candidates.length;
+        const nextUrl = candidates[nextIdx];
+
+        console.warn(`🚨 Switching API backend from ${api.defaults.baseURL} to ${nextUrl}...`);
+        config.api.baseURL = nextUrl;
+        api.defaults.baseURL = nextUrl;
+        requestConfig.baseURL = nextUrl;
+
+        window.dispatchEvent(new CustomEvent('backend:failover', {
+          detail: { baseURL: nextUrl }
         }));
       }
 
       const delay = RETRY_BASE_DELAY_MS * Math.pow(2, requestConfig._retryCount - 1);
       console.warn(
-        `⚠️ Request failed (${error.response?.status || 'network error'}). ` +
-        `Retrying ${requestConfig._retryCount}/${MAX_RETRIES} in ${delay}ms using ${requestConfig.baseURL || api.defaults.baseURL}...`,
-        requestConfig.url
+        `⚠️ API Request failed (${error.response?.status || 'network error'}). ` +
+        `Retrying (${requestConfig._retryCount}/${MAX_RETRIES}) in ${delay}ms using ${requestConfig.baseURL || api.defaults.baseURL}...`
       );
-      
-      await wait(delay);
-      return api(requestConfig); // Re-issue the exact same request
-    }
-    // ── End failover logic ────────────────────────────────────────────────────
 
-    // All retries exhausted — log and handle normally
+      await wait(delay);
+      return api(requestConfig);
+    }
+
     console.error('❌ API Error (all retries failed):', {
       url: requestConfig?.url,
       status: error.response?.status,
       message: error.message,
-      data: error.response?.data,
     });
 
-    // Handle specific error codes
     if (error.response?.status === 401) {
-      // Unauthorized - clear token and redirect to login
       localStorage.removeItem('token');
       localStorage.removeItem('userId');
       localStorage.removeItem('username');
-
-      // Only redirect if not already on login page
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
