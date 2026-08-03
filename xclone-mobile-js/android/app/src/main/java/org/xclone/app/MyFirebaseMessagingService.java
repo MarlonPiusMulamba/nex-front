@@ -48,38 +48,39 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // onMessageReceived — fires when the app is OPEN or in the BACKGROUND.
-    // When the app is CLOSED (killed), FCM with a `notification` payload shows
-    // automatically; for data-only payloads this method is needed.
-    // We always build the notification manually to guarantee consistent behavior.
+    // onMessageReceived — fires in ALL app states: open, background, AND killed.
+    //
+    // KEY DESIGN: The backend sends DATA-ONLY FCM messages (no `notification` field).
+    // This guarantees onMessageReceived is always called — even when the app is killed.
+    // If a `notification` field were present, Android would handle it automatically
+    // using the default channel (lower priority) and would NOT call this method when
+    // the app is killed, resulting in silent/missed notifications.
     // ─────────────────────────────────────────────────────────────────────────
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
         Log.i(TAG, "FCM message received from: " + remoteMessage.getFrom());
 
-        // Extract notification data
+        // Extract title/body exclusively from the DATA payload (data-only strategy)
         String title = null;
         String body = null;
 
-        // Priority 1: notification payload (standard FCM)
-        if (remoteMessage.getNotification() != null) {
-            title = remoteMessage.getNotification().getTitle();
-            body = remoteMessage.getNotification().getBody();
-            Log.d(TAG, "Notification payload — title: " + title + ", body: " + body);
-        }
-
-        // Priority 2: data payload (our backend sends this for flexibility)
         Map<String, String> data = remoteMessage.getData();
         if (data != null && !data.isEmpty()) {
-            if (title == null) title = data.get("title");
-            if (body == null) body = data.get("body");
-            Log.d(TAG, "Data payload type: " + data.get("type") + ", org_slug: " + data.get("org_slug"));
+            title = data.get("title");
+            body = data.get("body");
+            Log.d(TAG, "Data payload — title: " + title + ", type: " + data.get("type") + ", org_slug: " + data.get("org_slug"));
         }
 
-        // Fallback defaults
-        if (title == null || title.isEmpty()) title = "NexFi Notice Board";
-        if (body == null || body.isEmpty()) body = "You have a new notification";
+        // Fallback: also check notification payload (defensive, for any legacy messages)
+        if ((title == null || title.isEmpty()) && remoteMessage.getNotification() != null) {
+            title = remoteMessage.getNotification().getTitle();
+            body = remoteMessage.getNotification().getBody();
+        }
+
+        // Final fallback defaults
+        if (title == null || title.isEmpty()) title = "Bugema Notice Board";
+        if (body == null || body.isEmpty()) body = "A new notice has been posted";
 
         // Determine channel and notification type
         String type = (data != null) ? data.getOrDefault("type", "notice") : "notice";

@@ -21,25 +21,31 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function (payload) {
     console.log('[firebase-messaging-sw.js] Background message received:', payload);
 
-    // FCM data-only messages put everything in payload.data
+    // Data-only FCM — everything lives in payload.data
     const data = payload.data || {};
     const notification = payload.notification || {};
 
-    const title = data.title || notification.title || 'NexFi';
-    const body = data.body || notification.body || data.message || 'You have a new update';
+    const title = data.title || notification.title || 'Bugema Notice Board';
+    const body = data.body || notification.body || data.message || 'A new notice has been posted';
 
     const isCall = data.type === 'call';
     const isMissedCall = data.type === 'missed_call';
+    const isNotice = data.type === 'notice' || (!isCall && !isMissedCall);
+
+    // Build the target URL — notices go straight to the Bugema board
+    const orgSlug = data.org_slug || 'bugema';
+    const noticeUrl = `/notices/${orgSlug}`;
 
     const options = {
         body: body,
-        icon: '/favicon.png',
-        badge: '/favicon.png',
+        icon: '/bugema-logo.png',
+        badge: '/bugema-logo.png',
         vibrate: isCall ? [500, 200, 500, 200, 500, 200, 500, 200, 500] : [300, 100, 300],
         requireInteraction: isCall,
         data: {
-            url: data.click_action || data.url || '/',
+            url: isNotice ? noticeUrl : (data.click_action || data.url || '/'),
             type: data.type,
+            org_slug: orgSlug,
             call_id: data.call_id,
             caller_username: data.caller_username,
             caller_id: data.caller_id,
@@ -47,7 +53,7 @@ messaging.onBackgroundMessage(function (payload) {
             from_user_id: data.from_user_id,
             from_username: data.from_username
         },
-        tag: isCall ? 'nexfi-call' : (isMissedCall ? 'nexfi-missed-call' : (data.tag || 'nexfi-push')),
+        tag: isCall ? 'nexfi-call' : (isMissedCall ? 'nexfi-missed-call' : `notice-${orgSlug}`),
         renotify: true,
         silent: false,
         actions: isCall ? [
@@ -88,7 +94,8 @@ self.addEventListener('notificationclick', function (event) {
         });
     }
 
-    let targetUrl = event.notification.data?.url || '/';
+    // Default: use the URL stored in notification data (notice board URL for notices)
+    let targetUrl = event.notification.data?.url || '/notices/bugema';
 
     if (event.action === 'accept') {
         // Build URL with call parameters to open the call UI
@@ -98,7 +105,6 @@ self.addEventListener('notificationclick', function (event) {
         // Just close the notification, don't open the app
         return;
     } else if (event.notification.data?.type === 'message') {
-        // For message notifications, navigate to DMs
         targetUrl = `/messages`;
     }
 
@@ -112,7 +118,7 @@ self.addEventListener('notificationclick', function (event) {
                     return client.focus();
                 }
             }
-            // Open new window if app not open
+            // Open new window/tab if app not open
             if (self.clients.openWindow) {
                 return self.clients.openWindow(targetUrl);
             }
