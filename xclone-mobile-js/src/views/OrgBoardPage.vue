@@ -1121,6 +1121,7 @@ export default {
     formatNoticeBody(text) {
       if (!text) return '';
 
+      // Step 1: HTML-escape the entire text first to prevent XSS
       const escapeHtml = (str) =>
         str
           .replace(/&/g, '&amp;')
@@ -1129,63 +1130,53 @@ export default {
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#39;');
 
-      const parts = text.split(/(\s+)/);
+      const escaped = escapeHtml(text);
 
-      return parts
-        .map((part) => {
-          if (/\s+/.test(part)) {
-            return part.replace(/\n/g, '<br>');
-          }
+      // Step 2: Convert newlines to <br> ONCE across the whole string.
+      // (Previously the split/map approach could convert \n → <br> twice:
+      //  once in the whitespace-token branch AND again in the word fallback,
+      //  which caused the visible double-spacing after posting.)
+      const withBreaks = escaped.replace(/\n/g, '<br>');
 
-          let mainToken = part;
+      // Step 3: Inline URL / hashtag / mention decoration on each word.
+      // We split on spaces only (not \n, already converted) so we don't
+      // accidentally fragment <br> tags.
+      const urlRegex =
+        /^(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)$/i;
+
+      return withBreaks
+        .split(' ')
+        .map((word) => {
+          // Each 'word' may still contain <br> from Step 2 — keep those intact
+          if (!word || word === '<br>') return word;
+
+          let mainToken = word;
           let trailingPunct = '';
-          const punctMatch = part.match(/^(.+?)([.,!?:;)\\]]+)$/);
-          if (punctMatch) {
-            const candidate = punctMatch[1];
-            if (
-              /^(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)$/i.test(
-                candidate
-              )
-            ) {
-              mainToken = candidate;
-              trailingPunct = punctMatch[2];
-            }
+          const punctMatch = word.match(/^(.+?)([.,!?:;)\]]+)$/);
+          if (punctMatch && urlRegex.test(punctMatch[1])) {
+            mainToken = punctMatch[1];
+            trailingPunct = punctMatch[2];
           }
 
-          const urlRegex =
-            /^(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)$/i;
-
-          if (
-            urlRegex.test(mainToken) &&
-            !mainToken.startsWith('@') &&
-            !mainToken.startsWith('#')
-          ) {
-            const href =
-              mainToken.startsWith('http://') || mainToken.startsWith('https://')
-                ? mainToken
-                : `https://${mainToken}`;
-            const escapedUrl = escapeHtml(mainToken);
-            const escapedHref = escapeHtml(href);
-            const escapedPunct = escapeHtml(trailingPunct);
-            return `<a href="${escapedHref}" class="post-link notice-link" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${escapedUrl}</a>${escapedPunct}`;
+          if (urlRegex.test(mainToken) && !mainToken.startsWith('@') && !mainToken.startsWith('#')) {
+            const href = mainToken.startsWith('http://') || mainToken.startsWith('https://')
+              ? mainToken
+              : `https://${mainToken}`;
+            return `<a href="${href}" class="post-link notice-link" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${mainToken}</a>${trailingPunct}`;
           }
 
           if (mainToken.startsWith('#') && mainToken.length > 1) {
-            const escapedTag = escapeHtml(mainToken);
-            const escapedPunct = escapeHtml(trailingPunct);
-            return `<span class="hashtag" data-hashtag="${escapedTag}" style="color:#daa520; font-weight:600; cursor:pointer;">${escapedTag}</span>${escapedPunct}`;
+            return `<span class="hashtag" data-hashtag="${mainToken}" style="color:#daa520;font-weight:600;cursor:pointer">${mainToken}</span>${trailingPunct}`;
           }
 
           if (mainToken.startsWith('@') && mainToken.length > 1) {
-            const username = escapeHtml(mainToken.slice(1));
-            const escapedMention = escapeHtml(mainToken);
-            const escapedPunct = escapeHtml(trailingPunct);
-            return `<span class="mention" data-mention="${username}" style="color:#daa520; font-weight:600; cursor:pointer;">${escapedMention}</span>${escapedPunct}`;
+            const username = mainToken.slice(1);
+            return `<span class="mention" data-mention="${username}" style="color:#daa520;font-weight:600;cursor:pointer">${mainToken}</span>${trailingPunct}`;
           }
 
-          return escapeHtml(part).replace(/\n/g, '<br>');
+          return word;
         })
-        .join('');
+        .join(' ');
     },
     handleContentClick(event) {
       const target = event.target.closest('a');
@@ -2513,6 +2504,19 @@ export default {
 /* Body */
 .notice-body {
   padding: 12px 16px 4px;
+}
+
+.notice-text {
+  margin: 0;
+  padding: 0;
+  /* Match textarea's natural single line-height — 1.5 is the browser default
+     for <textarea> and prevents the double-spacing that occurs when the
+     <p> element's own margins stack with the <br> line breaks. */
+  line-height: 1.5;
+  white-space: normal;   /* allow wrapping, but don't add extra space */
+  word-break: break-word;
+  font-size: 0.97rem;
+  color: #1a1a1a;
 }
 
 .notice-title {
