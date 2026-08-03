@@ -480,7 +480,10 @@
 
                 <div class="notice-body">
                   <h3 class="notice-title">{{ notice.title }}</h3>
-                  <p class="notice-text" v-html="formatNoticeBody(notice.body)" @click="handleContentClick($event)"></p>
+                  <p class="notice-text" v-html="formatNoticeBody(getNoticeDisplayContent(notice.body, notice.id))" @click="handleContentClick($event, notice)"></p>
+                  <div v-if="notice.body && notice.body.length > 1000" class="show-more-toggle" @click.stop="toggleExpandNotice(notice.id)">
+                    {{ isNoticeExpanded(notice.id) ? 'Show less' : 'Show more' }}
+                  </div>
                 </div>
 
                 <!-- ── X-style image grid ───────────────────── -->
@@ -881,6 +884,7 @@ export default {
       errorMessage: null,
       _pollInterval: null,
       _lastKnownNoticeId: null,
+      expandedNotices: {},
     };
   },
   computed: {
@@ -1178,11 +1182,43 @@ export default {
         })
         .join(' ');
     },
-    handleContentClick(event) {
-      const target = event.target.closest('a');
+    handleContentClick(event, notice) {
+      const target = event.target.closest('a, .hashtag, .mention');
       if (target) {
         event.stopPropagation();
+        return;
       }
+      if (notice && notice.body && notice.body.length > 1000) {
+        this.toggleExpandNotice(notice.id);
+      }
+    },
+    isNoticeExpanded(noticeId) {
+      return !!this.expandedNotices[noticeId];
+    },
+    toggleExpandNotice(noticeId) {
+      this.expandedNotices = {
+        ...this.expandedNotices,
+        [noticeId]: !this.expandedNotices[noticeId]
+      };
+    },
+    getNoticeDisplayContent(body, noticeId) {
+      if (!body) return '';
+      if (body.length <= 1000 || this.isNoticeExpanded(noticeId)) {
+        return body;
+      }
+      return body.substring(0, 1000) + '...';
+    },
+    scrollToNotice(id) {
+      if (!id) return;
+      this.expandedNotices = { ...this.expandedNotices, [id]: true };
+      this.$nextTick(() => {
+        const el = document.getElementById('notice-' + id);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('notice-highlight');
+          setTimeout(() => el.classList.remove('notice-highlight'), 2000);
+        }
+      });
     },
     refreshAuthState() {
       const currentUserId = localStorage.getItem('userId');
@@ -2504,6 +2540,27 @@ export default {
 /* Body */
 .notice-body {
   padding: 12px 16px 4px;
+}
+
+.show-more-toggle {
+  color: #daa520;
+  font-size: 0.92rem;
+  cursor: pointer;
+  margin-top: 6px;
+  font-weight: 600;
+  display: inline-block;
+  user-select: none;
+}
+
+.show-more-toggle:hover {
+  text-decoration: underline;
+  color: #b8860b;
+}
+
+.notice-highlight {
+  outline: 2px solid #daa520;
+  box-shadow: 0 0 16px rgba(218, 165, 32, 0.4);
+  transition: all 0.3s ease;
 }
 
 .notice-text {
