@@ -355,14 +355,10 @@
             </div>
 
             <!-- Admin / Auth actions -->
-            <div class="sidebar-auth-box">
-              <ion-button v-if="canPost" @click="showComposer = true" expand="block" class="sidebar-post-btn">
+            <div class="sidebar-auth-box" v-if="canPost">
+              <ion-button @click="showComposer = true" expand="block" class="sidebar-post-btn">
                 <ion-icon :icon="add" slot="start"></ion-icon>
                 Post Notice
-              </ion-button>
-              <ion-button v-else-if="!userId" @click="goToLogin" expand="block" fill="outline" class="sidebar-login-btn">
-                <ion-icon :icon="logInOutline" slot="start"></ion-icon>
-                Admin Sign In
               </ion-button>
             </div>
 
@@ -682,16 +678,12 @@
             </ion-select>
           </div>
 
-          <!-- Post Notice / Sign In -->
+          <!-- Post Notice (Admins/Managers only) -->
           <button v-if="canPost" class="mobile-nav-btn mobile-post-nav-btn" @click="showComposer = true">
             <div class="post-icon-wrap">
               <ion-icon :icon="add"></ion-icon>
             </div>
             <span>Post</span>
-          </button>
-          <button v-else-if="!userId" class="mobile-nav-btn" @click="goToLogin">
-            <ion-icon :icon="logInOutline"></ion-icon>
-            <span>Sign In</span>
           </button>
         </nav>
       </div>
