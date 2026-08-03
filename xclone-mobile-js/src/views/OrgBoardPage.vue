@@ -76,12 +76,13 @@
         <span>Offline Mode — Viewing cached notices</span>
       </div>
 
-      <!-- Loading State -->
+      <!-- Loading State with Centered Bugema Logo & Golden Spinner Ring -->
       <div v-if="loading && !org" class="loading-state">
-        <div class="loader-ring">
-          <ion-spinner name="crescent" color="warning"></ion-spinner>
+        <div class="loading-logo-wrap">
+          <img src="/bugema-logo.png" class="loading-center-logo" @error="e => e.target.src = defaultLogo" />
+          <ion-spinner name="crescent" class="loading-spinner-ring"></ion-spinner>
         </div>
-        <p class="loading-text">Loading Notice Board...</p>
+        <p class="loading-text">Loading Bugema Notice Board...</p>
       </div>
 
       <!-- Connection Error / Failed to Load State -->
@@ -1843,24 +1844,46 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 60vh;
-  gap: 16px;
+  height: 65vh;
+  gap: 20px;
+  background: #ffffff;
 }
 
-.loader-ring {
-  width: 60px;
-  height: 60px;
-  background: rgba(218, 165, 32, 0.08);
-  border-radius: 50%;
+.loading-logo-wrap {
+  position: relative;
+  width: 100px;
+  height: 100px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.loading-center-logo {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 16px rgba(218, 165, 32, 0.3);
+  z-index: 2;
+  border: 2px solid #ffffff;
+}
+
+.loading-spinner-ring {
+  position: absolute;
+  inset: -8px;
+  width: 116px;
+  height: 116px;
+  color: #d4af37;
+  --color: #d4af37;
+  z-index: 3;
+}
+
 .loading-text {
-  font-size: 0.9rem;
-  color: #999;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #555555;
   margin: 0;
+  letter-spacing: 0.3px;
 }
 
 /* ─── Locked State ─────────────────────────────────────────── */
