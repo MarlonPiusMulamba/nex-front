@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar class="glass-toolbar">
         <ion-title>Notice Boards</ion-title>
-        <ion-buttons slot="end">
+        <ion-buttons slot="end" v-if="!isStandaloneMode">
           <ion-button @click="showApplyModal = true" class="apply-btn">
             <ion-icon slot="start" :icon="addOutline"></ion-icon>
             Register Org
@@ -163,6 +163,7 @@ import {
 } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config';
+import { saveDirectoryOffline, getOfflineDirectory } from '@/utils/offlineDb.js';
 import OrgApplyModal from '@/components/OrgApplyModal.vue';
 
 export default {
@@ -212,6 +213,14 @@ export default {
         .slice(0, 5); // Top 5
       
       return this.directoryBoards.filter(b => sortedIds.includes(String(b.id)));
+    },
+    isStandaloneMode() {
+      const path = this.$route?.path || '';
+      return (
+        Boolean(import.meta.env.VITE_STANDALONE_ORG) ||
+        /^\/notices/.test(path) ||
+        /^\/tabs\/notices/.test(path)
+      );
     }
   },
   methods: {
@@ -222,9 +231,14 @@ export default {
         });
         if (res.data.success) {
           this.directoryBoards = res.data.boards;
+          saveDirectoryOffline(this.directoryBoards, this.myBoards);
         }
       } catch (err) {
         console.error('Fetch directory error:', err);
+        const cached = await getOfflineDirectory();
+        if (cached && cached.directoryBoards && cached.directoryBoards.length > 0) {
+          this.directoryBoards = cached.directoryBoards;
+        }
       }
     },
     async fetchMyBoards() {
@@ -234,9 +248,14 @@ export default {
         });
         if (res.data.success) {
           this.myBoards = res.data.boards;
+          saveDirectoryOffline(this.directoryBoards, this.myBoards);
         }
       } catch (err) {
         console.error('Fetch my boards error:', err);
+        const cached = await getOfflineDirectory();
+        if (cached && cached.myBoards && cached.myBoards.length > 0) {
+          this.myBoards = cached.myBoards;
+        }
       }
     },
     async loadAll() {

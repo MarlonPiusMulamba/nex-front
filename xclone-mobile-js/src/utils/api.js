@@ -7,8 +7,8 @@ const isNative = Capacitor.isNativePlatform();
 // Create axios instance
 const api = axios.create({
   baseURL: config.api.baseURL,
-  // Native apps (Android/iOS) may be on slower mobile networks — give more headroom
-  timeout: isNative ? 45000 : config.api.timeout,
+  // 15s is enough on mobile — 45s caused very slow "Server Connection Issue" UX
+  timeout: isNative ? 15000 : config.api.timeout,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -16,12 +16,12 @@ const api = axios.create({
 
 console.log('📡 API baseURL:', api.defaults.baseURL, '| Platform:', isNative ? 'native' : 'web', '| VITE_API_URL:', import.meta.env.VITE_API_URL || 'not set');
 
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 1000;
 
 function shouldRetry(error) {
-  // Retry on network errors (no response at all — server asleep / IP unreachable)
-  if (!error.response) return true;
+  // Do NOT retry network errors more than once — if server is unreachable, retrying just wastes time
+  if (!error.response) return (error.config?._retryCount || 0) < 1;
   // Retry on Render cold-start / server error codes
   const retryableCodes = [500, 502, 503, 504];
   return retryableCodes.includes(error.response.status);

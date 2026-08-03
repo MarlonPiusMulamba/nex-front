@@ -5,34 +5,32 @@
         <ion-buttons slot="start" v-if="!isStandaloneMode">
           <ion-back-button default-href="/tabs/notices" class="back-btn"></ion-back-button>
         </ion-buttons>
-        <div class="org-header-title" v-if="org">
-          <div class="mini-logo-wrap">
-            <img :src="org.logo_url || defaultLogo" class="mini-logo" />
-            <div class="mini-logo-ring"></div>
-          </div>
-          <div class="header-text">
-            <div class="title-row">
-              <ion-title class="board-title">{{ org.name }}</ion-title>
+        <div class="org-header-title centered-header" v-if="org">
+          <div class="brand-title-row">
+            <span class="brand-word-left">{{ orgNameFirstWord }}</span>
+            <div class="mini-logo-wrap">
+              <img :src="org.logo_url || defaultLogo" class="mini-logo" />
+              <div class="mini-logo-ring"></div>
             </div>
-            <span class="board-subtitle">Digital Notice Board <template v-if="org.official_domain">• @{{ org.official_domain }}</template></span>
+            <span class="brand-word-right" v-if="orgNameRestWords">{{ orgNameRestWords }}</span>
           </div>
+          <span class="board-subtitle">Digital Notice Board <template v-if="org.official_domain">• @{{ org.official_domain }}</template></span>
         </div>
-        <div class="org-header-title" v-else>
-          <div class="mini-logo-wrap">
-            <img src="/bugema-logo.png" class="mini-logo" />
-            <div class="mini-logo-ring"></div>
-          </div>
-          <div class="header-text">
-            <div class="title-row">
-              <ion-title class="board-title">Bugema University</ion-title>
+        <div class="org-header-title centered-header" v-else>
+          <div class="brand-title-row">
+            <span class="brand-word-left">BUGEMA</span>
+            <div class="mini-logo-wrap">
+              <img src="/bugema-logo.png" class="mini-logo" />
+              <div class="mini-logo-ring"></div>
             </div>
-            <span class="board-subtitle">Digital Notice Board • @bugemauniv.ac.ug</span>
+            <span class="brand-word-right">UNIVERSITY</span>
           </div>
+          <span class="board-subtitle">Digital Notice Board • @bugemauniv.ac.ug</span>
         </div>
         <ion-buttons slot="end">
-          <!-- Profile Avatar Icon (shown when logged in) -->
+          <!-- Profile Avatar Icon (hidden in standalone APK mode) -->
           <button 
-            v-if="userId" 
+            v-if="userId && !isStandaloneMode" 
             class="profile-icon-btn" 
             @click="showProfilePanel = true"
             title="My Profile"
@@ -71,6 +69,12 @@
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
+
+      <!-- Offline Mode Banner -->
+      <div v-if="isOfflineMode" class="offline-notice-banner">
+        <ion-icon :icon="cloudOfflineOutline" class="offline-banner-icon"></ion-icon>
+        <span>Offline Mode — Viewing cached notices</span>
+      </div>
 
       <!-- Loading State -->
       <div v-if="loading && !org" class="loading-state">
@@ -806,10 +810,11 @@ import {
   cashOutline, calendarOutline, listOutline,
   createOutline, peopleOutline, businessOutline, logInOutline, searchOutline,
   closeCircleOutline, documentOutline, closeCircle, expandOutline,
-  arrowUpOutline, closeOutline, refresh
+  arrowUpOutline, closeOutline, refresh, cloudOfflineOutline
 } from 'ionicons/icons';
 import api from '@/utils/api.js';
 import config from '@/config';
+import { saveBoardOffline, getOfflineBoard } from '@/utils/offlineDb.js';
 import OrgAdminPanel from '../components/OrgAdminPanel.vue';
 import NoticeComposerModal from '../components/NoticeComposerModal.vue';
 
@@ -832,7 +837,8 @@ export default {
       chevronForwardOutline, alertCircleOutline, schoolOutline,
       cashOutline, calendarOutline, listOutline,
       createOutline, peopleOutline, businessOutline, logInOutline, searchOutline,
-      closeCircleOutline, documentOutline, closeCircle, expandOutline, arrowUpOutline, closeOutline, refresh,
+      closeCircleOutline, documentOutline, closeCircle, expandOutline, arrowUpOutline, closeOutline, refresh, cloudOfflineOutline,
+      isOfflineMode: false,
       newNoticesCount: 0,
       pendingNotices: [],
       showNewNoticesPill: false,
@@ -875,6 +881,16 @@ export default {
     };
   },
   computed: {
+    orgNameFirstWord() {
+      if (!this.org?.name) return 'BUGEMA';
+      const parts = this.org.name.trim().split(/\s+/);
+      return parts[0].toUpperCase();
+    },
+    orgNameRestWords() {
+      if (!this.org?.name) return 'UNIVERSITY';
+      const parts = this.org.name.trim().split(/\s+/);
+      return parts.length > 1 ? parts.slice(1).join(' ').toUpperCase() : '';
+    },
     isAdmin() {
       return this.membership?.role === 'org_admin';
     },
@@ -906,7 +922,11 @@ export default {
     },
     isStandaloneMode() {
       const path = this.$route?.path || '';
-      return /^\/notices\/.+/.test(path) || /^\/tabs\/notices\/.+/.test(path);
+      return (
+        Boolean(import.meta.env.VITE_STANDALONE_ORG) ||
+        /^\/notices/.test(path) ||
+        /^\/tabs\/notices/.test(path)
+      );
     },
     membersGroupedByDept() {
       const groups = {};
@@ -1037,6 +1057,14 @@ export default {
         if (res.data.success) {
           this.notices = res.data.notices || [];
           this.allNotices = res.data.notices || [];
+          this.isOfflineMode = false;
+          saveBoardOffline(this.org.slug, {
+            org: this.org,
+            membership: this.membership,
+            locked: this.locked,
+            notices: this.notices,
+            departments: this.departments
+          });
         }
       } catch (err) {
         console.error('Silent fetch notices error:', err);
@@ -1165,8 +1193,8 @@ export default {
     async loadAll() {
       this.loading = true;
       this.errorMessage = null;
+      const slug = this.$route?.params?.slug || import.meta.env.VITE_STANDALONE_ORG || 'bugema';
       try {
-        const slug = this.$route.params.slug || import.meta.env.VITE_STANDALONE_ORG || 'bugema';
         const res = await api.get(`/api/boards/${slug}`, {
           params: { user_id: this.userId }
         });
@@ -1177,7 +1205,16 @@ export default {
           this.notices = res.data.notices || [];
           this.allNotices = res.data.notices || [];
           this.departments = res.data.departments || [];
+          this.isOfflineMode = false;
           this.trackVisit();
+          // Save to offline storage
+          saveBoardOffline(slug, {
+            org: this.org,
+            membership: this.membership,
+            locked: this.locked,
+            notices: this.notices,
+            departments: this.departments
+          });
           // Update browser tab favicon and title to org branding
           this.updateDynamicFaviconAndTitle(this.org);
           // Fetch logged-in user profile if signed in
@@ -1189,7 +1226,23 @@ export default {
         }
       } catch (err) {
         console.error('Load board error:', err);
-        this.errorMessage = err?.message || 'Unable to reach backend server';
+        // Offline / network failure fallback: Load cached notices from offline storage
+        const cached = await getOfflineBoard(slug);
+        if (cached && cached.org) {
+          console.log(`📦 Loaded notice board '${slug}' from offline cache`);
+          this.org = cached.org;
+          this.membership = cached.membership;
+          this.locked = cached.locked || false;
+          this.notices = cached.notices || [];
+          this.allNotices = cached.notices || [];
+          this.departments = cached.departments || [];
+          this.isOfflineMode = true;
+          this.errorMessage = null;
+        } else {
+          const detail = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Network error';
+          const activeUrl = api?.defaults?.baseURL || 'https://ssp.bugemauniv.ac.ug';
+          this.errorMessage = `${detail} (Backend: ${activeUrl})`;
+        }
       } finally {
         this.loading = false;
       }
@@ -1637,15 +1690,43 @@ export default {
   flex: 1;
 }
 
+.org-header-title.centered-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex: 1;
+  width: 100%;
+  margin: 0 auto;
+  padding: 4px 0;
+}
+
+.brand-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.brand-word-left,
+.brand-word-right {
+  font-size: 0.92rem;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ion-text-color, #000000);
+}
+
 .mini-logo-wrap {
   position: relative;
   flex-shrink: 0;
 }
 
 .mini-logo {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   object-fit: cover;
   display: block;
 }
@@ -1653,8 +1734,8 @@ export default {
 .mini-logo-ring {
   position: absolute;
   inset: -2px;
-  border-radius: 12px;
-  border: 2px solid rgba(218, 165, 32, 0.5);
+  border-radius: 50%;
+  border: 2px solid rgba(218, 165, 32, 0.6);
   pointer-events: none;
 }
 
@@ -1681,11 +1762,12 @@ export default {
 }
 
 .board-subtitle {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: #daa520;
   font-weight: 600;
   opacity: 0.9;
   letter-spacing: 0.2px;
+  margin-top: 2px;
 }
 
 .official-badge {
@@ -3996,5 +4078,25 @@ export default {
     transform: translateY(0);
   }
 }
+
+.offline-notice-banner {
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  color: #000;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.offline-banner-icon {
+  font-size: 1.2rem;
+  color: #000;
+}
 </style>
+
 

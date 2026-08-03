@@ -11,7 +11,9 @@ echo Clean done.
 
 echo [2/4] Building Web Assets (Standalone Bugema Mode)...
 set VITE_STANDALONE_ORG=bugema
-set VITE_API_URL=http://10.129.128.215:5000
+set VITE_API_URL=https://ssp.bugemauniv.ac.ug
+set VITE_ENABLE_SOCKETIO=true
+set VITE_APP_TITLE=Bugema Notice Board
 set NODE_ENV=production
 call npx vite build
 if %ERRORLEVEL% neq 0 (

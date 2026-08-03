@@ -52,10 +52,13 @@ class SocketService {
         // Re-register presence after every automatic reconnect so that
         // calls and live chat resume without the user needing to refresh.
         this.socket.on('reconnect', (attemptNumber) => {
-            console.log(`🔄 Socket.IO reconnected after ${attemptNumber} attempt(s). Re-registering presence...`);
+            console.log(`🔄 Socket.IO reconnected after ${attemptNumber} attempt(s). Re-registering presence & checking missed notices...`);
             if (this.userId) {
                 this.socket.emit('user:register', { user_id: this.userId });
                 this.socket.emit('join', { user_id: this.userId });
+            }
+            if (window.notificationService && window.notificationService.checkMissedNotices) {
+                window.notificationService.checkMissedNotices();
             }
         });
 

@@ -401,4 +401,94 @@ export async function getAllPeerInfo() {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────
+//  Notice Board Offline Caching Helpers
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Save notice board state (org, notices, departments, membership) offline
+ */
+export async function saveBoardOffline(slug, boardData) {
+    if (!slug || !boardData) return;
+    const key = `board_${slug}`;
+    const payload = {
+        key,
+        slug,
+        data: boardData,
+        updated_at: new Date().toISOString()
+    };
+    try {
+        await db.appState.put(payload);
+    } catch (err) {
+        console.warn('Dexie saveBoardOffline warning:', err);
+    }
+    // Backup to localStorage for instant synchronous fallback
+    try {
+        localStorage.setItem(`cached_board_${slug}`, JSON.stringify(boardData));
+    } catch (_) {}
+}
+
+/**
+ * Retrieve cached notice board state offline
+ */
+export async function getOfflineBoard(slug) {
+    if (!slug) return null;
+    const key = `board_${slug}`;
+    try {
+        const record = await db.appState.get(key);
+        if (record && record.data) return record.data;
+    } catch (err) {
+        console.warn('Dexie getOfflineBoard warning:', err);
+    }
+    // Fallback to localStorage
+    try {
+        const local = localStorage.getItem(`cached_board_${slug}`);
+        if (local) return JSON.parse(local);
+    } catch (_) {}
+    return null;
+}
+
+/**
+ * Save notice board directory and user memberships offline
+ */
+export async function saveDirectoryOffline(directoryBoards, myBoards) {
+    const payload = {
+        key: 'board_directory',
+        directoryBoards: directoryBoards || [],
+        myBoards: myBoards || [],
+        updated_at: new Date().toISOString()
+    };
+    try {
+        await db.appState.put(payload);
+    } catch (err) {
+        console.warn('Dexie saveDirectoryOffline warning:', err);
+    }
+    try {
+        localStorage.setItem('cached_board_directory', JSON.stringify({ directoryBoards, myBoards }));
+    } catch (_) {}
+}
+
+/**
+ * Retrieve cached notice board directory offline
+ */
+export async function getOfflineDirectory() {
+    try {
+        const record = await db.appState.get('board_directory');
+        if (record) {
+            return {
+                directoryBoards: record.directoryBoards || [],
+                myBoards: record.myBoards || []
+            };
+        }
+    } catch (err) {
+        console.warn('Dexie getOfflineDirectory warning:', err);
+    }
+    try {
+        const local = localStorage.getItem('cached_board_directory');
+        if (local) return JSON.parse(local);
+    } catch (_) {}
+    return { directoryBoards: [], myBoards: [] };
+}
+
 export default db;
+

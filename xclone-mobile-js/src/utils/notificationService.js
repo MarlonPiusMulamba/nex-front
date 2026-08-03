@@ -76,6 +76,13 @@ class NotificationService {
         }
 
         this.isInitialized = true;
+        // Check for missed notices while app was offline/closed
+        this.checkMissedNotices();
+        setInterval(() => {
+            if (typeof navigator !== 'undefined' && navigator.onLine) {
+                localStorage.setItem('nexfi_last_online_time', String(Date.now()));
+            }
+        }, 10000);
     }
 
     // Keep this if you have custom service worker logic, otherwise Firebase will manage its own.
@@ -546,7 +553,7 @@ class NotificationService {
                             title: notifTitle,
                             body: notifBody,
                             id: notifId,
-                            schedule: { at: new Date(Date.now() + 500) },
+                            schedule: { at: new Date(Date.now() + 50) },
                             channelId: 'notices',
                             smallIcon: 'ic_stat_icon_config_sample',
                             extra: {
@@ -556,7 +563,7 @@ class NotificationService {
                             }
                         }]
                     });
-                    console.log('📱 ✅ Scheduled native mobile local tray notification id:', notifId);
+                    console.log('📱 ✅ Scheduled instant native mobile local tray notification id:', notifId);
                 } else {
                     console.warn('📱 ⛔ LocalNotifications permission NOT granted — cannot show tray notification');
                 }
@@ -575,6 +582,45 @@ class NotificationService {
                 org_slug: payload.org_slug,
                 notice_id: payload.notice_id
             });
+        }
+    }
+
+    async checkMissedNotices() {
+        try {
+            const lastOnline = localStorage.getItem('nexfi_last_online_time');
+            const now = Date.now();
+            localStorage.setItem('nexfi_last_online_time', String(now));
+
+            if (!lastOnline) return;
+
+            const timeDiff = now - parseInt(lastOnline, 10);
+            // Only check if user was offline for at least 10 seconds
+            if (timeDiff < 10000) return;
+
+            console.log(`🔍 Checking missed notices since ${new Date(parseInt(lastOnline, 10)).toISOString()}...`);
+            const apiUrl = config.api?.baseURL || config.baseURL;
+            const res = await axios.get(`${apiUrl}/api/notifications/missed_notices`, {
+                params: {
+                    since: lastOnline,
+                    org_slug: import.meta.env.VITE_STANDALONE_ORG || 'bugema'
+                }
+            });
+
+            if (res.data && res.data.success && Array.isArray(res.data.notices) && res.data.notices.length > 0) {
+                console.log(`📢 Found ${res.data.notices.length} missed notices posted while offline!`);
+                for (const notice of res.data.notices) {
+                    await this.triggerNoticeNotification({
+                        org_name: notice.org_name || 'Bugema University',
+                        dept_name: notice.dept_name || 'Notice Board',
+                        title: notice.title,
+                        body: notice.body,
+                        org_slug: notice.org_slug || 'bugema',
+                        notice_id: notice.id
+                    });
+                }
+            }
+        } catch (err) {
+            console.warn('Error checking missed notices:', err);
         }
     }
 

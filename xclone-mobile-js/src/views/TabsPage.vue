@@ -236,7 +236,11 @@ export default {
   computed: {
     isStandaloneNotice() {
       const path = this.$route?.path || '';
-      return /^\/tabs\/notices\/.+/.test(path) || /^\/notices\/.+/.test(path);
+      return (
+        Boolean(import.meta.env.VITE_STANDALONE_ORG) ||
+        /^\/tabs\/notices/.test(path) ||
+        /^\/notices/.test(path)
+      );
     }
   },
   methods: {
