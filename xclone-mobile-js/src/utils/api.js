@@ -1,16 +1,20 @@
 import axios from 'axios';
 import config from '../config/index.js';
+import { Capacitor } from '@capacitor/core';
+
+const isNative = Capacitor.isNativePlatform();
 
 // Create axios instance
 const api = axios.create({
   baseURL: config.api.baseURL,
-  timeout: config.api.timeout,
+  // Native apps (Android/iOS) may be on slower mobile networks — give more headroom
+  timeout: isNative ? 45000 : config.api.timeout,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-console.log('📡 API baseURL:', api.defaults.baseURL, '(VITE_API_URL:', import.meta.env.VITE_API_URL || 'not set', ')');
+console.log('📡 API baseURL:', api.defaults.baseURL, '| Platform:', isNative ? 'native' : 'web', '| VITE_API_URL:', import.meta.env.VITE_API_URL || 'not set');
 
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;

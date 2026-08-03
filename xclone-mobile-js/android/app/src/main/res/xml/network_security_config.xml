@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!--
+        Production backend — trust the Bugema University server's certificate chain.
+        This allows HTTPS connections to ssp.bugemauniv.ac.ug on Android 7+.
+    -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">ssp.bugemauniv.ac.ug</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!--
+        Supabase Storage CDN — needed for serving media from the bucket.
+    -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">supabase.co</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!--
+        Local development LAN — allow cleartext HTTP only for 10.x.x.x and
+        192.168.x.x addresses (used during dev/testing on campus Wi-Fi).
+        This does NOT affect the production APK behaviour.
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.0.0</domain>
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+
+    <!--
+        Default for all other domains: enforce HTTPS.
+    -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

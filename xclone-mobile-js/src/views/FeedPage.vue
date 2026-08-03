@@ -1441,33 +1441,48 @@ export default {
     // Only used for resolving /static/ relative paths.
     // Full http/https URLs are left as-is since the file physically lives there.
     _resolveStaticUrl(path) {
-      if (!path || typeof path !== 'string') return path;
-      if (path.startsWith('/static/')) return `${this.API_URL}${path}`;
-      return path;
+      return this._normalizeMediaUrl(path);
+    },
+    _normalizeMediaUrl(url) {
+      if (!url || typeof url !== 'string') return '';
+      if (url.startsWith('data:')) return url;
+
+      // Supabase CDN URLs — return as-is
+      if (url.includes('supabase.co')) return url;
+
+      // Handle legacy domains or local IP URLs containing /static/
+      const staticIndex = url.indexOf('/static/');
+      if (staticIndex !== -1) {
+        const relativePath = url.substring(staticIndex);
+        return `${this.API_URL}${relativePath}`;
+      }
+
+      if (url.startsWith('static/')) {
+        return `${this.API_URL}/${url}`;
+      }
+
+      if (url.startsWith('/')) {
+        return `${this.API_URL}${url}`;
+      }
+
+      if (url.startsWith('http')) return url;
+
+      return url;
     },
 
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
       if (typeof imageData !== 'string') return this.defaultAvatar;
-      // Already a data URI (legacy base64 thumbnails)
-      if (imageData.startsWith('data:')) return imageData;
-      // Full URL — return as-is (file lives on that server)
-      if (imageData.startsWith('http')) return imageData;
-      // Local static path — prepend API base URL
-      if (imageData.startsWith('/static/')) return `${this.API_URL}${imageData}`;
-      return this.defaultAvatar;
+      const normalized = this._normalizeMediaUrl(imageData);
+      if (!normalized) return this.defaultAvatar;
+      return normalized;
     },
 
     getVideoUrl(mediaItem) {
       if (!mediaItem) return '';
       const data = mediaItem.data || '';
       if (!data) return '';
-      // Full URL — return as-is
-      if (data.startsWith('http')) return data;
-      if (data.startsWith('/static/')) return `${this.API_URL}${data}`;
-      // Legacy bare base64
-      if (data.startsWith('data:')) return data;
-      return '';
+      return this._normalizeMediaUrl(data);
     },
     
     handleImageError(event) {
