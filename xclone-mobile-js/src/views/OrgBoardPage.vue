@@ -28,9 +28,9 @@
           <span class="board-subtitle">Digital Notice Board • @bugemauniv.ac.ug</span>
         </div>
         <ion-buttons slot="end">
-          <!-- Profile Avatar Icon (hidden in standalone APK mode) -->
+          <!-- Profile Avatar Icon (shown whenever logged in) -->
           <button 
-            v-if="userId && !isStandaloneMode" 
+            v-if="userId" 
             class="profile-icon-btn" 
             @click="showProfilePanel = true"
             title="My Profile"
@@ -729,26 +729,36 @@
                   <ion-icon v-else :icon="personOutline" class="profile-big-icon"></ion-icon>
                 </div>
               </div>
-              <!-- Info -->
-              <div class="profile-info-area" v-if="userProfile">
-                <h2 class="profile-display-name">{{ userProfile.first_name ? `${userProfile.first_name} ${userProfile.last_name || ''}` : userProfile.username }}</h2>
-                <span class="profile-username">@{{ userProfile.username }}</span>
-                <span class="profile-email" v-if="userProfile.email">{{ userProfile.email }}</span>
+              <!-- User Info -->
+              <div class="profile-info-area">
+                <h2 class="profile-display-name">
+                  {{ userProfile?.first_name ? `${userProfile.first_name} ${userProfile.last_name || ''}` : (userProfile?.username || username || 'User') }}
+                </h2>
+                <span class="profile-username" v-if="userProfile?.username || username">@{{ userProfile?.username || username }}</span>
+                <span class="profile-email" v-if="userProfile?.email">{{ userProfile.email }}</span>
               </div>
-              <div class="profile-info-area" v-else>
-                <h2 class="profile-display-name">{{ username || 'User' }}</h2>
+
+              <!-- Membership Details Card: Role & Department -->
+              <div class="profile-details-card" v-if="membership">
+                <div class="profile-detail-item">
+                  <span class="detail-label">Role</span>
+                  <span class="detail-value role-value">{{ formatRole(membership.role) }}</span>
+                </div>
+                <div class="profile-detail-item">
+                  <span class="detail-label">Department</span>
+                  <span class="detail-value">{{ userDeptName }}</span>
+                </div>
+                <div class="profile-detail-item" v-if="org?.name">
+                  <span class="detail-label">Board</span>
+                  <span class="detail-value">{{ org.name }}</span>
+                </div>
               </div>
-              <!-- Org membership badge -->
-              <div class="profile-membership-badge" v-if="membership">
-                <ion-icon :icon="shieldCheckmarkOutline"></ion-icon>
-                <span>{{ org?.name }} Member</span>
-                <span class="membership-role">{{ formatRole(membership.role) }}</span>
-              </div>
-              <!-- Actions -->
+
+              <!-- Logout Action Button -->
               <div class="profile-actions">
                 <button class="profile-action-btn profile-action-btn--danger" @click="signOut">
                   <ion-icon :icon="logInOutline" style="transform: rotate(180deg)"></ion-icon>
-                  Sign Out
+                  Log Out / Sign Out
                 </button>
               </div>
             </div>
@@ -882,6 +892,15 @@ export default {
       if (!this.org?.name) return 'UNIVERSITY';
       const parts = this.org.name.trim().split(/\s+/);
       return parts.length > 1 ? parts.slice(1).join(' ').toUpperCase() : '';
+    },
+    userDeptName() {
+      if (this.membership?.dept_name) return this.membership.dept_name;
+      if (this.membership?.dept_id) {
+        const d = (this.departments || []).find(x => String(x.id) === String(this.membership.dept_id));
+        if (d) return d.name;
+      }
+      if (this.userProfile?.dept_name) return this.userProfile.dept_name;
+      return 'General Board';
     },
     isAdmin() {
       return this.membership?.role === 'org_admin';
@@ -4089,6 +4108,46 @@ export default {
   font-size: 1.2rem;
   color: #000;
 }
+
+.profile-details-card {
+  background: rgba(218, 165, 32, 0.08);
+  border: 1px solid rgba(218, 165, 32, 0.2);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.detail-label {
+  color: #666;
+  font-weight: 600;
+}
+
+.detail-value {
+  color: #000;
+  font-weight: 700;
+}
+
+.role-value {
+  color: #b8860b;
+  background: rgba(218, 165, 32, 0.15);
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
 </style>
+
 
 
