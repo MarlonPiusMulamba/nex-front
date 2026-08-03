@@ -480,10 +480,7 @@
 
                 <div class="notice-body">
                   <h3 class="notice-title">{{ notice.title }}</h3>
-                  <p class="notice-text" v-html="formatNoticeBody(getNoticeDisplayContent(notice.body, notice.id))" @click="handleContentClick($event, notice)"></p>
-                  <div v-if="notice.body && notice.body.length > 1000" class="show-more-toggle" @click.stop="toggleExpandNotice(notice.id)">
-                    {{ isNoticeExpanded(notice.id) ? 'Show less' : 'Show more' }}
-                  </div>
+                  <p class="notice-text" v-html="getNoticeBodyHtml(notice.body, notice.id)" @click="handleContentClick($event, notice)"></p>
                 </div>
 
                 <!-- ── X-style image grid ───────────────────── -->
@@ -1188,7 +1185,14 @@ export default {
         event.stopPropagation();
         return;
       }
-      if (notice && notice.body && notice.body.length > 1000) {
+      // X-style "Read more" / "Show less" inline link
+      if (event.target.closest('.read-more')) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.toggleExpandNotice(notice.id);
+        return;
+      }
+      if (notice && notice.body && notice.body.length > 600) {
         this.toggleExpandNotice(notice.id);
       }
     },
@@ -1201,12 +1205,28 @@ export default {
         [noticeId]: !this.expandedNotices[noticeId]
       };
     },
-    getNoticeDisplayContent(body, noticeId) {
+    getNoticeBodyHtml(body, noticeId) {
       if (!body) return '';
-      if (body.length <= 1000 || this.isNoticeExpanded(noticeId)) {
-        return body;
+      const MAX_BODY_CHARS = 600;
+      const expanded = this.isNoticeExpanded(noticeId);
+
+      if (body.length <= MAX_BODY_CHARS) {
+        return this.formatNoticeBody(body);
       }
-      return body.substring(0, 1000) + '...';
+
+      if (expanded) {
+        // Full body + inline "Show less" to collapse back (X-style)
+        return this.formatNoticeBody(body) + ' <span class="read-more">Show less</span>';
+      }
+
+      // Truncate at the last word boundary within the 600-char window
+      let truncated = body.substring(0, MAX_BODY_CHARS);
+      const lastSpace = truncated.lastIndexOf(' ');
+      if (lastSpace > MAX_BODY_CHARS * 0.6) {
+        truncated = truncated.substring(0, lastSpace);
+      }
+
+      return this.formatNoticeBody(truncated) + ' <span class="read-more">Read more</span>';
     },
     scrollToNotice(id) {
       if (!id) return;
@@ -1862,7 +1882,7 @@ export default {
 
 /* ─── Board Content ────────────────────────────────────────── */
 .board-content {
-  --background: #f5f5f7;
+  --background: #ffffff;
 }
 
 /* ─── Loading ──────────────────────────────────────────────── */
@@ -2557,6 +2577,20 @@ export default {
   color: #b8860b;
 }
 
+/* X-style inline "Read more" / "Show less" link at the end of the notice text */
+.read-more {
+  color: #daa520;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline;
+  user-select: none;
+}
+
+.read-more:hover {
+  text-decoration: underline;
+  color: #b8860b;
+}
+
 .notice-highlight {
   outline: 2px solid #daa520;
   box-shadow: 0 0 16px rgba(218, 165, 32, 0.4);
@@ -3062,11 +3096,14 @@ export default {
   box-shadow: 0 3px 10px rgba(218,165,32,0.3);
 }
 
-/* Desktop grid — 3 columns */
+/* Desktop grid — 3 columns, X-style: centered canvas with white space at the
+   screen edges, and a feed column that never gets too wide on large displays. */
 .board-desktop-grid {
   display: flex;
+  max-width: 1280px;
+  margin: 0 auto;
   min-height: calc(100vh - 120px);
-  background: #f3f4f6;
+  background: transparent;
 }
 
 /* ── Left Sidebar (Desktop/Tablet only) ───────────── */
@@ -3251,6 +3288,8 @@ export default {
 .feed-col {
   flex: 1;
   min-width: 0;
+  max-width: 600px;
+  margin: 0 auto;
   background: #f3f4f6;
   display: flex;
   flex-direction: column;
@@ -3291,7 +3330,7 @@ export default {
   flex-shrink: 0;
   padding: 16px 14px;
   border-left: 1px solid rgba(0,0,0,0.07);
-  background: #f9f9fb;
+  background: #ffffff;
   flex-direction: column;
   gap: 14px;
   position: sticky;

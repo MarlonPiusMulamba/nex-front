@@ -50,16 +50,28 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     // ─────────────────────────────────────────────────────────────────────────
     // onMessageReceived — fires in ALL app states: open, background, AND killed.
     //
-    // KEY DESIGN: The backend sends DATA-ONLY FCM messages (no `notification` field).
-    // This guarantees onMessageReceived is always called — even when the app is killed.
-    // If a `notification` field were present, Android would handle it automatically
-    // using the default channel (lower priority) and would NOT call this method when
-    // the app is killed, resulting in silent/missed notifications.
+    // KEY DESIGN: The backend sends COMBINED notification+data FCM messages.
+    // Google Play services renders the notification payload directly (using the
+    // channel we set in the backend's AndroidNotification), so delivery works
+    // even when the app process is killed and no Java code has to run. When the
+    // process does run, this service receives the same message — we skip re-posting
+    // to avoid duplicates, and only build notifications ourselves for legacy
+    // pure data-only messages.
     // ─────────────────────────────────────────────────────────────────────────
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
         Log.i(TAG, "FCM message received from: " + remoteMessage.getFrom());
+
+        // Combined notification+data messages: Google Play services has ALREADY
+        // rendered the tray notification (using the channel we specify in the
+        // backend's AndroidNotification). Posting another one here would create a
+        // duplicate, so let the system handle those and only build notifications
+        // ourselves for legacy pure data-only messages.
+        if (remoteMessage.getNotification() != null) {
+            Log.d(TAG, "System-displayed notification payload — skipping custom post");
+            return;
+        }
 
         // Extract title/body exclusively from the DATA payload (data-only strategy)
         String title = null;

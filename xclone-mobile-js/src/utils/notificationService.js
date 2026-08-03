@@ -87,7 +87,8 @@ class NotificationService {
 
     // Keep this if you have custom service worker logic, otherwise Firebase will manage its own.
     async registerServiceWorker() {
-        if ('serviceWorker' in navigator) {
+        // Only register the cache-first sw.js in production to avoid stale dev bundles
+        if (import.meta.env.PROD && 'serviceWorker' in navigator) {
             try {
                 const registration = await navigator.serviceWorker.register('/sw.js');
                 console.log('✓ Service Worker registered:', registration.scope);
@@ -215,6 +216,9 @@ class NotificationService {
                     // Fallback: register sw.js for basic push support
                     console.log('Falling back to basic service worker registration');
                     try {
+                        if (!import.meta.env.PROD) {
+                            throw new Error('sw.js fallback skipped in dev to avoid stale caching');
+                        }
                         const registration = await navigator.serviceWorker.register('/sw.js');
                         await navigator.serviceWorker.ready;
                         let subscription = await registration.pushManager.getSubscription();
@@ -515,74 +519,24 @@ class NotificationService {
 
         console.log('🔔 Triggering Notice System Tray Notification:', { notifTitle, notifBody, targetUrl });
 
-        // Vibration via Haptics (works regardless of audio policy)
         const isNative = Capacitor.isNativePlatform();
-        if (isNative) {
-            Haptics.vibrate({ duration: 600 }).catch(() => {});
-        } else if ('vibrate' in navigator) {
+
+        // Native (Android): the backend now sends FCM notification+data messages,
+        // which the Android OS renders itself — tray + sound + vibration — in ALL
+        // app states (open, background, killed). Scheduling a local notification
+        // here too would produce duplicates, so native delegates entirely to FCM.
+        if (isNative) return;
+
+        // Web & Desktop: vibration + sound + tray pop-up
+        if ('vibrate' in navigator) {
             navigator.vibrate([200, 100, 200, 100, 200]);
         }
-
-        // 1. Mobile Native Tray / Pop-up Notification (Android / iOS via Capacitor)
-        if (isNative) {
-            try {
-                // Always ensure the channel exists right before scheduling
-                const noticesChannel = {
-                    id: 'notices',
-                    name: 'Notice Board Announcements',
-                    description: 'Notifications for new official notices and announcements',
-                    importance: 5,
-                    visibility: 1,
-                    vibration: true
-                };
-                await LocalNotifications.createChannel(noticesChannel).catch(() => {});
-
-                // Check / request permissions before scheduling
-                let permStatus = await LocalNotifications.checkPermissions().catch(() => ({ display: 'denied' }));
-                console.log('📱 LocalNotifications permission:', permStatus.display);
-
-                if (permStatus.display !== 'granted') {
-                    const req = await LocalNotifications.requestPermissions().catch(() => ({ display: 'denied' }));
-                    permStatus = req;
-                }
-
-                if (permStatus.display === 'granted') {
-                    const notifId = Math.floor(Date.now() % 2000000) + 1; // avoid 0
-                    await LocalNotifications.schedule({
-                        notifications: [{
-                            title: notifTitle,
-                            body: notifBody,
-                            id: notifId,
-                            schedule: { at: new Date(Date.now() + 50) },
-                            channelId: 'notices',
-                            smallIcon: 'ic_stat_icon_config_sample',
-                            extra: {
-                                url: targetUrl,
-                                org_slug: payload.org_slug,
-                                notice_id: payload.notice_id
-                            }
-                        }]
-                    });
-                    console.log('📱 ✅ Scheduled instant native mobile local tray notification id:', notifId);
-                } else {
-                    console.warn('📱 ⛔ LocalNotifications permission NOT granted — cannot show tray notification');
-                }
-            } catch (err) {
-                console.warn('📱 LocalNotifications plugin error:', err?.message || err);
-            }
-        }
-
-        // 2. Play audio sound (web-compatible; native sound is driven by the tray notification channel)
         this.playSound();
-
-        // 3. Web & Desktop Tray / Pop-up Notification
-        if (!isNative) {
-            this.showWebNotification(notifTitle, notifBody, '/logo.png', {
-                url: targetUrl,
-                org_slug: payload.org_slug,
-                notice_id: payload.notice_id
-            });
-        }
+        this.showWebNotification(notifTitle, notifBody, '/logo.png', {
+            url: targetUrl,
+            org_slug: payload.org_slug,
+            notice_id: payload.notice_id
+        });
     }
 
     async checkMissedNotices() {

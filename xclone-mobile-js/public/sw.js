@@ -125,7 +125,7 @@ self.addEventListener('notificationclick', function (event) {
     );
 });
 
-const CACHE_NAME = 'nexfi-v1';
+const CACHE_NAME = 'nexfi-v2';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',

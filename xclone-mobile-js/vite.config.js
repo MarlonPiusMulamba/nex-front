@@ -30,24 +30,24 @@ export default defineConfig(({ command, mode }) => {
     },
     // DEVELOPMENT SERVER
     server: {
-      host: '10.129.128.215',
+      host: '0.0.0.0',
       port: 5173,
       open: true,
-      strictPort: true,
+      strictPort: false,
       proxy: {
         '/api': {
-          target: 'http://10.129.128.215:5000',
+          target: 'http://127.0.0.1:5000',
           changeOrigin: true,
           secure: false
         },
         '/socket.io': {
-          target: 'http://10.129.128.215:5000',
+          target: 'http://127.0.0.1:5000',
           ws: true,
           changeOrigin: true,
           secure: false
         },
         '/static': {
-          target: 'http://10.129.128.215:5000',
+          target: 'http://127.0.0.1:5000',
           changeOrigin: true,
           secure: false
         }

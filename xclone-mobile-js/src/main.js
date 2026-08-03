@@ -165,7 +165,8 @@ router.isReady()
 
     // Register Service Worker only in browser (NOT in Capacitor native)
     // SW can interfere with Capacitor WebView's request handling causing white screen
-    if ('serviceWorker' in navigator && !Capacitor.isNativePlatform()) {
+    // Only in production — sw.js is cache-first and would serve stale dev modules
+    if (import.meta.env.PROD && 'serviceWorker' in navigator && !Capacitor.isNativePlatform()) {
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .then((registration) => {
           console.log('[SW] Registered, scope:', registration.scope);

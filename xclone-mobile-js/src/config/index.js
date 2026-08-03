@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 const PRODUCTION_BACKEND = 'https://ssp.bugemauniv.ac.ug';
 
 // ── Local LAN backend (development only — never used in APK builds) ──────────
-const LOCAL_BACKEND = 'http://10.129.128.215:5000';
+const LOCAL_BACKEND = 'http://localhost:5000';
 
 const config = {
   api: {
