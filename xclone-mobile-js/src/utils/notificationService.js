@@ -371,17 +371,26 @@ class NotificationService {
     }
 
 
-    async registerToken(token, deviceType) {
+    async registerToken(token, deviceType, prefDeptId) {
         try {
             const apiUrl = config.api?.baseURL || config.baseURL;
+            const currentPref = prefDeptId !== undefined ? prefDeptId : (localStorage.getItem('pref_dept_bugema') || null);
             await axios.post(`${apiUrl}/api/notifications/register-token`, {
-                user_id: this.userId,
+                user_id: this.userId || localStorage.getItem('userId') || 0,
                 token: token,
-                device_type: deviceType
+                device_type: deviceType,
+                pref_dept_id: currentPref ? Number(currentPref) : null
             });
-            console.log(`✓ ${deviceType} notification token registered`);
+            console.log(`✓ ${deviceType} notification token registered (pref_dept_id: ${currentPref})`);
         } catch (error) {
             console.error('Error registering notification token:', error);
+        }
+    }
+
+    async updateDeptPreference(prefDeptId) {
+        const storedToken = localStorage.getItem('fcm_token') || this.token;
+        if (storedToken) {
+            await this.registerToken(storedToken, 'fcm-update', prefDeptId);
         }
     }
 

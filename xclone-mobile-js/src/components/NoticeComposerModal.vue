@@ -29,9 +29,35 @@
             <ion-select-option value="Academic">Academic</ion-select-option>
             <ion-select-option value="Finance">Finance</ion-select-option>
             <ion-select-option value="Events">Events</ion-select-option>
-            <ion-select-option value="Urgent">Urgent</ion-select-option>
+            <ion-select-option value="Urgent">🚨 Urgent</ion-select-option>
           </ion-select>
         </ion-item>
+
+        <!-- 🚨 Urgency Active Window / Expiry Picker -->
+        <transition name="fade">
+          <div v-if="formData.category === 'Urgent'" class="urgent-expiry-wrapper">
+            <ion-item class="custom-item urgent-item">
+              <ion-label position="stacked">Urgency Duration</ion-label>
+              <ion-select v-model="formData.urgent_duration" interface="popover">
+                <ion-select-option value="12h">12 Hours (Same day alert)</ion-select-option>
+                <ion-select-option value="24h">24 Hours (1 Day — Default)</ion-select-option>
+                <ion-select-option value="48h">48 Hours (2 Days)</ion-select-option>
+                <ion-select-option value="3d">3 Days</ion-select-option>
+                <ion-select-option value="7d">7 Days (1 Week)</ion-select-option>
+                <ion-select-option value="custom">Custom Date & Time</ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-item class="custom-item urgent-item" v-if="formData.urgent_duration === 'custom'">
+              <ion-label position="stacked">Urgency Stops On</ion-label>
+              <input
+                type="datetime-local"
+                v-model="formData.custom_expires_at"
+                class="custom-datetime-picker"
+              />
+            </ion-item>
+          </div>
+        </transition>
 
         <ion-item class="custom-item" v-if="departments.length > 0">
           <ion-label position="stacked">Target Department</ion-label>
@@ -145,7 +171,9 @@ export default {
         body: '',
         category: 'General',
         dept_id: null,
-        is_pinned: false
+        is_pinned: false,
+        urgent_duration: '24h',
+        custom_expires_at: ''
       },
       userId: localStorage.getItem('userId'),
       API_URL: config.api.baseURL
@@ -204,6 +232,30 @@ export default {
         payload.append('is_pinned', this.formData.is_pinned);
         if (this.formData.dept_id) payload.append('dept_id', this.formData.dept_id);
 
+        // 🚨 Compute Urgent Expiry Timestamp
+        let calculatedExpiresAt = null;
+        if (this.formData.category === 'Urgent') {
+          const now = new Date();
+          if (this.formData.urgent_duration === '12h') {
+            calculatedExpiresAt = new Date(now.getTime() + 12 * 3600 * 1000).toISOString();
+          } else if (this.formData.urgent_duration === '24h') {
+            calculatedExpiresAt = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
+          } else if (this.formData.urgent_duration === '48h') {
+            calculatedExpiresAt = new Date(now.getTime() + 48 * 3600 * 1000).toISOString();
+          } else if (this.formData.urgent_duration === '3d') {
+            calculatedExpiresAt = new Date(now.getTime() + 72 * 3600 * 1000).toISOString();
+          } else if (this.formData.urgent_duration === '7d') {
+            calculatedExpiresAt = new Date(now.getTime() + 7 * 24 * 3600 * 1000).toISOString();
+          } else if (this.formData.urgent_duration === 'custom' && this.formData.custom_expires_at) {
+            calculatedExpiresAt = new Date(this.formData.custom_expires_at).toISOString();
+          } else {
+            calculatedExpiresAt = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
+          }
+        }
+        if (calculatedExpiresAt) {
+          payload.append('expires_at', calculatedExpiresAt);
+        }
+
         // Append images under key "files" (supports multiple)
         for (const img of this.imageFiles) {
           payload.append('files', img);
@@ -239,7 +291,9 @@ export default {
         body: '',
         category: 'General',
         dept_id: null,
-        is_pinned: false
+        is_pinned: false,
+        urgent_duration: '24h',
+        custom_expires_at: ''
       };
     }
   }
@@ -406,4 +460,34 @@ export default {
 }
 .preview-note p { margin: 0; font-size: 0.85rem; opacity: 0.6; }
 .preview-note ion-icon { color: gold; font-size: 1.2rem; }
+
+/* ── Urgent Expiry Section ── */
+.urgent-expiry-wrapper {
+  background: rgba(239, 68, 68, 0.04);
+  border: 1px dashed rgba(239, 68, 68, 0.3);
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin-bottom: 14px;
+}
+
+.urgent-item {
+  --background: transparent;
+  margin-bottom: 6px;
+}
+
+.custom-datetime-picker {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(218, 165, 32, 0.3);
+  background: var(--ion-background-color, #ffffff);
+  color: var(--ion-text-color, #1a1a1a);
+  font-family: inherit;
+  font-size: 0.9rem;
+  margin-top: 4px;
+  outline: none;
+}
+.custom-datetime-picker:focus {
+  border-color: #daa520;
+}
 </style>

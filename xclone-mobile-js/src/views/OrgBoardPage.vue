@@ -300,17 +300,6 @@
           ════════════════════════════════════════════════════ -->
           <aside class="dept-sidebar">
 
-            <!-- Org identity mini card -->
-            <div class="sidebar-org-card" v-if="org">
-              <img :src="org.logo_url || defaultLogo" class="sidebar-org-logo" />
-              <div class="sidebar-org-info">
-                <span class="sidebar-org-name">{{ org.name }}</span>
-                <span class="sidebar-org-domain" v-if="org.official_domain">
-                  <ion-icon :icon="globeOutline"></ion-icon>
-                  {{ org.official_domain }}
-                </span>
-              </div>
-            </div>
 
             <!-- Departments nav -->
             <div class="sidebar-section">
@@ -350,6 +339,14 @@
                     <ion-icon v-else :icon="businessOutline"></ion-icon>
                   </div>
                   <span class="dept-nav-label">{{ dept.name }}</span>
+                  <span
+                    class="pref-pin-badge"
+                    :class="{ 'pref-pin-badge--active': Number(preferredDeptId) === Number(dept.id) }"
+                    @click.stop="togglePreferredDept(dept.id)"
+                    :title="Number(preferredDeptId) === Number(dept.id) ? 'Click to unpin default department' : 'Set as default department on this device'"
+                  >
+                    {{ Number(preferredDeptId) === Number(dept.id) ? '📌 Saved' : '📌 Pin' }}
+                  </span>
                   <span class="dept-nav-count">{{ noticesPerDept[dept.id] || 0 }}</span>
                 </button>
               </nav>
@@ -385,12 +382,28 @@
 
             <!-- Search & Category Filters -->
             <div class="filter-bar">
-              <div class="search-wrap">
-                <ion-searchbar
-                  v-model="searchQuery"
-                  placeholder="Search notices…"
-                  class="notice-searchbar"
-                ></ion-searchbar>
+              <div class="search-row">
+                <div class="search-wrap">
+                  <ion-searchbar
+                    v-model="searchQuery"
+                    placeholder="Search notices…"
+                    class="notice-searchbar"
+                  ></ion-searchbar>
+                </div>
+                <!-- Mobile Department Dropdown Selector -->
+                <div class="mobile-dept-dropdown-wrap" v-if="departments && departments.length > 0">
+                  <ion-select
+                    v-model="selectedDept"
+                    interface="popover"
+                    class="mobile-dept-select-box"
+                    placeholder="Department ▾"
+                  >
+                    <ion-select-option :value="null">All Depts</ion-select-option>
+                    <ion-select-option v-for="dept in departments" :key="dept.id" :value="dept.id">
+                      {{ dept.name }}
+                    </ion-select-option>
+                  </ion-select>
+                </div>
               </div>
               <div class="category-scroll">
                 <button
@@ -406,13 +419,25 @@
               </div>
             </div>
 
-            <!-- Active dept label (desktop only) -->
+            <!-- Active Department Banner with Pin / Unpin Button (Mobile Portrait & Landscape & Desktop) -->
             <div class="active-dept-label" v-if="selectedDept">
-              <ion-icon :icon="businessOutline"></ion-icon>
-              <span>{{ departments.find(d => d.id === selectedDept)?.name }}</span>
-              <button class="clear-dept-btn" @click="selectedDept = null">
-                <ion-icon :icon="closeCircleOutline"></ion-icon>
-              </button>
+              <div class="active-dept-title-box">
+                <ion-icon :icon="businessOutline"></ion-icon>
+                <span class="active-dept-name">{{ departments.find(d => d.id === selectedDept)?.name }}</span>
+              </div>
+              <div class="active-dept-actions">
+                <button
+                  class="pin-my-dept-btn"
+                  :class="{ 'pin-my-dept-btn--active': Number(preferredDeptId) === Number(selectedDept) }"
+                  @click="togglePreferredDept(selectedDept)"
+                  :title="Number(preferredDeptId) === Number(selectedDept) ? 'Click to unpin this default department' : 'Pin as your default department on this device'"
+                >
+                  {{ Number(preferredDeptId) === Number(selectedDept) ? '📌 Pinned (Unpin)' : '📌 Pin as My Dept' }}
+                </button>
+                <button class="clear-dept-btn" @click="selectedDept = null" title="Clear department filter">
+                  <ion-icon :icon="closeCircleOutline"></ion-icon>
+                </button>
+              </div>
             </div>
 
             <!-- Notices List -->
@@ -818,6 +843,7 @@ import {
 import api from '@/utils/api.js';
 import config from '@/config';
 import { saveBoardOffline, getOfflineBoard } from '@/utils/offlineDb.js';
+import notificationService from '@/utils/notificationService.js';
 import OrgAdminPanel from '../components/OrgAdminPanel.vue';
 import NoticeComposerModal from '../components/NoticeComposerModal.vue';
 
@@ -865,6 +891,7 @@ export default {
       joining: false,
       selectedCategory: 'All',
       selectedDept: null,
+      preferredDeptId: null,
       categories: ['All', 'General', 'Academic', 'Finance', 'Events', 'Urgent'],
       showAdminPanel: false,
       showComposer: false,
@@ -967,8 +994,16 @@ export default {
       });
     },
     urgentNotices() {
+      const now = new Date().getTime();
+      const DAY_MS = 24 * 60 * 60 * 1000;
       return (this.allNotices.length ? this.allNotices : this.notices)
-        .filter(n => n.category === 'Urgent')
+        .filter(n => {
+          if (n.category !== 'Urgent') return false;
+          const expiryTime = n.expires_at
+            ? new Date(n.expires_at).getTime()
+            : new Date(n.created_at).getTime() + DAY_MS;
+          return now < expiryTime;
+        })
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     },
     pinnedNotices() {
@@ -1018,6 +1053,14 @@ export default {
       if (!payload) return;
       const currentSlug = this.$route?.params?.slug || this.org?.slug || import.meta.env.VITE_STANDALONE_ORG || 'bugema';
       if (payload.org_slug && payload.org_slug !== currentSlug) return;
+
+      // 🔕 Targeted Department Live Filter
+      const targetDeptId = payload.dept_id;
+      const savedPref = localStorage.getItem('pref_dept_' + currentSlug);
+      if (targetDeptId && savedPref && Number(targetDeptId) !== Number(savedPref)) {
+        console.log(`🔇 Live notice for dept ${targetDeptId} ignored (user pinned dept ${savedPref})`);
+        return;
+      }
 
       console.log('📢 OrgBoardPage received live notice:new payload:', payload);
       const newNotice = payload.notice || null;
@@ -1131,53 +1174,34 @@ export default {
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#39;');
 
-      const escaped = escapeHtml(text);
+      let escaped = escapeHtml(text);
 
-      // Step 2: Convert newlines to <br> ONCE across the whole string.
-      // (Previously the split/map approach could convert \n → <br> twice:
-      //  once in the whitespace-token branch AND again in the word fallback,
-      //  which caused the visible double-spacing after posting.)
-      const withBreaks = escaped.replace(/\n/g, '<br>');
+      // Step 2: Auto-link plain text URLs (https://, http://, ftp://, www.)
+      const urlRegex = /(https?:\/\/[^\s<]+|ftp:\/\/[^\s<]+|www\.[^\s<]+)/ig;
 
-      // Step 3: Inline URL / hashtag / mention decoration on each word.
-      // We split on spaces only (not \n, already converted) so we don't
-      // accidentally fragment <br> tags.
-      const urlRegex =
-        /^(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)$/i;
+      escaped = escaped.replace(urlRegex, (match) => {
+        let mainUrl = match;
+        let trailingPunct = '';
+        const punctMatch = match.match(/^(.+?)([.,!?:;)\]]+)$/);
+        if (punctMatch) {
+          mainUrl = punctMatch[1];
+          trailingPunct = punctMatch[2];
+        }
 
-      return withBreaks
-        .split(' ')
-        .map((word) => {
-          // Each 'word' may still contain <br> from Step 2 — keep those intact
-          if (!word || word === '<br>') return word;
+        const lowerUrl = mainUrl.toLowerCase();
+        const href = lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://') || lowerUrl.startsWith('ftp://')
+          ? mainUrl
+          : `https://${mainUrl}`;
 
-          let mainToken = word;
-          let trailingPunct = '';
-          const punctMatch = word.match(/^(.+?)([.,!?:;)\]]+)$/);
-          if (punctMatch && urlRegex.test(punctMatch[1])) {
-            mainToken = punctMatch[1];
-            trailingPunct = punctMatch[2];
-          }
+        return `<a href="${href}" class="post-link notice-link" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${mainUrl}</a>${trailingPunct}`;
+      });
 
-          if (urlRegex.test(mainToken) && !mainToken.startsWith('@') && !mainToken.startsWith('#')) {
-            const href = mainToken.startsWith('http://') || mainToken.startsWith('https://')
-              ? mainToken
-              : `https://${mainToken}`;
-            return `<a href="${href}" class="post-link notice-link" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${mainToken}</a>${trailingPunct}`;
-          }
+      // Step 3: Auto-format hashtags (#tag) and mentions (@user)
+      escaped = escaped.replace(/(^|\s)(#[a-zA-Z0-9_]+)/g, '$1<span class="hashtag" data-hashtag="$2" style="color:#daa520;font-weight:600;cursor:pointer">$2</span>');
+      escaped = escaped.replace(/(^|\s)(@[a-zA-Z0-9_]+)/g, '$1<span class="mention" data-mention="$2" style="color:#daa520;font-weight:600;cursor:pointer">$2</span>');
 
-          if (mainToken.startsWith('#') && mainToken.length > 1) {
-            return `<span class="hashtag" data-hashtag="${mainToken}" style="color:#daa520;font-weight:600;cursor:pointer">${mainToken}</span>${trailingPunct}`;
-          }
-
-          if (mainToken.startsWith('@') && mainToken.length > 1) {
-            const username = mainToken.slice(1);
-            return `<span class="mention" data-mention="${username}" style="color:#daa520;font-weight:600;cursor:pointer">${mainToken}</span>${trailingPunct}`;
-          }
-
-          return word;
-        })
-        .join(' ');
+      // Step 4: Convert newlines to <br>
+      return escaped.replace(/\n/g, '<br>');
     },
     handleContentClick(event, notice) {
       const target = event.target.closest('a, .hashtag, .mention');
@@ -1192,7 +1216,7 @@ export default {
         this.toggleExpandNotice(notice.id);
         return;
       }
-      if (notice && notice.body && notice.body.length > 600) {
+      if (notice && notice.body && notice.body.length > 300) {
         this.toggleExpandNotice(notice.id);
       }
     },
@@ -1207,7 +1231,7 @@ export default {
     },
     getNoticeBodyHtml(body, noticeId) {
       if (!body) return '';
-      const MAX_BODY_CHARS = 600;
+      const MAX_BODY_CHARS = 300;
       const expanded = this.isNoticeExpanded(noticeId);
 
       if (body.length <= MAX_BODY_CHARS) {
@@ -1216,17 +1240,17 @@ export default {
 
       if (expanded) {
         // Full body + inline "Show less" to collapse back (X-style)
-        return this.formatNoticeBody(body) + ' <span class="read-more">Show less</span>';
+        return this.formatNoticeBody(body) + ' <span class="read-more" title="Click to collapse notice">Show less ▴</span>';
       }
 
-      // Truncate at the last word boundary within the 600-char window
+      // Truncate at the last word boundary within the window
       let truncated = body.substring(0, MAX_BODY_CHARS);
       const lastSpace = truncated.lastIndexOf(' ');
       if (lastSpace > MAX_BODY_CHARS * 0.6) {
         truncated = truncated.substring(0, lastSpace);
       }
 
-      return this.formatNoticeBody(truncated) + ' <span class="read-more">Read more</span>';
+      return this.formatNoticeBody(truncated) + '... <span class="read-more" title="Click to read full notice">Read more ▾</span>';
     },
     scrollToNotice(id) {
       if (!id) return;
@@ -1249,6 +1273,44 @@ export default {
         this.loadAll();
       }
     },
+    async togglePreferredDept(deptId) {
+      if (Number(this.preferredDeptId) === Number(deptId)) {
+        await this.savePreferredDept(null);
+      } else {
+        await this.savePreferredDept(deptId);
+      }
+    },
+    async savePreferredDept(deptId) {
+      const slug = this.org?.slug || this.$route?.params?.slug || 'bugema';
+      if (deptId === null) {
+        localStorage.removeItem('pref_dept_' + slug);
+        this.preferredDeptId = null;
+        this.selectedDept = null;
+        notificationService.updateDeptPreference(null);
+        const toast = await toastController.create({
+          message: 'Cleared default department view.',
+          duration: 2000,
+          color: 'warning',
+          position: 'bottom'
+        });
+        await toast.present();
+        return;
+      }
+      localStorage.setItem('pref_dept_' + slug, String(deptId));
+      this.preferredDeptId = Number(deptId);
+      this.selectedDept = Number(deptId);
+      this.selectedCategory = 'All';
+      notificationService.updateDeptPreference(deptId);
+      const deptObj = (this.departments || []).find(d => Number(d.id) === Number(deptId));
+      const deptName = deptObj ? deptObj.name : 'Department';
+      const toast = await toastController.create({
+        message: `📌 Saved '${deptName}' as your default department on this device!`,
+        duration: 2500,
+        color: 'success',
+        position: 'bottom'
+      });
+      await toast.present();
+    },
     async loadAll() {
       this.loading = true;
       this.errorMessage = null;
@@ -1266,6 +1328,16 @@ export default {
           this.departments = res.data.departments || [];
           this.isOfflineMode = false;
           this.trackVisit();
+
+          // 📌 Zero-Login Department Auto-Focus
+          const savedPref = localStorage.getItem('pref_dept_' + slug);
+          if (savedPref && this.selectedDept === null) {
+            const matchedDept = (this.departments || []).find(d => Number(d.id) === Number(savedPref));
+            if (matchedDept) {
+              this.selectedDept = matchedDept.id;
+              this.preferredDeptId = matchedDept.id;
+            }
+          }
           // Save to offline storage
           saveBoardOffline(slug, {
             org: this.org,
@@ -1735,11 +1807,13 @@ export default {
 <style scoped>
 /* ─── Toolbar ─────────────────────────────────────────────── */
 .glass-toolbar {
-  --background: rgba(255, 255, 255, 0.92);
-  --border-color: rgba(218, 165, 32, 0.15);
+  --background: rgba(255, 255, 255, 0.94);
+  --border-color: rgba(218, 165, 32, 0.2);
+  --min-height: 56px;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 1px 0 rgba(218, 165, 32, 0.12);
+  box-shadow: 0 2px 12px rgba(218, 165, 32, 0.12);
+  padding: 4px 0;
 }
 
 .org-header-title {
@@ -1758,23 +1832,24 @@ export default {
   flex: 1;
   width: 100%;
   margin: 0 auto;
-  padding: 4px 0;
+  padding: 4px 8px;
 }
 
 .brand-title-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .brand-word-left,
 .brand-word-right {
-  font-size: 0.92rem;
+  font-size: clamp(1.2rem, 2.5vw, 1.8rem);
   font-weight: 900;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
   color: var(--ion-text-color, #000000);
+  line-height: 1.1;
 }
 
 .mini-logo-wrap {
@@ -1783,18 +1858,19 @@ export default {
 }
 
 .mini-logo {
-  width: 32px;
-  height: 32px;
+  width: clamp(38px, 3.8vw, 52px);
+  height: clamp(38px, 3.8vw, 52px);
   border-radius: 50%;
   object-fit: cover;
   display: block;
+  box-shadow: 0 3px 10px rgba(218, 165, 32, 0.3);
 }
 
 .mini-logo-ring {
   position: absolute;
   inset: -2px;
   border-radius: 50%;
-  border: 2px solid rgba(218, 165, 32, 0.6);
+  border: 2px solid rgba(218, 165, 32, 0.7);
   pointer-events: none;
 }
 
@@ -1806,7 +1882,7 @@ export default {
 }
 
 .board-title {
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-weight: 800;
   padding: 0;
   white-space: nowrap;
@@ -1821,11 +1897,11 @@ export default {
 }
 
 .board-subtitle {
-  font-size: 0.68rem;
-  color: #daa520;
-  font-weight: 600;
-  opacity: 0.9;
-  letter-spacing: 0.2px;
+  font-size: clamp(0.68rem, 1.1vw, 0.88rem);
+  color: #b38209;
+  font-weight: 700;
+  opacity: 0.95;
+  letter-spacing: 0.3px;
   margin-top: 2px;
 }
 
@@ -2577,18 +2653,43 @@ export default {
   color: #b8860b;
 }
 
-/* X-style inline "Read more" / "Show less" link at the end of the notice text */
-.read-more {
-  color: #daa520;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline;
-  user-select: none;
+/* X-style inline "Read more ▾" / "Show less ▴" link in Bugema Gold */
+.notice-text :deep(.read-more),
+:deep(.read-more) {
+  color: #b38209 !important;
+  background: rgba(218, 165, 32, 0.14) !important;
+  border: 1.5px solid rgba(218, 165, 32, 0.45) !important;
+  font-weight: 800 !important;
+  font-size: 0.84rem !important;
+  padding: 3px 10px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-left: 6px !important;
+  user-select: none !important;
+  transition: all 0.2s ease-in-out !important;
+  vertical-align: middle !important;
+  box-shadow: 0 2px 6px rgba(218, 165, 32, 0.18) !important;
 }
 
-.read-more:hover {
-  text-decoration: underline;
-  color: #b8860b;
+.notice-text :deep(.read-more:hover),
+:deep(.read-more:hover) {
+  color: #000000 !important;
+  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  border-color: #daa520 !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  transform: translateY(-1px) scale(1.04) !important;
+  box-shadow: 0 4px 14px rgba(218, 165, 32, 0.4) !important;
+}
+
+.notice-text :deep(.read-more:active),
+:deep(.read-more:active) {
+  transform: translateY(0) scale(0.98) !important;
+  background: #c0921c !important;
+  color: #000000 !important;
 }
 
 .notice-highlight {
@@ -2598,15 +2699,13 @@ export default {
 }
 
 .notice-text {
+  font-family: 'Tahoma', 'Segoe UI', Geneva, Verdana, sans-serif;
   margin: 0;
   padding: 0;
-  /* Match textarea's natural single line-height — 1.5 is the browser default
-     for <textarea> and prevents the double-spacing that occurs when the
-     <p> element's own margins stack with the <br> line breaks. */
-  line-height: 1.5;
-  white-space: normal;   /* allow wrapping, but don't add extra space */
+  line-height: 1.6;
+  white-space: pre-wrap;
   word-break: break-word;
-  font-size: 0.97rem;
+  font-size: 0.96rem;
   color: #1a1a1a;
 }
 
@@ -2642,42 +2741,44 @@ export default {
   gap: 0;
 }
 
-.notice-text {
-  font-family: 'Tahoma', 'Segoe UI', Geneva, Verdana, sans-serif;
-  margin: 0;
-  font-size: 0.94rem;
-  line-height: 1.65;
-  color: #333;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
 .notice-text :deep(a),
-.notice-text a,
-.notice-link,
-.post-link {
-  color: #2563eb !important;
-  text-decoration: underline !important;
-  font-weight: 600 !important;
-  word-break: break-all;
-  overflow-wrap: anywhere;
-  cursor: pointer;
-  transition: color 0.15s ease, text-decoration 0.15s ease;
+.notice-text :deep(.notice-link),
+.notice-text :deep(.post-link),
+:deep(a.notice-link),
+:deep(a.post-link) {
+  color: #b38209 !important;
+  background: rgba(218, 165, 32, 0.12) !important;
+  border-bottom: 2px solid #daa520 !important;
+  padding: 2px 7px !important;
+  border-radius: 5px !important;
+  font-weight: 700 !important;
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  transition: all 0.2s ease-in-out !important;
+  display: inline !important;
 }
 
 .notice-text :deep(a:hover),
-.notice-text a:hover,
-.notice-link:hover,
-.post-link:hover {
-  color: #1d4ed8 !important;
+.notice-text :deep(.notice-link:hover),
+.notice-text :deep(.post-link:hover),
+:deep(a.notice-link:hover),
+:deep(a.post-link:hover) {
+  color: #855f00 !important;
+  background: rgba(218, 165, 32, 0.25) !important;
+  border-bottom-color: #b38209 !important;
   text-decoration: underline !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 8px rgba(218, 165, 32, 0.25) !important;
 }
 
 .notice-text :deep(a:focus),
-.notice-text a:focus,
-.notice-link:focus,
-.post-link:focus {
-  outline: 2px auto #2563eb;
+.notice-text :deep(.notice-link:focus),
+.notice-text :deep(.post-link:focus),
+:deep(a.notice-link:focus),
+:deep(a.post-link:focus) {
+  outline: 2px auto #daa520;
   outline-offset: 2px;
 }
 
@@ -4269,6 +4370,213 @@ export default {
   font-weight: 800;
   letter-spacing: 0.5px;
   text-transform: uppercase;
+}
+
+/* 📌 Zero-Login Department Preference Pins */
+.pref-pin-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  color: #666;
+  cursor: pointer;
+  margin-left: auto;
+  margin-right: 6px;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.pref-pin-badge:hover {
+  background: rgba(218, 165, 32, 0.18);
+  color: #b38209;
+}
+
+.pref-pin-badge--active {
+  background: rgba(218, 165, 32, 0.22) !important;
+  color: #b38209 !important;
+  border: 1px solid rgba(218, 165, 32, 0.4) !important;
+  font-weight: 800 !important;
+}
+
+.pin-my-dept-btn {
+  background: rgba(218, 165, 32, 0.12);
+  border: 1px solid rgba(218, 165, 32, 0.35);
+  color: #b38209;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  margin-left: 10px;
+  transition: all 0.2s ease;
+}
+
+.pin-my-dept-btn:hover {
+  background: rgba(218, 165, 32, 0.22);
+  transform: translateY(-1px);
+}
+
+.pin-my-dept-btn--active {
+  background: linear-gradient(135deg, #d4af37, #ffd700);
+  color: #000;
+  font-weight: 800;
+  border-color: #daa520;
+}
+
+/* 📱 Mobile Department Selector Pills & Pin Controls */
+.dept-mobile-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 4px 4px 4px;
+  margin-top: 6px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.dept-mobile-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-dept-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--ion-background-color, #ffffff);
+  color: var(--ion-text-color, #333);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.mobile-dept-pill:hover {
+  background: rgba(218, 165, 32, 0.1);
+  border-color: rgba(218, 165, 32, 0.4);
+}
+
+.mobile-dept-pill--active {
+  background: rgba(218, 165, 32, 0.15) !important;
+  border-color: #daa520 !important;
+  color: #b38209 !important;
+  font-weight: 800 !important;
+}
+
+.mobile-dept-pill--saved {
+  border-color: rgba(218, 165, 32, 0.6) !important;
+}
+
+.mobile-pin-btn {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  color: #555;
+  margin-left: 4px;
+  transition: all 0.15s ease;
+}
+
+.mobile-pin-btn--saved {
+  background: #daa520 !important;
+  color: #000 !important;
+  font-weight: 800 !important;
+}
+
+/* 🏷️ Active Department Banner (Mobile Portrait & Landscape & Desktop) */
+.active-dept-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  background: rgba(218, 165, 32, 0.1);
+  border: 1.5px solid rgba(218, 165, 32, 0.35);
+  border-radius: 12px;
+  margin: 10px 0 16px 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #b38209;
+}
+
+.active-dept-title-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.active-dept-title-box ion-icon {
+  font-size: 1.2rem;
+  color: #daa520;
+  flex-shrink: 0;
+}
+
+.active-dept-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.active-dept-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.clear-dept-btn {
+  background: transparent;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 1.2rem;
+  padding: 2px;
+}
+.clear-dept-btn:hover {
+  color: #ef4444;
+}
+
+/* 📱 Mobile Search & Department Select Row */
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.search-wrap {
+  flex: 1;
+}
+
+.mobile-dept-dropdown-wrap {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.mobile-dept-select-box {
+  --background: rgba(218, 165, 32, 0.08);
+  --border-radius: 12px;
+  --padding-start: 10px;
+  --padding-end: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #b38209;
+  border: 1px solid rgba(218, 165, 32, 0.35);
+  border-radius: 12px;
+  max-width: 155px;
+  height: 42px;
 }
 </style>
 

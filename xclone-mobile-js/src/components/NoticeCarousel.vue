@@ -74,36 +74,28 @@ export default {
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#39;');
 
-      const parts = text.split(/(\s+)/);
+      let escaped = escapeHtml(text);
 
-      return parts
-        .map((part) => {
-          if (/\s+/.test(part)) return part.replace(/\n/g, '<br>');
+      const urlRegex = /(https?:\/\/[^\s<]+|ftp:\/\/[^\s<]+|www\.[^\s<]+)/ig;
 
-          let mainToken = part;
-          let trailingPunct = '';
-          const punctMatch = part.match(/^(.+?)([.,!?:;)\\]]+)$/);
-          if (punctMatch) {
-            const candidate = punctMatch[1];
-            if (/^(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)$/i.test(candidate)) {
-              mainToken = candidate;
-              trailingPunct = punctMatch[2];
-            }
-          }
+      escaped = escaped.replace(urlRegex, (match) => {
+        let mainUrl = match;
+        let trailingPunct = '';
+        const punctMatch = match.match(/^(.+?)([.,!?:;)\]]+)$/);
+        if (punctMatch) {
+          mainUrl = punctMatch[1];
+          trailingPunct = punctMatch[2];
+        }
 
-          const urlRegex = /^(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/[^\s]*)?)$/i;
+        const lowerUrl = mainUrl.toLowerCase();
+        const href = lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://') || lowerUrl.startsWith('ftp://')
+          ? mainUrl
+          : `https://${mainUrl}`;
 
-          if (urlRegex.test(mainToken) && !mainToken.startsWith('@') && !mainToken.startsWith('#')) {
-            const href = mainToken.startsWith('http://') || mainToken.startsWith('https://') ? mainToken : `https://${mainToken}`;
-            const escapedUrl = escapeHtml(mainToken);
-            const escapedHref = escapeHtml(href);
-            const escapedPunct = escapeHtml(trailingPunct);
-            return `<a href="${escapedHref}" class="post-link notice-link" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${escapedUrl}</a>${escapedPunct}`;
-          }
+        return `<a href="${href}" class="post-link notice-link" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${mainUrl}</a>${trailingPunct}`;
+      });
 
-          return escapeHtml(part).replace(/\n/g, '<br>');
-        })
-        .join('');
+      return escaped.replace(/\n/g, '<br>');
     },
     async fetchRecentNotices() {
       this.loading = true;
