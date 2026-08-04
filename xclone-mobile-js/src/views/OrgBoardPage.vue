@@ -318,7 +318,7 @@
                     <ion-icon :icon="listOutline"></ion-icon>
                   </div>
                   <span class="dept-nav-label">All Departments</span>
-                  <span class="dept-nav-count">{{ notices.length }}</span>
+                  <span class="dept-nav-count" v-if="canPost">{{ notices.length }}</span>
                 </button>
 
                 <!-- Individual departments -->
@@ -347,7 +347,7 @@
                   >
                     {{ Number(preferredDeptId) === Number(dept.id) ? '📌 Saved' : '📌 Pin' }}
                   </span>
-                  <span class="dept-nav-count">{{ noticesPerDept[dept.id] || 0 }}</span>
+                  <span class="dept-nav-count" v-if="canPost">{{ noticesPerDept[dept.id] || 0 }}</span>
                 </button>
               </nav>
             </div>
@@ -1175,6 +1175,14 @@ export default {
           .replace(/'/g, '&#39;');
 
       let escaped = escapeHtml(text);
+
+      // Step 1b: Restore safe text formatting tags (Bold, Italic, Underline)
+      escaped = escaped
+        .replace(/&lt;b&gt;/gi, '<b>').replace(/&lt;\/b&gt;/gi, '</b>')
+        .replace(/&lt;strong&gt;/gi, '<strong>').replace(/&lt;\/strong&gt;/gi, '</strong>')
+        .replace(/&lt;i&gt;/gi, '<i>').replace(/&lt;\/i&gt;/gi, '</i>')
+        .replace(/&lt;em&gt;/gi, '<em>').replace(/&lt;\/em&gt;/gi, '</em>')
+        .replace(/&lt;u&gt;/gi, '<u>').replace(/&lt;\/u&gt;/gi, '</u>');
 
       // Step 2: Auto-link plain text URLs (https://, http://, ftp://, www.)
       const urlRegex = /(https?:\/\/[^\s<]+|ftp:\/\/[^\s<]+|www\.[^\s<]+)/ig;
@@ -2703,7 +2711,7 @@ export default {
   margin: 0;
   padding: 0;
   line-height: 1.6;
-  white-space: pre-wrap;
+  white-space: normal;
   word-break: break-word;
   font-size: 0.96rem;
   color: #1a1a1a;

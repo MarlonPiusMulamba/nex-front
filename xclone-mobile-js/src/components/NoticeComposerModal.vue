@@ -69,9 +69,22 @@
           </ion-select>
         </ion-item>
 
+        <div class="formatting-toolbar-row">
+          <span class="formatting-label">Format:</span>
+          <button type="button" class="format-btn" @click="applyFormatting('bold')" title="Bold">
+            <strong>B</strong>
+          </button>
+          <button type="button" class="format-btn" @click="applyFormatting('italic')" title="Italic">
+            <em>I</em>
+          </button>
+          <button type="button" class="format-btn" @click="applyFormatting('underline')" title="Underline">
+            <u>U</u>
+          </button>
+        </div>
+
         <ion-item class="custom-item body-item">
           <ion-label position="stacked">Announcement Content</ion-label>
-          <ion-textarea v-model="formData.body" placeholder="Type your announcement here..." :rows="6" auto-grow></ion-textarea>
+          <ion-textarea ref="bodyTextarea" v-model="formData.body" placeholder="Type your announcement here..." :rows="6" auto-grow></ion-textarea>
         </ion-item>
 
         <!-- ── Media attachment section ────────────────────── -->
@@ -188,6 +201,44 @@ export default {
     }
   },
   methods: {
+    applyFormatting(type) {
+      const textareaComponent = this.$refs.bodyTextarea;
+      const nativeTextarea = textareaComponent?.$el?.querySelector('textarea') || textareaComponent;
+      let start = 0;
+      let end = 0;
+      if (nativeTextarea && typeof nativeTextarea.selectionStart === 'number') {
+        start = nativeTextarea.selectionStart;
+        end = nativeTextarea.selectionEnd;
+      }
+
+      const fullText = this.formData.body || '';
+      const selectedText = fullText.substring(start, end) || 'text';
+
+      let tagOpen = '';
+      let tagClose = '';
+
+      if (type === 'bold') {
+        tagOpen = '<b>';
+        tagClose = '</b>';
+      } else if (type === 'italic') {
+        tagOpen = '<i>';
+        tagClose = '</i>';
+      } else if (type === 'underline') {
+        tagOpen = '<u>';
+        tagClose = '</u>';
+      }
+
+      const replacement = `${tagOpen}${selectedText}${tagClose}`;
+      this.formData.body = fullText.substring(0, start) + replacement + fullText.substring(end);
+
+      this.$nextTick(() => {
+        if (nativeTextarea && nativeTextarea.setSelectionRange) {
+          nativeTextarea.focus();
+          const cursorPosition = start + tagOpen.length + selectedText.length + tagClose.length;
+          nativeTextarea.setSelectionRange(cursorPosition, cursorPosition);
+        }
+      });
+    },
     triggerImageInput() {
       const el = this.$refs.imageInput;
       if (el) el.click();
@@ -489,5 +540,39 @@ export default {
 }
 .custom-datetime-picker:focus {
   border-color: #daa520;
+}
+
+/* ── Formatting Toolbar ── */
+.formatting-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 4px 0;
+  padding: 4px 6px;
+}
+.formatting-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.format-btn {
+  background: rgba(218, 165, 32, 0.12);
+  border: 1px solid rgba(218, 165, 32, 0.3);
+  border-radius: 8px;
+  color: #daa520;
+  padding: 5px 12px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.format-btn:hover, .format-btn:active {
+  background: #daa520;
+  color: #000;
+  transform: translateY(-1px);
 }
 </style>

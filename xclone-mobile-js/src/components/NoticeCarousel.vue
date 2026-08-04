@@ -76,6 +76,13 @@ export default {
 
       let escaped = escapeHtml(text);
 
+      escaped = escaped
+        .replace(/&lt;b&gt;/gi, '<b>').replace(/&lt;\/b&gt;/gi, '</b>')
+        .replace(/&lt;strong&gt;/gi, '<strong>').replace(/&lt;\/strong&gt;/gi, '</strong>')
+        .replace(/&lt;i&gt;/gi, '<i>').replace(/&lt;\/i&gt;/gi, '</i>')
+        .replace(/&lt;em&gt;/gi, '<em>').replace(/&lt;\/em&gt;/gi, '</em>')
+        .replace(/&lt;u&gt;/gi, '<u>').replace(/&lt;\/u&gt;/gi, '</u>');
+
       const urlRegex = /(https?:\/\/[^\s<]+|ftp:\/\/[^\s<]+|www\.[^\s<]+)/ig;
 
       escaped = escaped.replace(urlRegex, (match) => {
@@ -436,7 +443,7 @@ export default {
   font-size: 0.95rem;
   line-height: 1.6;
   color: #2c3e50;
-  white-space: pre-wrap;
+  white-space: normal;
 }
 
 .attachment-box {
