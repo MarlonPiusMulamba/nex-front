@@ -28,6 +28,14 @@
           <span class="board-subtitle">Digital Notice Board • @bugemauniv.ac.ug</span>
         </div>
         <ion-buttons slot="end">
+          <!-- Language & Theme Settings (Desktop/Tablet only; mobile uses bottom-nav icon) -->
+          <button
+            class="header-settings-btn desktop-header-settings"
+            @click="showSettingsModal = true"
+            title="Language & Theme"
+          >
+            <ion-icon :icon="globeOutline" class="header-settings-icon"></ion-icon>
+          </button>
           <!-- Profile Avatar Icon (shown whenever logged in) -->
           <button 
             v-if="userId" 
@@ -711,6 +719,12 @@
             </div>
             <span>Post</span>
           </button>
+
+          <!-- Settings (Language & Theme) -->
+          <button class="mobile-nav-btn" @click="showSettingsModal = true">
+            <ion-icon :icon="globeOutline"></ion-icon>
+            <span>{{ t('settings') }}</span>
+          </button>
         </nav>
       </div>
 
@@ -722,6 +736,9 @@
         :membership="membership"
         @refresh="loadAll"
       />
+
+      <!-- Settings Modal (Language & Theme) -->
+      <SettingsModal v-model:isOpen="showSettingsModal" />
 
       <!-- Notice Composer Modal -->
       <NoticeComposerModal 
@@ -844,8 +861,11 @@ import api from '@/utils/api.js';
 import config from '@/config';
 import { saveBoardOffline, getOfflineBoard } from '@/utils/offlineDb.js';
 import notificationService from '@/utils/notificationService.js';
+import { i18nState, t } from '@/utils/i18n.js';
+import { translateNotice } from '@/utils/translationService.js';
 import OrgAdminPanel from '../components/OrgAdminPanel.vue';
 import NoticeComposerModal from '../components/NoticeComposerModal.vue';
+import SettingsModal from '../components/SettingsModal.vue';
 
 export default {
   name: 'OrgBoardPage',
@@ -855,7 +875,8 @@ export default {
     IonSelect, IonSelectOption, IonRefresher, IonRefresherContent,
     IonLabel, IonSearchbar,
     OrgAdminPanel,
-    NoticeComposerModal
+    NoticeComposerModal,
+    SettingsModal
   },
   data() {
     return {
@@ -896,6 +917,8 @@ export default {
       showAdminPanel: false,
       showComposer: false,
       showProfilePanel: false,
+      showSettingsModal: false,
+      i18nState,
       userProfile: null,
       userId: localStorage.getItem('userId'),
       username: localStorage.getItem('username'),
@@ -1039,6 +1062,12 @@ export default {
       if (val === 'members' && this.isAdmin && this.allMembers.length === 0) {
         this.fetchMembers();
       }
+    },
+    'i18nState.lang'() {
+      this.applyAutoTranslate();
+    },
+    'i18nState.autoTranslate'() {
+      this.applyAutoTranslate();
     }
   },
   methods: {
@@ -1121,6 +1150,7 @@ export default {
             notices: this.notices,
             departments: this.departments
           });
+          this.applyAutoTranslate();
         }
       } catch (err) {
         console.error('Silent fetch notices error:', err);
@@ -1141,6 +1171,7 @@ export default {
         this.newNoticesCount = 0;
         this.showNewNoticesPill = false;
 
+        this.applyAutoTranslate();
         this.scrollToTop();
         if (firstId) {
           this.$nextTick(() => this.scrollToNotice(firstId));
@@ -1210,6 +1241,78 @@ export default {
 
       // Step 4: Convert newlines to <br>
       return escaped.replace(/\n/g, '<br>');
+    },
+    t,
+    // 🌐 Auto-translate all loaded notices to the chosen language (in place)
+    async applyAutoTranslate() {
+      const lang = i18nState.lang;
+      const enabled = i18nState.autoTranslate;
+      const target = enabled && lang !== 'en' ? lang : 'en';
+
+      // Deduplicate across allNotices + notices (same objects referenced in both)
+      const merged = {};
+      [this.allNotices, this.notices].forEach(list => {
+        (list || []).forEach(n => {
+          if (n && n.id != null) merged[n.id] = n;
+        });
+      });
+      const notices = Object.values(merged);
+      if (notices.length === 0) return;
+
+      // Revert to originals when auto-translate is off or English is selected
+      if (target === 'en') {
+        notices.forEach(n => {
+          if (n._isTranslated) {
+            n.title = n._origTitle || n.title;
+            n.body = n._origBody || n.body;
+            n._isTranslated = false;
+            n._translatedLang = null;
+          }
+        });
+        return;
+      }
+
+      await Promise.all(notices.map(async (n) => {
+        if ((n._isTranslated && n._translatedLang === target) || n._translating) return;
+        n._translating = true;
+        try {
+          if (!n._origTitle) n._origTitle = n.title;
+          if (!n._origBody) n._origBody = n.body;
+          const translated = await translateNotice(n, target);
+          n.title = translated.title;
+          n.body = translated.body;
+          n._isTranslated = true;
+          n._translatedLang = target;
+        } catch (err) {
+          console.warn('Auto-translate error for notice', n.id, err);
+        } finally {
+          n._translating = false;
+        }
+      }));
+    },
+    async toggleNoticeTranslation(notice) {
+      if (!notice) return;
+      if (notice._isTranslated) {
+        notice.title = notice._origTitle || notice.title;
+        notice.body = notice._origBody || notice.body;
+        notice._isTranslated = false;
+        return;
+      }
+      if (!notice._origTitle) notice._origTitle = notice.title;
+      if (!notice._origBody) notice._origBody = notice.body;
+
+      notice._translating = true;
+      try {
+        const targetLang = i18nState.lang || 'sw';
+        const translated = await translateNotice(notice, targetLang);
+        notice.title = translated.title;
+        notice.body = translated.body;
+        notice._isTranslated = true;
+      } catch (err) {
+        console.warn('Notice translation error:', err);
+      } finally {
+        notice._translating = false;
+      }
     },
     handleContentClick(event, notice) {
       const target = event.target.closest('a, .hashtag, .mention');
@@ -1362,6 +1465,7 @@ export default {
           if (this.membership?.role === 'org_admin') {
             this.fetchMembers();
           }
+          this.applyAutoTranslate();
         }
       } catch (err) {
         console.error('Load board error:', err);
@@ -1377,6 +1481,7 @@ export default {
           this.departments = cached.departments || [];
           this.isOfflineMode = true;
           this.errorMessage = null;
+          this.applyAutoTranslate();
         } else {
           const detail = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Network error';
           const activeUrl = api?.defaults?.baseURL || 'https://ssp.bugemauniv.ac.ug';
@@ -1455,6 +1560,7 @@ export default {
         if (res.data.success) {
           this.notices = res.data.notices;
           this.allNotices = res.data.notices;
+          this.applyAutoTranslate();
         }
       } catch (err) {
         console.error('Fetch notices error:', err);
@@ -1730,6 +1836,7 @@ export default {
             console.log(`📡 Poller found ${newItems.length} new notice(s)! Updating board...`);
             this.allNotices = freshNotices;
             this.notices = freshNotices;
+            this.applyAutoTranslate();
             // Fire full notification (tray + sound + vibration) for each new item
             if (window.notificationService) {
               for (const notice of newItems) {
@@ -1815,8 +1922,9 @@ export default {
 <style scoped>
 /* ─── Toolbar ─────────────────────────────────────────────── */
 .glass-toolbar {
-  --background: rgba(255, 255, 255, 0.94);
-  --border-color: rgba(218, 165, 32, 0.2);
+  --background: var(--ion-toolbar-background, rgba(255, 255, 255, 0.94));
+  --color: var(--ion-text-color, #111827);
+  --border-color: var(--ion-border-color, rgba(218, 165, 32, 0.2));
   --min-height: 56px;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -1964,9 +2072,40 @@ export default {
   --color: #888;
 }
 
+/* Language & Theme settings button in the board header (desktop/tablet only) */
+.header-settings-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.header-settings-btn:hover {
+  background: rgba(218, 165, 32, 0.12);
+  color: #daa520;
+}
+
+.header-settings-icon {
+  font-size: 1.3rem;
+}
+
+@media (max-width: 767px) {
+  .desktop-header-settings {
+    display: none;
+  }
+}
+
 /* ─── Board Content ────────────────────────────────────────── */
 .board-content {
-  --background: #ffffff;
+  --background: var(--ion-background-color, #ffffff);
+  --color: var(--ion-text-color, #111827);
 }
 
 /* ─── Loading ──────────────────────────────────────────────── */
@@ -1977,7 +2116,8 @@ export default {
   justify-content: center;
   height: 65vh;
   gap: 20px;
-  background: #ffffff;
+  background: var(--ion-background-color, #ffffff);
+  color: var(--ion-text-color, #111827);
 }
 
 .loading-logo-wrap {
@@ -2145,8 +2285,8 @@ export default {
   position: relative;
   padding: 28px 20px 20px 20px;
   overflow: hidden;
-  background: #fff;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
+  background: var(--ion-card-background, #ffffff);
+  border-bottom: 1px solid var(--ion-border-color, rgba(0,0,0,0.06));
 }
 
 .hero-bg {
@@ -2204,7 +2344,7 @@ export default {
   font-size: 1.3rem;
   font-weight: 900;
   margin: 0 0 4px 0;
-  color: #1a1a1a;
+  color: var(--ion-text-color, #1a1a1a);
   letter-spacing: -0.3px;
   white-space: nowrap;
   overflow: hidden;
@@ -2240,7 +2380,7 @@ export default {
 .stat-val {
   font-size: 1.1rem;
   font-weight: 800;
-  color: #1a1a1a;
+  color: var(--ion-text-color, #1a1a1a);
   line-height: 1;
 }
 
@@ -2333,11 +2473,11 @@ export default {
 
 /* ─── Filter Bar ───────────────────────────────────────────── */
 .filter-bar {
-  background: #fff;
+  background: var(--ion-card-background, #ffffff);
   position: sticky;
   top: 0;
   z-index: 10;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
+  border-bottom: 1px solid var(--ion-border-color, rgba(0,0,0,0.06));
   box-shadow: 0 2px 12px rgba(0,0,0,0.04);
 }
 
@@ -2518,11 +2658,12 @@ export default {
 
 .notice-card {
   font-family: Tahoma, 'Segoe UI', Geneva, Verdana, sans-serif !important;
-  background: #fff;
+  background: var(--ion-card-background, #fff);
+  color: var(--ion-text-color, #1a1a1a);
   border-radius: 18px;
   padding: 0;
   margin-bottom: 12px;
-  border: 1px solid rgba(0,0,0,0.06);
+  border: 1px solid var(--ion-border-color, rgba(0,0,0,0.06));
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   overflow: hidden;
   transition: transform 0.2s, box-shadow 0.2s;
@@ -2609,7 +2750,7 @@ export default {
 .auth-name {
   font-weight: 700;
   font-size: 0.9rem;
-  color: #1a1a1a;
+  color: var(--ion-text-color, #1a1a1a);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2904,7 +3045,8 @@ export default {
 /* ─── Members View ──────────────────────────────────────────── */
 .members-view {
   padding: 14px;
-  background: #f5f5f7;
+  background: var(--ion-background-color, #f5f5f7);
+  color: var(--ion-text-color, #111827);
   min-height: 60vh;
 }
 
@@ -2924,10 +3066,11 @@ export default {
   display: flex;
   gap: 10px;
   margin-bottom: 18px;
-  background: #fff;
+  background: var(--ion-card-background, #fff);
+  color: var(--ion-text-color, #111827);
   border-radius: 16px;
   padding: 14px 16px;
-  border: 1px solid rgba(0,0,0,0.05);
+  border: 1px solid var(--ion-border-color, rgba(0,0,0,0.05));
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
@@ -2948,7 +3091,7 @@ export default {
 .ms-val {
   font-size: 1.3rem;
   font-weight: 900;
-  color: #1a1a1a;
+  color: var(--ion-text-color, #1a1a1a);
   line-height: 1;
 }
 
@@ -3174,7 +3317,7 @@ export default {
   padding: 10px 14px 6px;
   overflow-x: auto;
   scrollbar-width: none;
-  background: #fff;
+  background: var(--ion-card-background, #fff);
   border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 .mobile-dept-pills::-webkit-scrollbar { display: none; }
@@ -3223,8 +3366,8 @@ export default {
   max-width: 320px;
   flex-shrink: 0;
   padding: 16px 14px;
-  border-right: 1px solid rgba(0,0,0,0.07);
-  background: #fff;
+  border-right: 1px solid var(--ion-border-color, rgba(0,0,0,0.07));
+  background: var(--ion-background-color, #ffffff);
   flex-direction: column;
   gap: 12px;
   position: sticky;
@@ -3283,7 +3426,7 @@ export default {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  color: #888;
+  color: var(--ion-color-medium, #888);
   margin: 0 0 8px 0;
   display: flex;
   align-items: center;
@@ -3310,7 +3453,7 @@ export default {
   text-align: left;
   width: 100%;
   transition: all 0.18s;
-  color: #444;
+  color: var(--ion-text-color, #444);
 }
 .dept-nav-item:hover {
   background: rgba(218,165,32,0.07);
@@ -3399,21 +3542,23 @@ export default {
   min-width: 0;
   max-width: 600px;
   margin: 0 auto;
-  background: #f3f4f6;
+  background: var(--ion-background-color, #f3f4f6);
   display: flex;
   flex-direction: column;
 }
 
 .active-dept-label {
-  display: none; /* hidden on mobile */
+  display: flex !important;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  background: rgba(218,165,32,0.06);
-  border-bottom: 1px solid rgba(218,165,32,0.12);
-  font-size: 0.82rem;
+  padding: 10px 14px;
+  background: rgba(218,165,32,0.1);
+  border: 1.5px solid rgba(218,165,32,0.35);
+  border-radius: 12px;
+  margin: 10px 14px 14px 14px;
+  font-size: 0.88rem;
   font-weight: 700;
-  color: #c0921c;
+  color: #b38209;
 }
 .active-dept-label ion-icon { font-size: 14px; }
 .clear-dept-btn {
@@ -3563,7 +3708,7 @@ export default {
 .widget--urgent-cta {
   border: 1.5px solid rgba(239, 68, 68, 0.35);
   box-shadow: 0 4px 18px rgba(239, 68, 68, 0.12);
-  background: linear-gradient(180deg, rgba(254, 242, 242, 0.7) 0%, #ffffff 100%);
+  background: var(--ion-card-background, #ffffff);
 }
 
 .urgent-pulse-icon {
@@ -3597,6 +3742,7 @@ export default {
   transition: all 0.2s ease;
   cursor: pointer;
   border: 1px solid transparent;
+  color: var(--ion-text-color, #1a1a1a);
 }
 
 .widget-notice-item:hover {
@@ -3636,7 +3782,7 @@ export default {
 /* WhatsApp Status Style Pinned Notices (24h Expiry) */
 .widget--pinned {
   border: 1px solid rgba(218, 165, 32, 0.25);
-  background: linear-gradient(180deg, rgba(254, 252, 232, 0.6) 0%, #ffffff 100%);
+  background: var(--ion-card-background, #ffffff);
 }
 
 .status-ring-wrap {
@@ -3701,7 +3847,8 @@ export default {
   .dept-sidebar {
     display: flex !important;
   }
-  .widgets-col {
+  .widgets-col,
+  .board-widgets-col {
     display: flex !important;
   }
   .active-dept-label {
@@ -4541,6 +4688,34 @@ export default {
   margin-left: auto;
 }
 
+.pin-my-dept-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1.5px solid rgba(218, 165, 32, 0.5);
+  background: rgba(218, 165, 32, 0.12);
+  color: #b38209;
+  font-size: 0.8rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.pin-my-dept-btn:hover {
+  background: rgba(218, 165, 32, 0.25);
+}
+
+.pin-my-dept-btn--active {
+  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  color: #000000 !important;
+  border-color: transparent !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 8px rgba(218, 165, 32, 0.3) !important;
+}
+
 .clear-dept-btn {
   background: transparent;
   border: none;
@@ -4585,6 +4760,60 @@ export default {
   border-radius: 12px;
   max-width: 155px;
   height: 42px;
+}
+
+/* 🌙 DARK MODE OVERRIDES FOR NOTICE BOARD & APP */
+body.dark .board-content,
+body.dark .board-feed,
+body.dark .notice-card,
+body.dark .modal-content,
+body.dark .notice-detail-card {
+  background-color: #16181c !important;
+  color: #f3f4f6 !important;
+  border-color: #2f3336 !important;
+}
+
+body.dark .notice-title,
+body.dark .auth-name,
+body.dark .empty-title,
+body.dark .board-subtitle,
+body.dark .dept-name,
+body.dark .member-name,
+body.dark .role-title {
+  color: #f3f4f6 !important;
+}
+
+body.dark .notice-text,
+body.dark .empty-desc,
+body.dark .auth-handle,
+body.dark .notice-date {
+  color: #9ca3af !important;
+}
+
+body.dark .dept-sidebar,
+body.dark .dept-nav,
+body.dark .dept-nav-item {
+  background: #0f1419 !important;
+  color: #f3f4f6 !important;
+  border-color: #2f3336 !important;
+}
+
+body.dark .cat-pill {
+  background: #21262d !important;
+  color: #c9d1d9 !important;
+  border-color: #30363d !important;
+}
+
+body.dark .cat-pill--active {
+  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  color: #000000 !important;
+}
+
+body.dark .members-table-container,
+body.dark .members-table,
+body.dark .notice-detail-content {
+  background: #16181c !important;
+  color: #f3f4f6 !important;
 }
 </style>
 

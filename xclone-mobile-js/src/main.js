@@ -17,7 +17,8 @@ import '@ionic/vue/css/text-transformation.css';
 import '@ionic/vue/css/flex-utils.css';
 import '@ionic/vue/css/display.css';
 
-// Desktop layout styles
+// Desktop layout & Theme styles
+import './theme/variables.css';
 import './theme/desktop.css';
 
 console.log('🚀 Step 1: Imports successful');

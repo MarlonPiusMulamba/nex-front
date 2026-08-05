@@ -54,6 +54,11 @@
           </router-link>
 
 
+          <div class="nav-item" @click="showSettingsModal = true">
+            <ion-icon :icon="settingsOutline" class="nav-icon"></ion-icon>
+            <span class="nav-label">{{ t('settings') }}</span>
+          </div>
+
           <!-- Logout Button (Desktop only) -->
           <div class="nav-item logout-item" @click="logout">
             <ion-icon :icon="logOutOutline" class="nav-icon"></ion-icon>
@@ -126,6 +131,11 @@
               <ion-label class="tab-lbl">Club</ion-label>
             </ion-tab-button>
 
+            <div class="tab-btn custom-settings-tab" @click="showSettingsModal = true">
+              <ion-icon :icon="settingsOutline"></ion-icon>
+              <ion-label class="tab-lbl">{{ t('settings') }}</ion-label>
+            </div>
+
           </ion-tab-bar>
         </ion-tabs>
 
@@ -149,6 +159,8 @@
       </aside>
     </div>
 
+    <SettingsModal v-model:isOpen="showSettingsModal" />
+
     <PostTypeSelectorModal 
       v-model:isOpen="showTypeSelector"
       @select="handleTypeSelect"
@@ -171,7 +183,7 @@ import {
   IonPage, IonTabs, IonRouterOutlet, IonTabBar, IonTabButton, 
   IonIcon, IonLabel, IonBadge, IonFab, IonFabButton 
 } from '@ionic/vue';
-import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline, add, shieldOutline, playCircleOutline, megaphoneOutline } from 'ionicons/icons';
+import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline, add, shieldOutline, playCircleOutline, megaphoneOutline, settingsOutline } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config/index.js';
 import TrendingWidget from '@/components/TrendingWidget.vue';
@@ -180,6 +192,8 @@ import NoticeWidget from '@/components/NoticeWidget.vue';
 import notificationService from '@/utils/notificationService.js';
 import PostComposerModal from '@/components/PostComposerModal.vue';
 import PostTypeSelectorModal from '@/components/PostTypeSelectorModal.vue';
+import SettingsModal from '@/components/SettingsModal.vue';
+import { i18nState, t } from '@/utils/i18n.js';
 
 export default {
   name: 'TabsPage',
@@ -190,7 +204,8 @@ export default {
     SuggestedUsersWidget,
     NoticeWidget,
     PostComposerModal,
-    PostTypeSelectorModal
+    PostTypeSelectorModal,
+    SettingsModal
   },
   data() {
     return {
@@ -205,6 +220,9 @@ export default {
       shieldOutline,
       playCircleOutline,
       megaphoneOutline,
+      settingsOutline,
+      showSettingsModal: false,
+      i18nState,
       unreadCount: 0,
       prevUnreadCount: 0,
       unreadNotifCount: 0,
@@ -244,6 +262,7 @@ export default {
     }
   },
   methods: {
+    t,
     async unlockAudio() {
       try {
         if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -469,7 +488,7 @@ ion-page {
 
 /* ─── Mobile Tab Bar ──────────────────────────────────────── */
 .mobile-tab-bar {
-  --background: #ffffff;
+  --background: var(--ion-tab-bar-background, #ffffff);
   --border: 0 none;
   box-shadow: 0 -1px 0 rgba(0,0,0,0.07), 0 -4px 16px rgba(0,0,0,0.06);
 }

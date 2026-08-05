@@ -14,6 +14,7 @@ import { IonApp, IonRouterOutlet, IonIcon } from '@ionic/vue';
 import { cloudOfflineOutline } from 'ionicons/icons';
 import CallOverlay from './components/CallOverlay.vue';
 import notificationService from './utils/notificationService.js';
+import { setTheme, applyThemeToBody, i18nState } from './utils/i18n.js';
 
 export default {
   name: 'App',
@@ -25,7 +26,7 @@ export default {
   },
   data() {
     return {
-      theme: 'light',
+      theme: i18nState.theme || 'light',
       isOffline: !navigator.onLine,
       cloudOfflineOutline
     };
@@ -37,16 +38,7 @@ export default {
     applyTheme(nextTheme) {
       const t = nextTheme === 'dark' ? 'dark' : 'light';
       this.theme = t;
-      try {
-        localStorage.setItem('theme', t);
-      } catch (_) {}
-
-      // Keep the root element in sync for :root.light / :root.dark CSS
-      const root = document.documentElement;
-      root.classList.remove('light', 'dark');
-      root.classList.add(t);
-
-      window.dispatchEvent(new CustomEvent('themeChanged', { detail: t }));
+      setTheme(t);
     },
     toggleTheme() {
       this.applyTheme(this.theme === 'dark' ? 'light' : 'dark');
@@ -98,12 +90,20 @@ export default {
       });
     }
 
-    // Default to light theme unless user explicitly chose dark before
+    // Theme listener and initial application
     let saved = null;
     try {
-      saved = localStorage.getItem('theme');
+      saved = localStorage.getItem('pref_theme') || localStorage.getItem('theme');
     } catch (_) {}
-    this.applyTheme(saved === 'dark' ? 'dark' : 'light');
+    const initialT = saved === 'dark' ? 'dark' : 'light';
+    this.theme = initialT;
+    applyThemeToBody(initialT);
+
+    window.addEventListener('themeChanged', (e) => {
+      if (e && e.detail) {
+        this.theme = e.detail;
+      }
+    });
 
     // Initialize LAN P2P Service globally
     const lanSocket = this.$socketService?.socket || this.$socket || null;

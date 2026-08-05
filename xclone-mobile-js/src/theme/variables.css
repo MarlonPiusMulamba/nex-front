@@ -1,18 +1,27 @@
-/* ✅ FORCE LIGHT THEME ONLY */
+/* NEXFI Global Theme Variables */
 
 :root {
   color-scheme: light;
 
   --ion-background-color: #f9fafb;
-  --ion-text-color: #1a1a1a;
+  --ion-background-color-rgb: 249, 250, 251;
+  --ion-text-color: #111827;
+  --ion-text-color-rgb: 17, 24, 39;
 
   --ion-card-background: #ffffff;
-  --ion-card-text: #111111;
+  --ion-card-text: #111827;
+
+  --ion-item-background: #ffffff;
+  --ion-toolbar-background: #ffffff;
+  --ion-toolbar-text-color: #111827;
 
   --ion-input-background: #f1f3f5;
   --ion-input-text: #111111;
 
+  --ion-tab-bar-background: #ffffff;
   --ion-tab-bar-hover: #daa520;
+  --ion-border-color: #e5e7eb;
+
   --ion-color-primary: #daa520;
   --ion-color-primary-rgb: 218, 165, 32;
   --ion-color-primary-contrast: #ffffff;
@@ -22,15 +31,223 @@
 
   --ion-color-secondary: #b8860b;
   --ion-color-tertiary: #ffd700;
+  --ion-color-light: #f7f9f9;
 }
 
-/* 🚫 Disable any dark theme preference completely */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: light !important;
-    --ion-background-color: #f9fafb !important;
-    --ion-text-color: #1a1a1a !important;
-    --ion-card-background: #ffffff !important;
-    --ion-input-background: #f1f3f5 !important;
-  }
+/* 🌙 Dark Mode Theme Overrides */
+:root.dark,
+html.dark,
+body.dark,
+body.dark-theme,
+.dark {
+  color-scheme: dark;
+
+  --ion-background-color: #0b0f14;
+  --ion-background-color-rgb: 11, 15, 20;
+
+  --ion-text-color: #f3f4f6;
+  --ion-text-color-rgb: 243, 244, 246;
+
+  --ion-card-background: #16181c;
+  --ion-card-background-rgb: 22, 24, 28;
+  --ion-card-text: #f3f4f6;
+
+  --ion-item-background: #16181c;
+  --ion-toolbar-background: #0f1419;
+  --ion-toolbar-text-color: #f3f4f6;
+
+  --ion-input-background: #1f2937;
+  --ion-input-text: #ffffff;
+
+  --ion-tab-bar-background: #0f1419;
+  --ion-border-color: #2f3336;
+  --ion-color-light: #1f2937;
+}
+
+/* 🟢 Global Body & App Root Dark Theme */
+body.dark,
+body.dark-theme,
+html.dark {
+  background-color: #0b0f14 !important;
+  color: #f3f4f6 !important;
+}
+
+body.dark #app,
+body.dark ion-app,
+body.dark ion-content,
+body.dark .ion-page,
+body.dark ion-router-outlet,
+body.dark ion-modal,
+body.dark ion-toolbar,
+body.dark ion-menu,
+body.dark ion-header,
+body.dark ion-footer {
+  --background: #0b0f14 !important;
+  --color: #f3f4f6 !important;
+  background-color: #0b0f14 !important;
+  color: #f3f4f6 !important;
+}
+
+/* 🖤 Main Desktop Layout, Sidebars & Grid Columns */
+body.dark .desktop-layout,
+body.dark .main-content,
+body.dark .standalone-main,
+body.dark .left-sidebar,
+body.dark .right-sidebar,
+body.dark .board-desktop-grid,
+body.dark .feed-col,
+body.dark .widgets-col,
+body.dark .board-widgets-col,
+body.dark .dept-sidebar,
+body.dark .board-content,
+body.dark .board-feed,
+body.dark .notice-list-container,
+body.dark .notice-list,
+body.dark .loading-state,
+body.dark .empty-feed,
+body.dark .members-view {
+  background-color: #0b0f14 !important;
+  --background: #0b0f14 !important;
+  color: #f3f4f6 !important;
+  border-color: #2f3336 !important;
+}
+
+/* 🏷️ Header Toolbars & Navigation Bars */
+body.dark .glass-toolbar,
+body.dark .board-header-wrapper,
+body.dark ion-header ion-toolbar,
+body.dark .settings-toolbar,
+body.dark ion-footer,
+body.dark ion-tab-bar,
+body.dark .mobile-tab-bar,
+body.dark .tab-btn,
+body.dark ion-tab-button {
+  --background: #0f1419 !important;
+  background: #0f1419 !important;
+  border-color: #2f3336 !important;
+  color: #f3f4f6 !important;
+}
+
+body.dark .tab-lbl {
+  color: #9ca3af !important;
+}
+
+/* 📦 Widgets & Cards in Dark Mode */
+body.dark .widget,
+body.dark .widget--recent,
+body.dark .widget--pinned,
+body.dark .widget--urgent-cta,
+body.dark .notice-widget,
+body.dark .trending-widget,
+body.dark .suggested-users-widget,
+body.dark .hero-banner,
+body.dark .filter-bar,
+body.dark .notice-card,
+body.dark .settings-card,
+body.dark .modal-card,
+body.dark .profile-card,
+body.dark .detail-card,
+body.dark .notice-detail-content,
+body.dark .members-summary,
+body.dark .user-item,
+body.dark .notice-item,
+body.dark .trend-item,
+body.dark .widget-notice-item {
+  background-color: #16181c !important;
+  border-color: #2f3336 !important;
+  color: #f3f4f6 !important;
+}
+
+body.dark .trend-item:hover,
+body.dark .user-item:hover,
+body.dark .notice-item:hover,
+body.dark .widget-notice-item:hover {
+  background-color: #21262d !important;
+}
+
+/* 🔍 Search Input & Select Boxes */
+body.dark .search-wrap,
+body.dark .search-wrap input,
+body.dark ion-searchbar,
+body.dark .search-input,
+body.dark .custom-select,
+body.dark .mobile-dept-select-box {
+  --background: #1f2937 !important;
+  background-color: #1f2937 !important;
+  color: #ffffff !important;
+  --color: #ffffff !important;
+  border-color: #374151 !important;
+}
+
+/* 📝 Text & Heading Colors */
+body.dark .brand-word-left,
+body.dark .brand-word-right,
+body.dark .org-name,
+body.dark .auth-name,
+body.dark .notice-title,
+body.dark .stat-val,
+body.dark .ms-val,
+body.dark .empty-title,
+body.dark .locked-title,
+body.dark .board-title,
+body.dark .widget-title,
+body.dark .trend-topic,
+body.dark .user-name,
+body.dark .wni-title {
+  color: #f3f4f6 !important;
+}
+
+body.dark .notice-text,
+body.dark .empty-desc,
+body.dark .auth-handle,
+body.dark .notice-date,
+body.dark .stat-lab,
+body.dark .user-handle,
+body.dark .user-bio,
+body.dark .trend-category,
+body.dark .trend-count,
+body.dark .stat-badge,
+body.dark .wni-meta {
+  color: #9ca3af !important;
+}
+
+/* 🏷️ Pills & Badges */
+body.dark .cat-pill {
+  background: #1f2937 !important;
+  color: #d1d5db !important;
+  border-color: #374151 !important;
+}
+
+body.dark .cat-pill:hover {
+  background: rgba(218, 165, 32, 0.2) !important;
+  color: #ffd700 !important;
+}
+
+body.dark .cat-pill--active {
+  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  color: #000000 !important;
+}
+
+body.dark .dept-sidebar,
+body.dark .left-sidebar,
+body.dark .right-sidebar,
+body.dark .widgets-col,
+body.dark .board-widgets-col {
+  background: #0b0f14 !important;
+  border-color: #2f3336 !important;
+}
+
+body.dark .nav-item {
+  color: #e5e7eb !important;
+}
+
+body.dark .noticeboard-footer,
+body.dark .notice-footer {
+  background: transparent !important;
+  border-top-color: #2f3336 !important;
+  color: #9ca3af !important;
+}
+
+body.dark .footer-note {
+  color: #9ca3af !important;
 }
