@@ -375,6 +375,26 @@
           ════════════════════════════════════════════════════ -->
           <main class="feed-col">
 
+            <!-- 🚨 Emergency Broadcast Marquee Ticker -->
+            <div v-if="urgentNotices && urgentNotices.length > 0 && !dismissedTicker" class="emergency-ticker-bar">
+              <div class="ticker-badge" @click="scrollToNotice(urgentNotices[0].id)">
+                <span class="ticker-pulse-dot"></span>
+                <ion-icon :icon="megaphoneOutline" class="ticker-badge-icon"></ion-icon>
+                <span class="ticker-badge-label">EMERGENCY BROADCAST</span>
+              </div>
+              <div class="ticker-content-wrap" @click="scrollToNotice(urgentNotices[0].id)">
+                <div class="ticker-marquee-text">
+                  <span v-for="(n, idx) in urgentNotices" :key="'tick-' + n.id" class="ticker-item">
+                    🚨 <strong>[{{ n.dept_name || 'Campus' }}]</strong> {{ n.title }} — {{ (n.body || '').replace(/<[^>]*>/g, '').substring(0, 90) }}...
+                    <span v-if="idx < urgentNotices.length - 1" class="ticker-sep">•</span>
+                  </span>
+                </div>
+              </div>
+              <button class="ticker-dismiss-btn" @click.stop="dismissedTicker = true" title="Dismiss Ticker">
+                <ion-icon :icon="closeOutline"></ion-icon>
+              </button>
+            </div>
+
             <!-- 🔔 Floating Real-Time "New Notices" Notification Pill -->
             <transition name="pill-slide">
               <div v-if="showNewNoticesPill" class="new-notices-pill-wrap">
@@ -387,6 +407,18 @@
                 </button>
               </div>
             </transition>
+
+            <!-- 👁️ Unread Notices Summary & "Mark All as Read" Banner -->
+            <div v-if="unreadNoticesCount > 0" class="unread-summary-bar">
+              <div class="unread-badge-box">
+                <span class="unread-pulse-dot"></span>
+                <span class="unread-text"><strong>{{ unreadNoticesCount }}</strong> new notice{{ unreadNoticesCount !== 1 ? 's' : '' }} since your last visit</span>
+              </div>
+              <button class="mark-read-btn" @click="markAllNoticesAsRead">
+                <ion-icon :icon="checkmarkCircle" class="mark-read-icon"></ion-icon>
+                <span>Mark All as Read</span>
+              </button>
+            </div>
 
             <!-- Search & Category Filters -->
             <div class="filter-bar">
@@ -505,6 +537,10 @@
                     </div>
                   </div>
                   <div class="notice-badges">
+                    <!-- ✨ NEW Unread Badge -->
+                    <span v-if="isNoticeUnread(notice)" class="new-unread-badge" title="New notice posted since your last visit">
+                      ✨ NEW
+                    </span>
                     <span class="cat-badge" :class="'cat-badge--' + (notice.category || 'general').toLowerCase()">
                       {{ notice.category || 'General' }}
                     </span>
@@ -550,9 +586,54 @@
                     <ion-icon :icon="timeOutline" class="date-icon"></ion-icon>
                     {{ formatDate(notice.created_at) }}
                   </div>
-                  <ion-button fill="clear" size="small" v-if="isAdmin || isAuthor(notice)" @click="deleteNotice(notice.id)" class="delete-btn">
-                    <ion-icon slot="icon-only" :icon="trashOutline"></ion-icon>
-                  </ion-button>
+
+                  <div class="footer-right-actions">
+                    <!-- 🖼️ Export Institutional Flyer Button -->
+                    <button 
+                      class="export-flyer-btn"
+                      @click="exportNoticeFlyer(notice)"
+                      title="Download high-resolution official institutional flyer image"
+                    >
+                      <ion-icon :icon="downloadOutline" class="flyer-btn-icon"></ion-icon>
+                      <span class="flyer-btn-text">Flyer</span>
+                    </button>
+
+                    <!-- 🔗 Share Notice Button -->
+                    <button 
+                      class="share-notice-btn"
+                      @click="shareNotice(notice)"
+                      title="Share announcement via WhatsApp, Telegram, or Copy Link"
+                    >
+                      <ion-icon :icon="shareSocialOutline" class="share-btn-icon"></ion-icon>
+                      <span class="share-btn-text">Share</span>
+                    </button>
+
+                    <!-- 🗓️ Add to Calendar Button (Events, Academic, Urgent, or all notices) -->
+                    <button 
+                      class="add-calendar-btn"
+                      @click="addToCalendar(notice)"
+                      title="Add announcement to Google Calendar or download iCal (.ics)"
+                    >
+                      <ion-icon :icon="calendarOutline" class="cal-btn-icon"></ion-icon>
+                      <span class="cal-btn-text">Add to Cal</span>
+                    </button>
+
+                    <!-- 🔊 Text-to-Speech Audio Reader Button -->
+                    <button 
+                      class="audio-reader-btn" 
+                      :class="{ 'audio-reader-btn--active': speakingNoticeId === notice.id }"
+                      @click="toggleAudioReader(notice)"
+                      :title="speakingNoticeId === notice.id ? 'Stop reading' : `Listen to announcement in ${i18nState.lang === 'fr' ? 'French' : i18nState.lang === 'sw' ? 'Swahili' : 'English'}`"
+                    >
+                      <ion-icon :icon="speakingNoticeId === notice.id ? volumeHigh : volumeMediumOutline" class="audio-btn-icon"></ion-icon>
+                      <span class="audio-btn-text">{{ speakingNoticeId === notice.id ? 'Reading...' : 'Listen' }}</span>
+                      <span v-if="speakingNoticeId === notice.id" class="audio-wave-dot"></span>
+                    </button>
+
+                    <ion-button fill="clear" size="small" v-if="isAdmin || isAuthor(notice)" @click="deleteNotice(notice.id)" class="delete-btn">
+                      <ion-icon slot="icon-only" :icon="trashOutline"></ion-icon>
+                    </ion-button>
+                  </div>
                 </div>
               </div>
 
@@ -855,7 +936,8 @@ import {
   cashOutline, calendarOutline, listOutline,
   createOutline, peopleOutline, businessOutline, logInOutline, searchOutline,
   closeCircleOutline, documentOutline, closeCircle, expandOutline,
-  arrowUpOutline, closeOutline, refresh, cloudOfflineOutline
+  arrowUpOutline, closeOutline, refresh, cloudOfflineOutline,
+  volumeHigh, volumeMediumOutline, shareSocialOutline, downloadOutline
 } from 'ionicons/icons';
 import api from '@/utils/api.js';
 import config from '@/config';
@@ -888,6 +970,9 @@ export default {
       cashOutline, calendarOutline, listOutline,
       createOutline, peopleOutline, businessOutline, logInOutline, searchOutline,
       closeCircleOutline, documentOutline, closeCircle, expandOutline, arrowUpOutline, closeOutline, refresh, cloudOfflineOutline,
+      volumeHigh, volumeMediumOutline, shareSocialOutline, downloadOutline,
+      dismissedTicker: false,
+      lastVisitTimestamp: null,
       isOfflineMode: false,
       newNoticesCount: 0,
       pendingNotices: [],
@@ -1052,6 +1137,11 @@ export default {
       });
       return map;
     },
+    unreadNoticesCount() {
+      const list = this.allNotices.length ? this.allNotices : (this.notices || []);
+      if (!this.lastVisitTimestamp) return list.length;
+      return list.filter(n => this.isNoticeUnread(n)).length;
+    },
   },
   watch: {
     '$route'(to, from) {
@@ -1071,6 +1161,468 @@ export default {
     }
   },
   methods: {
+    isNoticeUnread(notice) {
+      if (!notice || !notice.created_at) return false;
+      if (!this.lastVisitTimestamp) return true;
+      const createdTime = new Date(notice.created_at).getTime();
+      return createdTime > Number(this.lastVisitTimestamp);
+    },
+    markAllNoticesAsRead() {
+      const slug = this.org?.slug || this.$route?.params?.slug || 'bugema';
+      const now = Date.now();
+      localStorage.setItem('last_visit_' + slug, String(now));
+      this.lastVisitTimestamp = now;
+      toastController.create({
+        message: '✨ Marked all notices as read!',
+        duration: 2000,
+        color: 'success',
+        position: 'bottom'
+      }).then(t => t.present());
+    },
+    async exportNoticeFlyer(notice) {
+      if (!notice) return;
+
+      const orgName = this.org?.name || 'BUGEMA UNIVERSITY';
+      const deptName = notice.dept_name || notice.org_name || 'General Office';
+      const category = notice.category || 'General';
+      const title = notice.title || 'Official Announcement';
+      const cleanBody = (notice.body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      const noticeDate = this.formatDate(notice.created_at || Date.now());
+      
+      const baseUrl = window.location.origin + window.location.pathname;
+      const noticeUrl = `${baseUrl}#notice-${notice.id}`;
+
+      const toastLoading = await toastController.create({
+        message: '🖼️ Generating Official Notice Flyer...',
+        duration: 1500,
+        color: 'warning',
+        position: 'bottom'
+      });
+      await toastLoading.present();
+
+      // Create High-DPI Canvas (Width: 1000px, Height: 1350px)
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      const width = 1000;
+      const height = 1350;
+      canvas.width = width;
+      canvas.height = height;
+
+      const isDark = i18nState.theme === 'dark' || document.body.classList.contains('dark');
+
+      // 1. Outer Background
+      ctx.fillStyle = isDark ? '#0b0f14' : '#f3f4f6';
+      ctx.fillRect(0, 0, width, height);
+
+      // Inner card container with rounded corners
+      const margin = 40;
+      const cardW = width - (margin * 2);
+      const cardH = height - (margin * 2);
+      const cornerRadius = 24;
+
+      ctx.fillStyle = isDark ? '#16181c' : '#ffffff';
+      ctx.strokeStyle = isDark ? '#2f3336' : '#e5e7eb';
+      ctx.lineWidth = 3;
+
+      ctx.beginPath();
+      ctx.roundRect(margin, margin, cardW, cardH, cornerRadius);
+      ctx.fill();
+      ctx.stroke();
+
+      // 2. Top Header Brand Bar (Golden Gradient)
+      const headerHeight = 160;
+      const grad = ctx.createLinearGradient(margin, margin, margin + cardW, margin);
+      grad.addColorStop(0, '#0b0f14');
+      grad.addColorStop(0.5, '#16181c');
+      grad.addColorStop(1, '#0b0f14');
+
+      ctx.beginPath();
+      ctx.roundRect(margin, margin, cardW, headerHeight, [cornerRadius, cornerRadius, 0, 0]);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Gold accent bar below header
+      ctx.fillStyle = '#daa520';
+      ctx.fillRect(margin, margin + headerHeight - 4, cardW, 4);
+
+      // Institution Title
+      ctx.font = 'bold 36px Tahoma, sans-serif';
+      ctx.fillStyle = '#ffd700';
+      ctx.textAlign = 'center';
+      ctx.fillText(orgName.toUpperCase(), width / 2, margin + 65);
+
+      ctx.font = 'bold 18px Tahoma, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('DIGITAL NOTICE BOARD • OFFICIAL ANNOUNCEMENT', width / 2, margin + 105);
+
+      // 3. Department & Category Badge
+      let yCursor = margin + headerHeight + 55;
+
+      ctx.textAlign = 'left';
+      // Department Label
+      ctx.font = 'bold 24px Tahoma, sans-serif';
+      ctx.fillStyle = '#daa520';
+      ctx.fillText(`📌 ${deptName}`, margin + 40, yCursor);
+
+      // Category Tag Badge
+      ctx.font = 'bold 18px Tahoma, sans-serif';
+      const tagText = category.toUpperCase();
+      const tagWidth = ctx.measureText(tagText).width + 30;
+      ctx.fillStyle = category === 'Urgent' ? '#ef4444' : '#daa520';
+      ctx.beginPath();
+      ctx.roundRect(width - margin - 40 - tagWidth, yCursor - 22, tagWidth, 32, 16);
+      ctx.fill();
+      ctx.fillStyle = '#000000';
+      ctx.textAlign = 'center';
+      ctx.fillText(tagText, width - margin - 40 - (tagWidth / 2), yCursor);
+
+      // 4. Divider Line
+      yCursor += 30;
+      ctx.strokeStyle = isDark ? '#2f3336' : '#e5e7eb';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(margin + 40, yCursor);
+      ctx.lineTo(width - margin - 40, yCursor);
+      ctx.stroke();
+
+      // 5. Notice Title
+      yCursor += 50;
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 32px Tahoma, sans-serif';
+      ctx.fillStyle = isDark ? '#ffffff' : '#111827';
+      
+      // Wrap Title
+      const titleWords = title.split(' ');
+      let titleLine = '';
+      const maxTextWidth = cardW - 80;
+
+      for (let n = 0; n < titleWords.length; n++) {
+        const testLine = titleLine + titleWords[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxTextWidth && n > 0) {
+          ctx.fillText(titleLine, margin + 40, yCursor);
+          titleLine = titleWords[n] + ' ';
+          yCursor += 44;
+        } else {
+          titleLine = testLine;
+        }
+      }
+      ctx.fillText(titleLine, margin + 40, yCursor);
+      yCursor += 45;
+
+      // 6. Notice Date
+      ctx.font = '500 18px Tahoma, sans-serif';
+      ctx.fillStyle = '#888888';
+      ctx.fillText(`🕒 Posted on: ${noticeDate}`, margin + 40, yCursor);
+      yCursor += 40;
+
+      // 7. Body Text (Wrapped)
+      ctx.font = '22px Tahoma, sans-serif';
+      ctx.fillStyle = isDark ? '#d1d5db' : '#374151';
+
+      const bodyWords = cleanBody.split(' ');
+      let bodyLine = '';
+      const maxBodyY = height - margin - 170;
+
+      for (let i = 0; i < bodyWords.length; i++) {
+        const testLine = bodyLine + bodyWords[i] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxTextWidth && i > 0) {
+          if (yCursor < maxBodyY) {
+            ctx.fillText(bodyLine, margin + 40, yCursor);
+            bodyLine = bodyWords[i] + ' ';
+            yCursor += 34;
+          } else {
+            ctx.fillText(bodyLine.trim() + '...', margin + 40, yCursor);
+            break;
+          }
+        } else {
+          bodyLine = testLine;
+        }
+      }
+      if (yCursor < maxBodyY && bodyLine) {
+        ctx.fillText(bodyLine, margin + 40, yCursor);
+      }
+
+      // 8. Footer (App Brand & Notice Generated Link)
+      const footerY = height - margin - 130;
+
+      ctx.strokeStyle = '#daa520';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(margin + 40, footerY);
+      ctx.lineTo(width - margin - 40, footerY);
+      ctx.stroke();
+
+      ctx.font = 'bold 20px Tahoma, sans-serif';
+      ctx.fillStyle = '#daa520';
+      ctx.fillText('🏛️ NEXFI NOTICE BOARD • OFFICIAL INSTITUTIONAL FLYER', margin + 40, footerY + 36);
+
+      ctx.font = 'bold 18px Tahoma, sans-serif';
+      ctx.fillStyle = isDark ? '#9ca3af' : '#4b5563';
+      ctx.fillText(`🔗 Notice URL: ${noticeUrl}`, margin + 40, footerY + 70);
+
+      ctx.font = 'italic 16px Tahoma, sans-serif';
+      ctx.fillStyle = '#888888';
+      ctx.fillText(`Generated on ${new Date().toLocaleString()} • Verified Institutional Document 🛡️`, margin + 40, footerY + 98);
+
+      // Trigger Download
+      const imageURI = canvas.toDataURL('image/png');
+      const downloadLink = document.createElement('a');
+      const safeFilename = `${orgName.replace(/\s+/g, '_')}_Flyer_${notice.id}.png`;
+      downloadLink.href = imageURI;
+      downloadLink.download = safeFilename;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+
+      const toastSuccess = await toastController.create({
+        message: `📥 Official Notice Flyer downloaded: ${safeFilename}`,
+        duration: 3000,
+        color: 'success',
+        position: 'bottom'
+      });
+      await toastSuccess.present();
+    },
+    async shareNotice(notice) {
+      if (!notice) return;
+
+      const orgName = this.org?.name || 'Bugema University';
+      const deptName = notice.dept_name || notice.org_name || 'General Board';
+      const title = notice.title || 'Official Announcement';
+      const cleanBody = (notice.body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      const summary = cleanBody.length > 140 ? cleanBody.substring(0, 140) + '...' : cleanBody;
+      
+      const baseUrl = window.location.origin + window.location.pathname;
+      const noticeUrl = `${baseUrl}#notice-${notice.id}`;
+
+      const shareText = `📢 *${orgName.toUpperCase()} DIGITAL NOTICE BOARD*\n📌 *Dept:* ${deptName}\n\n*Title:* ${title}\n\n${summary}\n\n🔗 *Read Full Notice:* ${noticeUrl}`;
+
+      const canWebShare = typeof navigator !== 'undefined' && Boolean(navigator.share);
+
+      const alert = await alertController.create({
+        header: '🔗 Share Announcement',
+        subHeader: title,
+        message: 'Choose how you want to share this notice:',
+        buttons: [
+          {
+            text: '💚 Share via WhatsApp',
+            handler: () => {
+              const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+              window.open(waUrl, '_blank', 'noopener,noreferrer');
+            }
+          },
+          {
+            text: '✈️ Share via Telegram',
+            handler: () => {
+              const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(noticeUrl)}&text=${encodeURIComponent(`📢 *${orgName}* - ${title}`)}`;
+              window.open(tgUrl, '_blank', 'noopener,noreferrer');
+            }
+          },
+          {
+            text: '📋 Copy Direct Link',
+            handler: async () => {
+              try {
+                await navigator.clipboard.writeText(noticeUrl);
+                const toast = await toastController.create({
+                  message: '📋 Direct notice link copied to clipboard!',
+                  duration: 2200,
+                  color: 'success',
+                  position: 'bottom'
+                });
+                await toast.present();
+              } catch (e) {
+                console.warn('Clipboard copy fallback:', e);
+              }
+            }
+          },
+          ...(canWebShare ? [{
+            text: '📱 Device Native Share Sheet',
+            handler: async () => {
+              try {
+                await navigator.share({
+                  title: `${orgName} - ${title}`,
+                  text: shareText,
+                  url: noticeUrl
+                });
+              } catch (e) {
+                console.warn('Web Share cancelled:', e);
+              }
+            }
+          }] : []),
+          {
+            text: 'Cancel',
+            role: 'cancel'
+          }
+        ]
+      });
+      await alert.present();
+    },
+    async addToCalendar(notice) {
+      if (!notice) return;
+
+      const title = notice.title || 'Bugema Notice Board Announcement';
+      const cleanBody = (notice.body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      const deptName = notice.dept_name || notice.org_name || 'Bugema University';
+      const location = `${deptName} - Digital Notice Board`;
+
+      // Event Date: Default to expires_at if set, otherwise notice created_at
+      const eventDate = notice.expires_at ? new Date(notice.expires_at) : new Date(notice.created_at || Date.now());
+      const endDate = new Date(eventDate.getTime() + 60 * 60 * 1000); // 1 hour event duration
+
+      const formatISOForCalendar = (date) => {
+        return date.toISOString().replace(/-|:|\.\d+/g, '');
+      };
+
+      const startISO = formatISOForCalendar(eventDate);
+      const endISO = formatISOForCalendar(endDate);
+
+      const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&details=${encodeURIComponent(cleanBody)}&location=${encodeURIComponent(location)}&dates=${startISO}/${endISO}`;
+
+      const alert = await alertController.create({
+        header: '🗓️ Add to Calendar',
+        subHeader: title,
+        message: 'Save announcement date to your preferred calendar:',
+        buttons: [
+          {
+            text: '📅 Google Calendar',
+            handler: () => {
+              window.open(googleUrl, '_blank', 'noopener,noreferrer');
+            }
+          },
+          {
+            text: '📥 Download iCal (.ics)',
+            handler: () => {
+              this.downloadIcsFile(title, cleanBody, location, eventDate, endDate);
+            }
+          },
+          {
+            text: 'Cancel',
+            role: 'cancel'
+          }
+        ]
+      });
+      await alert.present();
+    },
+    downloadIcsFile(title, details, location, startDate, endDate) {
+      const formatIcsDate = (date) => {
+        return date.toISOString().replace(/-|:|\.\d+/g, '');
+      };
+
+      const icsContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//NEXFI//Bugema Digital Notice Board//EN',
+        'CALSCALE:GREGORIAN',
+        'BEGIN:VEVENT',
+        `SUMMARY:${title.replace(/\n/g, ' ')}`,
+        `DESCRIPTION:${details.replace(/\n/g, ' ')}`,
+        `LOCATION:${location}`,
+        `DTSTART:${formatIcsDate(startDate)}`,
+        `DTEND:${formatIcsDate(endDate)}`,
+        `DTSTAMP:${formatIcsDate(new Date())}`,
+        'STATUS:CONFIRMED',
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\r\n');
+
+      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.setAttribute('download', `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_event.ics`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    },
+    async toggleAudioReader(notice) {
+      if (!notice) return;
+
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+        const toast = await toastController.create({
+          message: 'Text-to-Speech is not supported on this browser.',
+          duration: 2000,
+          color: 'warning',
+          position: 'bottom'
+        });
+        await toast.present();
+        return;
+      }
+
+      // If already reading this notice, stop speech!
+      if (this.speakingNoticeId === notice.id) {
+        window.speechSynthesis.cancel();
+        this.speakingNoticeId = null;
+        return;
+      }
+
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+      this.speakingNoticeId = notice.id;
+
+      const targetLang = i18nState.lang || 'en'; // 'en', 'sw', 'fr'
+
+      // Clean HTML tags and whitespace from title and body
+      let rawTitle = notice.title || '';
+      let rawBody = (notice.body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+      let readTitle = rawTitle;
+      let readBody = rawBody;
+
+      // Translate text to active user setting language if not English
+      if (targetLang !== 'en') {
+        try {
+          const translated = await translateNotice({ title: rawTitle, body: rawBody }, targetLang);
+          if (translated && translated.title) {
+            readTitle = translated.title;
+            readBody = (translated.body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+          }
+        } catch (e) {
+          console.warn('TTS translation fallback:', e);
+        }
+      }
+
+      const textToRead = `${readTitle}. ${readBody}`;
+      const utterance = new SpeechSynthesisUtterance(textToRead);
+
+      // Map app setting language ('en', 'sw', 'fr') to SpeechSynthesis BCP 47 language code
+      const langCodeMap = {
+        en: 'en-US',
+        sw: 'sw-KE',
+        fr: 'fr-FR'
+      };
+      const targetCode = langCodeMap[targetLang] || 'en-US';
+      utterance.lang = targetCode;
+      utterance.rate = 0.92;
+      utterance.pitch = 1.0;
+
+      // Select matching voice for the target language if available
+      const voices = window.speechSynthesis.getVoices();
+      if (voices && voices.length) {
+        const matchedVoice = voices.find(v => 
+          v.lang.toLowerCase() === targetCode.toLowerCase() || 
+          v.lang.toLowerCase().startsWith(targetLang)
+        );
+        if (matchedVoice) {
+          utterance.voice = matchedVoice;
+        }
+      }
+
+      utterance.onend = () => {
+        if (this.speakingNoticeId === notice.id) {
+          this.speakingNoticeId = null;
+        }
+      };
+
+      utterance.onerror = (err) => {
+        console.warn('SpeechSynthesis error:', err);
+        if (this.speakingNoticeId === notice.id) {
+          this.speakingNoticeId = null;
+        }
+      };
+
+      window.speechSynthesis.speak(utterance);
+    },
     handleScroll(event) {
       const scrollTop = event?.detail?.scrollTop || window.scrollY || document.documentElement.scrollTop || 0;
       this.isScrolledDown = scrollTop > 100;
@@ -1426,6 +1978,8 @@ export default {
       this.loading = true;
       this.errorMessage = null;
       const slug = this.$route?.params?.slug || import.meta.env.VITE_STANDALONE_ORG || 'bugema';
+      const savedLastVisit = localStorage.getItem('last_visit_' + slug);
+      this.lastVisitTimestamp = savedLastVisit ? Number(savedLastVisit) : null;
       try {
         const res = await api.get(`/api/boards/${slug}`, {
           params: { user_id: this.userId }
@@ -1901,6 +2455,9 @@ export default {
     }, 15000);
   },
   unmounted() {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     window.removeEventListener('scroll', this.handleScroll);
     if (this._windowNoticeNewHandler) {
       window.removeEventListener('notice:new', this._windowNoticeNewHandler);
@@ -4814,6 +5371,382 @@ body.dark .members-table,
 body.dark .notice-detail-content {
   background: #16181c !important;
   color: #f3f4f6 !important;
+}
+
+/* 🖼️ Export Institutional Flyer Button */
+.export-flyer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 18px;
+  border: 1.5px solid rgba(218, 165, 32, 0.4);
+  background: rgba(218, 165, 32, 0.08);
+  color: #b38209;
+  font-size: 0.8rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  white-space: nowrap;
+}
+
+.export-flyer-btn:hover {
+  background: rgba(218, 165, 32, 0.2);
+  border-color: #daa520;
+  transform: translateY(-1px);
+}
+
+.flyer-btn-icon {
+  font-size: 0.95rem;
+}
+
+body.dark .export-flyer-btn {
+  background: rgba(218, 165, 32, 0.15);
+  color: #ffd700;
+  border-color: rgba(218, 165, 32, 0.45);
+}
+
+/* 🔗 One-Click Share Notice Button */
+.share-notice-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 18px;
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.08);
+  color: #059669;
+  font-size: 0.8rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  white-space: nowrap;
+}
+
+.share-notice-btn:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+  transform: translateY(-1px);
+}
+
+.share-btn-icon {
+  font-size: 0.95rem;
+}
+
+body.dark .share-notice-btn {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+/* 🗓️ Add to Calendar Button */
+.add-calendar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 18px;
+  border: 1.5px solid rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.08);
+  color: #2563eb;
+  font-size: 0.8rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  white-space: nowrap;
+}
+
+.add-calendar-btn:hover {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: #2563eb;
+  transform: translateY(-1px);
+}
+
+.cal-btn-icon {
+  font-size: 0.95rem;
+}
+
+body.dark .add-calendar-btn {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border-color: rgba(96, 165, 250, 0.4);
+}
+
+/* 🔊 Text-to-Speech Audio Reader Button */
+.footer-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.audio-reader-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 18px;
+  border: 1.5px solid rgba(218, 165, 32, 0.4);
+  background: rgba(218, 165, 32, 0.08);
+  color: #b38209;
+  font-size: 0.8rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.audio-reader-btn:hover {
+  background: rgba(218, 165, 32, 0.2);
+  border-color: #daa520;
+  transform: translateY(-1px);
+}
+
+.audio-reader-btn--active {
+  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  color: #000000 !important;
+  border-color: transparent !important;
+  box-shadow: 0 3px 12px rgba(218, 165, 32, 0.4) !important;
+  animation: audioPulse 1.5s infinite ease-in-out;
+}
+
+@keyframes audioPulse {
+  0% { box-shadow: 0 0 0 0 rgba(218, 165, 32, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(218, 165, 32, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(218, 165, 32, 0); }
+}
+
+.audio-btn-icon {
+  font-size: 1rem;
+}
+
+.audio-wave-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #000000;
+  animation: waveDot 0.8s infinite alternate;
+}
+
+@keyframes waveDot {
+  0% { transform: scale(0.6); opacity: 0.5; }
+  100% { transform: scale(1.3); opacity: 1; }
+}
+
+body.dark .audio-reader-btn {
+  background: rgba(218, 165, 32, 0.15);
+  color: #ffd700;
+  border-color: rgba(218, 165, 32, 0.45);
+}
+
+body.dark .audio-reader-btn--active {
+  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  color: #000000 !important;
+}
+
+/* 🚨 Emergency Broadcast Marquee Ticker */
+.emergency-ticker-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  color: #ffffff;
+  padding: 8px 14px;
+  border-radius: 12px;
+  margin: 10px 14px 4px 14px;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.3);
+  overflow: hidden;
+  position: relative;
+  z-index: 5;
+}
+
+.ticker-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ticker-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffd700;
+  animation: tickerPulse 1.2s infinite alternate;
+}
+
+@keyframes tickerPulse {
+  0% { transform: scale(0.7); opacity: 0.6; }
+  100% { transform: scale(1.3); opacity: 1; }
+}
+
+.ticker-content-wrap {
+  flex: 1;
+  overflow: hidden;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ticker-marquee-text {
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  animation: marqueeAnim 18s linear infinite;
+}
+
+.ticker-marquee-text:hover {
+  animation-play-state: paused;
+}
+
+@keyframes marqueeAnim {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.ticker-sep {
+  margin: 0 10px;
+  color: #ffd700;
+}
+
+.ticker-dismiss-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #ffffff;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.ticker-dismiss-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* 👁️ Unread Notices Summary Bar */
+.unread-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(218, 165, 32, 0.1);
+  border: 1.5px solid rgba(218, 165, 32, 0.35);
+  border-radius: 12px;
+  padding: 8px 14px;
+  margin: 8px 14px 12px 14px;
+  font-size: 0.82rem;
+  color: #b38209;
+}
+
+.unread-badge-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.unread-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #daa520;
+  animation: unreadPulse 1.4s infinite ease-in-out;
+}
+
+@keyframes unreadPulse {
+  0% { box-shadow: 0 0 0 0 rgba(218, 165, 32, 0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(218, 165, 32, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(218, 165, 32, 0); }
+}
+
+.mark-read-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #d4af37, #ffd700);
+  color: #000000;
+  border: none;
+  padding: 5px 11px;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+.mark-read-btn:hover {
+  transform: scale(1.03);
+}
+
+.new-unread-badge {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 850;
+  padding: 3px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.4px;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+  animation: badgePop 0.4s ease-out;
+}
+
+@keyframes badgePop {
+  0% { transform: scale(0.7); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+body.dark .unread-summary-bar {
+  background: rgba(218, 165, 32, 0.15) !important;
+  border-color: rgba(218, 165, 32, 0.4) !important;
+  color: #ffd700 !important;
+}
+
+/* 📱 Responsive Mobile Action Buttons: Hide text labels on small screens, show icons only */
+@media (max-width: 767px) {
+  .flyer-btn-text,
+  .share-btn-text,
+  .cal-btn-text,
+  .audio-btn-text {
+    display: none !important;
+  }
+
+  .export-flyer-btn,
+  .share-notice-btn,
+  .add-calendar-btn,
+  .audio-reader-btn {
+    padding: 6px 9px !important;
+    border-radius: 50% !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    justify-content: center !important;
+  }
+
+  .flyer-btn-icon,
+  .share-btn-icon,
+  .cal-btn-icon,
+  .audio-btn-icon {
+    font-size: 1.15rem !important;
+    margin: 0 !important;
+  }
+
+  .footer-right-actions {
+    gap: 6px !important;
+  }
 }
 </style>
 
