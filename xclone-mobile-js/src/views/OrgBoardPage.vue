@@ -948,6 +948,7 @@ import { translateNotice } from '@/utils/translationService.js';
 import OrgAdminPanel from '../components/OrgAdminPanel.vue';
 import NoticeComposerModal from '../components/NoticeComposerModal.vue';
 import SettingsModal from '../components/SettingsModal.vue';
+import html2canvas from 'html2canvas';
 
 export default {
   name: 'OrgBoardPage',
@@ -1186,204 +1187,230 @@ export default {
       const deptName = notice.dept_name || notice.org_name || 'General Office';
       const category = notice.category || 'General';
       const title = notice.title || 'Official Announcement';
-      const cleanBody = (notice.body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
       const noticeDate = this.formatDate(notice.created_at || Date.now());
       
       const baseUrl = window.location.origin + window.location.pathname;
       const noticeUrl = `${baseUrl}#notice-${notice.id}`;
+      const avatarSrc = this.getNoticeAvatar(notice);
+      const isDark = i18nState.theme === 'dark' || document.body.classList.contains('dark');
 
       const toastLoading = await toastController.create({
-        message: '🖼️ Generating Official Notice Flyer...',
-        duration: 1500,
+        message: '🖼️ Capturing Official Post Screenshot Flyer...',
+        duration: 2500,
         color: 'warning',
         position: 'bottom'
       });
       await toastLoading.present();
 
-      // Create High-DPI Canvas (Width: 1000px, Height: 1350px)
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      // Convert image URLs to Base64 to guarantee CORS rendering in html2canvas
+      const toBase64 = async (url) => {
+        if (!url || url.startsWith('data:')) return url;
+        try {
+          const res = await fetch(url, { mode: 'cors' });
+          const blob = await res.blob();
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(url);
+            reader.readAsDataURL(blob);
+          });
+        } catch (e) {
+          return url;
+        }
+      };
 
-      const width = 1000;
-      const height = 1350;
-      canvas.width = width;
-      canvas.height = height;
+      const base64Avatar = await toBase64(avatarSrc);
+      const base64Media = (notice.media_urls && notice.media_urls.length > 0)
+        ? await Promise.all(notice.media_urls.map(url => toBase64(url)))
+        : [];
 
-      const isDark = i18nState.theme === 'dark' || document.body.classList.contains('dark');
-
-      // 1. Outer Background
-      ctx.fillStyle = isDark ? '#0b0f14' : '#f3f4f6';
-      ctx.fillRect(0, 0, width, height);
-
-      // Inner card container with rounded corners
-      const margin = 40;
-      const cardW = width - (margin * 2);
-      const cardH = height - (margin * 2);
-      const cornerRadius = 24;
-
-      ctx.fillStyle = isDark ? '#16181c' : '#ffffff';
-      ctx.strokeStyle = isDark ? '#2f3336' : '#e5e7eb';
-      ctx.lineWidth = 3;
-
-      ctx.beginPath();
-      ctx.roundRect(margin, margin, cardW, cardH, cornerRadius);
-      ctx.fill();
-      ctx.stroke();
-
-      // 2. Top Header Brand Bar (Golden Gradient)
-      const headerHeight = 160;
-      const grad = ctx.createLinearGradient(margin, margin, margin + cardW, margin);
-      grad.addColorStop(0, '#0b0f14');
-      grad.addColorStop(0.5, '#16181c');
-      grad.addColorStop(1, '#0b0f14');
-
-      ctx.beginPath();
-      ctx.roundRect(margin, margin, cardW, headerHeight, [cornerRadius, cornerRadius, 0, 0]);
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      // Gold accent bar below header
-      ctx.fillStyle = '#daa520';
-      ctx.fillRect(margin, margin + headerHeight - 4, cardW, 4);
-
-      // Institution Title
-      ctx.font = 'bold 36px Tahoma, sans-serif';
-      ctx.fillStyle = '#ffd700';
-      ctx.textAlign = 'center';
-      ctx.fillText(orgName.toUpperCase(), width / 2, margin + 65);
-
-      ctx.font = 'bold 18px Tahoma, sans-serif';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText('DIGITAL NOTICE BOARD • OFFICIAL ANNOUNCEMENT', width / 2, margin + 105);
-
-      // 3. Department & Category Badge
-      let yCursor = margin + headerHeight + 55;
-
-      ctx.textAlign = 'left';
-      // Department Label
-      ctx.font = 'bold 24px Tahoma, sans-serif';
-      ctx.fillStyle = '#daa520';
-      ctx.fillText(`📌 ${deptName}`, margin + 40, yCursor);
-
-      // Category Tag Badge
-      ctx.font = 'bold 18px Tahoma, sans-serif';
-      const tagText = category.toUpperCase();
-      const tagWidth = ctx.measureText(tagText).width + 30;
-      ctx.fillStyle = category === 'Urgent' ? '#ef4444' : '#daa520';
-      ctx.beginPath();
-      ctx.roundRect(width - margin - 40 - tagWidth, yCursor - 22, tagWidth, 32, 16);
-      ctx.fill();
-      ctx.fillStyle = '#000000';
-      ctx.textAlign = 'center';
-      ctx.fillText(tagText, width - margin - 40 - (tagWidth / 2), yCursor);
-
-      // 4. Divider Line
-      yCursor += 30;
-      ctx.strokeStyle = isDark ? '#2f3336' : '#e5e7eb';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(margin + 40, yCursor);
-      ctx.lineTo(width - margin - 40, yCursor);
-      ctx.stroke();
-
-      // 5. Notice Title
-      yCursor += 50;
-      ctx.textAlign = 'left';
-      ctx.font = 'bold 32px Tahoma, sans-serif';
-      ctx.fillStyle = isDark ? '#ffffff' : '#111827';
+      // Create high-resolution screenshot container
+      const wrapper = document.createElement('div');
+      wrapper.className = `flyer-snapshot-container ${isDark ? 'dark-theme' : 'light-theme'}`;
       
-      // Wrap Title
-      const titleWords = title.split(' ');
-      let titleLine = '';
-      const maxTextWidth = cardW - 80;
+      wrapper.style.position = 'fixed';
+      wrapper.style.left = '-9999px';
+      wrapper.style.top = '0';
+      wrapper.style.width = '800px';
+      wrapper.style.zIndex = '-9999';
+      wrapper.style.background = isDark ? '#0b0f14' : '#f3f4f6';
+      wrapper.style.padding = '32px';
+      wrapper.style.boxSizing = 'border-box';
+      wrapper.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+      wrapper.style.color = isDark ? '#e7e9ea' : '#0f1419';
 
-      for (let n = 0; n < titleWords.length; n++) {
-        const testLine = titleLine + titleWords[n] + ' ';
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxTextWidth && n > 0) {
-          ctx.fillText(titleLine, margin + 40, yCursor);
-          titleLine = titleWords[n] + ' ';
-          yCursor += 44;
-        } else {
-          titleLine = testLine;
+      const bodyHtml = this.getNoticeBodyHtml(notice.body, notice.id);
+
+      // Media Grid HTML
+      let mediaGridHtml = '';
+      if (base64Media.length > 0) {
+        const displayCount = Math.min(base64Media.length, 4);
+        const gridCells = base64Media.slice(0, 4).map((url, mi) => `
+          <div style="position:relative; overflow:hidden; border-radius:12px; background:${isDark ? '#202429' : '#e5e7eb'}; height: 100%;">
+            <img src="${url}" style="width:100%; height:100%; object-fit:cover; display:block;" />
+            ${mi === 3 && base64Media.length > 4 ? `
+              <div style="position:absolute; inset:0; background:rgba(0,0,0,0.65); color:#ffffff; display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:bold;">
+                +${base64Media.length - 4}
+              </div>
+            ` : ''}
+          </div>
+        `).join('');
+
+        const gridStyle = displayCount === 1 ? 'grid-template-columns: 1fr; height: 380px;' :
+                          displayCount === 2 ? 'grid-template-columns: 1fr 1fr; height: 280px;' :
+                          displayCount === 3 ? 'grid-template-columns: 1fr 1fr; height: 320px;' :
+                          'grid-template-columns: 1fr 1fr; height: 340px;';
+
+        mediaGridHtml = `
+          <div style="display:grid; gap:10px; margin-top:20px; border-radius:16px; overflow:hidden; ${gridStyle}">
+            ${gridCells}
+          </div>
+        `;
+      }
+
+      // Attachment HTML
+      let attachmentHtml = '';
+      if (notice.attachment_url) {
+        attachmentHtml = `
+          <div style="display:flex; align-items:center; gap:12px; padding:14px 20px; margin-top:20px; background:${isDark ? '#1d2127' : '#f0f4f8'}; border:1.5px solid ${isDark ? '#2f3336' : '#cbd5e1'}; border-radius:14px; color:${isDark ? '#60a5fa' : '#2563eb'}; font-weight:700; font-size:15px;">
+            <span style="font-size:22px;">📄</span>
+            <span>View Official Document / Attachment</span>
+          </div>
+        `;
+      }
+
+      // Category color mapping
+      const catColor = category === 'Urgent' ? '#ef4444' : 
+                       category === 'Academic' ? '#3b82f6' : 
+                       category === 'Finance' ? '#10b981' : 
+                       category === 'Events' ? '#8b5cf6' : '#daa520';
+
+      // Complete Snapshot Card HTML
+      wrapper.innerHTML = `
+        <div style="background: ${isDark ? '#16181c' : '#ffffff'}; border: 2.5px solid ${isDark ? '#2f3336' : '#e5e7eb'}; border-radius: 26px; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.3);">
+          
+          <!-- Institutional Header Banner -->
+          <div style="background: linear-gradient(135deg, #0b0f14 0%, #1e2430 50%, #0b0f14 100%); padding: 26px 36px; border-bottom: 4px solid #daa520; text-align: center; color: #ffffff;">
+            <div style="font-size: 28px; font-weight: 900; letter-spacing: 1.5px; color: #ffd700; text-transform: uppercase;">
+              🏛️ ${orgName.toUpperCase()}
+            </div>
+            <div style="font-size: 13px; font-weight: 800; letter-spacing: 2px; color: #cbd5e1; margin-top: 6px; text-transform: uppercase;">
+              OFFICIAL DIGITAL NOTICE BOARD • POST SNAPSHOT
+            </div>
+          </div>
+
+          <!-- Post Card Content -->
+          <div style="padding: 32px 36px;">
+            
+            ${notice.is_pinned ? `
+              <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(218,165,32,0.15); color:#daa520; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:800; margin-bottom:20px; border:1px solid rgba(218,165,32,0.35);">
+                📌 Pinned Notice
+              </div>
+            ` : ''}
+
+            <!-- Author Header -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px;">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <div style="position: relative; width: 56px; height: 56px; border-radius: 50%; padding: 2px; background: linear-gradient(135deg, #daa520, #ffd700); flex-shrink: 0;">
+                  <img src="${base64Avatar}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #222;" />
+                </div>
+                <div>
+                  <div style="font-size: 20px; font-weight: 800; color: ${isDark ? '#ffffff' : '#0f1419'};">
+                    ${deptName}
+                  </div>
+                  <div style="font-size: 13px; color: #888888; margin-top: 2px; font-weight: 600;">
+                    Official Institutional Publisher
+                  </div>
+                </div>
+              </div>
+
+              <!-- Category Badge -->
+              <div style="background: ${catColor}; color: #ffffff; padding: 7px 18px; border-radius: 20px; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                ${category}
+              </div>
+            </div>
+
+            <!-- Notice Title -->
+            <h2 style="font-size: 26px; font-weight: 800; line-height: 1.35; margin: 0 0 18px 0; color: ${isDark ? '#ffffff' : '#0f1419'};">
+              ${title}
+            </h2>
+
+            <!-- Notice Body (Exact HTML formatting, links, bold text, emojis) -->
+            <div class="notice-text-content" style="font-size: 17px; line-height: 1.7; color: ${isDark ? '#d1d5db' : '#374151'}; margin-bottom: 22px; overflow-wrap: break-word;">
+              ${bodyHtml}
+            </div>
+
+            <!-- Media Grid -->
+            ${mediaGridHtml}
+
+            <!-- Attachment Bar -->
+            ${attachmentHtml}
+
+            <!-- Timestamp -->
+            <div style="margin-top: 24px; padding-top: 14px; border-top: 1px solid ${isDark ? '#26292e' : '#f1f5f9'}; font-size: 14px; color: #888888; display: flex; align-items: center; gap: 6px; font-weight: 600;">
+              <span>🕒 Posted on: ${noticeDate}</span>
+            </div>
+
+          </div>
+
+          <!-- Bottom Verification Footer -->
+          <div style="background: ${isDark ? '#111317' : '#f8fafc'}; padding: 20px 36px; border-top: 2px solid ${isDark ? '#2f3336' : '#e2e8f0'}; display: flex; flex-direction: column; gap: 6px;">
+            <div style="font-size: 15px; font-weight: 800; color: #daa520; display: flex; align-items: center; gap: 8px;">
+              <span>🏛️ ${orgName} • Digital Notice Board</span>
+            </div>
+            <div style="font-size: 12px; color: ${isDark ? '#9ca3af' : '#64748b'}; word-break: break-all; font-family: monospace;">
+              🔗 ${noticeUrl}
+            </div>
+            <div style="font-size: 11px; color: #888888; font-style: italic; margin-top: 2px;">
+              🛡️ Verified Institutional Post Snapshot • Generated on ${new Date().toLocaleString()}
+            </div>
+          </div>
+
+        </div>
+      `;
+
+      document.body.appendChild(wrapper);
+
+      try {
+        const canvas = await html2canvas(wrapper, {
+          scale: 2.5,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: isDark ? '#0b0f14' : '#f3f4f6',
+          logging: false
+        });
+
+        document.body.removeChild(wrapper);
+
+        const imageURI = canvas.toDataURL('image/png');
+        const downloadLink = document.createElement('a');
+        const safeFilename = `${orgName.replace(/\s+/g, '_')}_Notice_${notice.id}.png`;
+        downloadLink.href = imageURI;
+        downloadLink.download = safeFilename;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+
+        const toastSuccess = await toastController.create({
+          message: `📥 Official Post Screenshot Flyer downloaded: ${safeFilename}`,
+          duration: 3000,
+          color: 'success',
+          position: 'bottom'
+        });
+        await toastSuccess.present();
+      } catch (err) {
+        console.error('Error generating flyer snapshot:', err);
+        if (document.body.contains(wrapper)) {
+          document.body.removeChild(wrapper);
         }
+        const toastErr = await toastController.create({
+          message: '❌ Failed to capture post screenshot flyer. Please try again.',
+          duration: 3000,
+          color: 'danger',
+          position: 'bottom'
+        });
+        await toastErr.present();
       }
-      ctx.fillText(titleLine, margin + 40, yCursor);
-      yCursor += 45;
-
-      // 6. Notice Date
-      ctx.font = '500 18px Tahoma, sans-serif';
-      ctx.fillStyle = '#888888';
-      ctx.fillText(`🕒 Posted on: ${noticeDate}`, margin + 40, yCursor);
-      yCursor += 40;
-
-      // 7. Body Text (Wrapped)
-      ctx.font = '22px Tahoma, sans-serif';
-      ctx.fillStyle = isDark ? '#d1d5db' : '#374151';
-
-      const bodyWords = cleanBody.split(' ');
-      let bodyLine = '';
-      const maxBodyY = height - margin - 170;
-
-      for (let i = 0; i < bodyWords.length; i++) {
-        const testLine = bodyLine + bodyWords[i] + ' ';
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxTextWidth && i > 0) {
-          if (yCursor < maxBodyY) {
-            ctx.fillText(bodyLine, margin + 40, yCursor);
-            bodyLine = bodyWords[i] + ' ';
-            yCursor += 34;
-          } else {
-            ctx.fillText(bodyLine.trim() + '...', margin + 40, yCursor);
-            break;
-          }
-        } else {
-          bodyLine = testLine;
-        }
-      }
-      if (yCursor < maxBodyY && bodyLine) {
-        ctx.fillText(bodyLine, margin + 40, yCursor);
-      }
-
-      // 8. Footer (App Brand & Notice Generated Link)
-      const footerY = height - margin - 130;
-
-      ctx.strokeStyle = '#daa520';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(margin + 40, footerY);
-      ctx.lineTo(width - margin - 40, footerY);
-      ctx.stroke();
-
-      ctx.font = 'bold 20px Tahoma, sans-serif';
-      ctx.fillStyle = '#daa520';
-      ctx.fillText('🏛️ NEXFI NOTICE BOARD • OFFICIAL INSTITUTIONAL FLYER', margin + 40, footerY + 36);
-
-      ctx.font = 'bold 18px Tahoma, sans-serif';
-      ctx.fillStyle = isDark ? '#9ca3af' : '#4b5563';
-      ctx.fillText(`🔗 Notice URL: ${noticeUrl}`, margin + 40, footerY + 70);
-
-      ctx.font = 'italic 16px Tahoma, sans-serif';
-      ctx.fillStyle = '#888888';
-      ctx.fillText(`Generated on ${new Date().toLocaleString()} • Verified Institutional Document 🛡️`, margin + 40, footerY + 98);
-
-      // Trigger Download
-      const imageURI = canvas.toDataURL('image/png');
-      const downloadLink = document.createElement('a');
-      const safeFilename = `${orgName.replace(/\s+/g, '_')}_Flyer_${notice.id}.png`;
-      downloadLink.href = imageURI;
-      downloadLink.download = safeFilename;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-
-      const toastSuccess = await toastController.create({
-        message: `📥 Official Notice Flyer downloaded: ${safeFilename}`,
-        duration: 3000,
-        color: 'success',
-        position: 'bottom'
-      });
-      await toastSuccess.present();
     },
     async shareNotice(notice) {
       if (!notice) return;
@@ -1410,14 +1437,22 @@ export default {
             text: '💚 Share via WhatsApp',
             handler: () => {
               const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
-              window.open(waUrl, '_blank', 'noopener,noreferrer');
+              if (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform()) {
+                window.open(waUrl, '_system');
+              } else {
+                window.open(waUrl, '_blank', 'noopener,noreferrer');
+              }
             }
           },
           {
             text: '✈️ Share via Telegram',
             handler: () => {
               const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(noticeUrl)}&text=${encodeURIComponent(`📢 *${orgName}* - ${title}`)}`;
-              window.open(tgUrl, '_blank', 'noopener,noreferrer');
+              if (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform()) {
+                window.open(tgUrl, '_system');
+              } else {
+                window.open(tgUrl, '_blank', 'noopener,noreferrer');
+              }
             }
           },
           {
@@ -1427,13 +1462,13 @@ export default {
                 await navigator.clipboard.writeText(noticeUrl);
                 const toast = await toastController.create({
                   message: '📋 Direct notice link copied to clipboard!',
-                  duration: 2200,
+                  duration: 2500,
                   color: 'success',
                   position: 'bottom'
                 });
                 await toast.present();
               } catch (e) {
-                console.warn('Clipboard copy fallback:', e);
+                console.warn('Clipboard copy error:', e);
               }
             }
           },
@@ -1447,7 +1482,9 @@ export default {
                   url: noticeUrl
                 });
               } catch (e) {
-                console.warn('Web Share cancelled:', e);
+                if (e.name !== 'AbortError') {
+                  console.warn('Native share error:', e);
+                }
               }
             }
           }] : []),
@@ -1540,7 +1577,7 @@ export default {
 
       if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
         const toast = await toastController.create({
-          message: 'Text-to-Speech is not supported on this browser.',
+          message: 'Text-to-Speech is not supported on this device/browser.',
           duration: 2000,
           color: 'warning',
           position: 'bottom'
@@ -1556,7 +1593,10 @@ export default {
         return;
       }
 
-      // Cancel any ongoing speech
+      // Cancel any ongoing speech and ensure WebView SpeechSynthesis engine is resumed
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
       window.speechSynthesis.cancel();
       this.speakingNoticeId = notice.id;
 
@@ -1582,46 +1622,65 @@ export default {
         }
       }
 
-      const textToRead = `${readTitle}. ${readBody}`;
-      const utterance = new SpeechSynthesisUtterance(textToRead);
+      const playSpeech = () => {
+        const textToRead = `${readTitle}. ${readBody}`;
+        const utterance = new SpeechSynthesisUtterance(textToRead);
 
-      // Map app setting language ('en', 'sw', 'fr') to SpeechSynthesis BCP 47 language code
-      const langCodeMap = {
-        en: 'en-US',
-        sw: 'sw-KE',
-        fr: 'fr-FR'
-      };
-      const targetCode = langCodeMap[targetLang] || 'en-US';
-      utterance.lang = targetCode;
-      utterance.rate = 0.92;
-      utterance.pitch = 1.0;
+        const langCodeMap = {
+          en: 'en-US',
+          sw: 'sw-KE',
+          fr: 'fr-FR'
+        };
+        const targetCode = langCodeMap[targetLang] || 'en-US';
+        utterance.lang = targetCode;
+        utterance.rate = 0.92;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
 
-      // Select matching voice for the target language if available
-      const voices = window.speechSynthesis.getVoices();
-      if (voices && voices.length) {
-        const matchedVoice = voices.find(v => 
-          v.lang.toLowerCase() === targetCode.toLowerCase() || 
-          v.lang.toLowerCase().startsWith(targetLang)
-        );
-        if (matchedVoice) {
-          utterance.voice = matchedVoice;
+        const voices = window.speechSynthesis.getVoices();
+        if (voices && voices.length) {
+          const matchedVoice = voices.find(v => 
+            v.lang.toLowerCase() === targetCode.toLowerCase() || 
+            v.lang.toLowerCase().startsWith(targetLang)
+          );
+          if (matchedVoice) {
+            utterance.voice = matchedVoice;
+          }
         }
+
+        utterance.onstart = () => {
+          console.log('🗣️ Text-to-speech started');
+        };
+
+        utterance.onend = () => {
+          if (this.speakingNoticeId === notice.id) {
+            this.speakingNoticeId = null;
+          }
+        };
+
+        utterance.onerror = (err) => {
+          console.warn('SpeechSynthesis error:', err);
+          if (this.speakingNoticeId === notice.id) {
+            this.speakingNoticeId = null;
+          }
+        };
+
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+        window.speechSynthesis.speak(utterance);
+      };
+
+      // Android WebView voice loading workaround
+      if (window.speechSynthesis.getVoices().length === 0) {
+        window.speechSynthesis.onvoiceschanged = () => {
+          playSpeech();
+          window.speechSynthesis.onvoiceschanged = null;
+        };
+        setTimeout(playSpeech, 150);
+      } else {
+        playSpeech();
       }
-
-      utterance.onend = () => {
-        if (this.speakingNoticeId === notice.id) {
-          this.speakingNoticeId = null;
-        }
-      };
-
-      utterance.onerror = (err) => {
-        console.warn('SpeechSynthesis error:', err);
-        if (this.speakingNoticeId === notice.id) {
-          this.speakingNoticeId = null;
-        }
-      };
-
-      window.speechSynthesis.speak(utterance);
     },
     handleScroll(event) {
       const scrollTop = event?.detail?.scrollTop || window.scrollY || document.documentElement.scrollTop || 0;

@@ -118,6 +118,123 @@
           </div>
         </div>
 
+        <!-- 📱 Install Mobile App Section -->
+        <div class="settings-card install-card">
+          <div class="card-header">
+            <ion-icon :icon="downloadOutline" class="section-icon"></ion-icon>
+            <div>
+              <h3>Install NEXFI Mobile App</h3>
+              <p class="section-desc">Download native APK, iOS profile, or 1-click PWA</p>
+            </div>
+          </div>
+
+          <!-- Install Platform Selector Tabs -->
+          <div class="install-tabs-grid">
+            <button 
+              class="install-tab" 
+              :class="{ 'install-tab--active': activeInstallTab === 'android' }"
+              @click="activeInstallTab = 'android'"
+            >
+              <span class="tab-emoji">🤖</span>
+              <span>Android (.APK)</span>
+            </button>
+
+            <button 
+              class="install-tab" 
+              :class="{ 'install-tab--active': activeInstallTab === 'pwa' }"
+              @click="activeInstallTab = 'pwa'"
+            >
+              <span class="tab-emoji">⚡</span>
+              <span>PWA App</span>
+            </button>
+
+            <button 
+              class="install-tab" 
+              :class="{ 'install-tab--active': activeInstallTab === 'ios' }"
+              @click="activeInstallTab = 'ios'"
+            >
+              <span class="tab-emoji">🍏</span>
+              <span>iOS (iPhone)</span>
+            </button>
+          </div>
+
+          <!-- Tab 1: Android (.APK Direct Download & Progress Bar) -->
+          <div v-if="activeInstallTab === 'android'" class="install-tab-content">
+            <div class="install-info-box">
+              <p class="install-instruction">
+                <strong>Direct Android Package:</strong> Download the official Bugema Digital Notice Board <code>.apk</code> installer directly to your Android device.
+              </p>
+            </div>
+
+            <!-- Live Download Progress Bar -->
+            <div v-if="apkDownloading" class="progress-wrap">
+              <div class="progress-info-row">
+                <span>Downloading APK...</span>
+                <span>{{ apkProgress }}%</span>
+              </div>
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" :style="{ width: apkProgress + '%' }"></div>
+              </div>
+            </div>
+
+            <!-- Download Completed State -->
+            <div v-else-if="apkDownloaded" class="download-completed-box">
+              <span class="ready-badge">✅ APK Download Complete (100%)</span>
+              <p class="ready-desc">Tap <strong>Open & Install APK</strong> below to trigger Android package installer on your phone!</p>
+              <ion-button expand="block" class="install-action-btn" @click="openDownloadedApk">
+                <ion-icon :icon="folderOpenOutline" slot="start"></ion-icon>
+                Open & Install APK
+              </ion-button>
+            </div>
+
+            <!-- Initial Download Action Button -->
+            <ion-button 
+              v-else 
+              expand="block" 
+              class="install-action-btn" 
+              @click="startApkDownload"
+            >
+              <ion-icon :icon="arrowDownCircleOutline" slot="start"></ion-icon>
+              Download & Install Android APK
+            </ion-button>
+          </div>
+
+          <!-- Tab 2: PWA Instant Installation -->
+          <div v-else-if="activeInstallTab === 'pwa'" class="install-tab-content">
+            <div class="install-info-box">
+              <p class="install-instruction">
+                <strong>Instant PWA Installation:</strong> Install the full-screen Bugema Notice Board directly onto your phone or computer home screen without app stores!
+              </p>
+            </div>
+
+            <ion-button expand="block" class="install-action-btn pwa-btn" @click="installPWA">
+              <ion-icon :icon="flashOutline" slot="start"></ion-icon>
+              1-Click Install PWA Web App
+            </ion-button>
+
+            <p v-if="pwaMessage" class="pwa-status-msg">{{ pwaMessage }}</p>
+          </div>
+
+          <!-- Tab 3: iOS Installation Instructions -->
+          <div v-else-if="activeInstallTab === 'ios'" class="install-tab-content">
+            <div class="install-info-box">
+              <p class="install-instruction">
+                <strong>iOS Home Screen App:</strong>
+              </p>
+              <ol class="ios-steps-list">
+                <li>Open this site in <strong>Safari</strong> on your iPhone / iPad.</li>
+                <li>Tap the <strong>Share</strong> button (bottom toolbar).</li>
+                <li>Scroll down & tap <strong>Add to Home Screen ➕</strong>.</li>
+              </ol>
+            </div>
+
+            <ion-button expand="block" fill="outline" class="ios-action-btn" @click="copyIosShareLink">
+              <ion-icon :icon="copyOutline" slot="start"></ion-icon>
+              Copy Link for Safari
+            </ion-button>
+          </div>
+        </div>
+
         <div class="settings-footer-btn">
           <ion-button expand="block" class="done-btn" @click="close">
             {{ t('close') }}
@@ -132,12 +249,14 @@
 <script>
 import {
   IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons,
-  IonButton, IonIcon, IonToggle
+  IonButton, IonIcon, IonToggle, toastController
 } from '@ionic/vue';
 import {
   settingsOutline, closeOutline, moonOutline, languageOutline,
-  checkmarkCircle, colorWandOutline
+  checkmarkCircle, colorWandOutline, downloadOutline,
+  arrowDownCircleOutline, folderOpenOutline, flashOutline, copyOutline
 } from 'ionicons/icons';
+import axios from 'axios';
 import { i18nState, t, setLanguage, setTheme, setAutoTranslate } from '@/utils/i18n.js';
 
 export default {
@@ -158,8 +277,29 @@ export default {
       languageOutline,
       checkmarkCircle,
       colorWandOutline,
-      i18nState
+      downloadOutline,
+      arrowDownCircleOutline,
+      folderOpenOutline,
+      flashOutline,
+      copyOutline,
+      i18nState,
+      activeInstallTab: 'android',
+      apkDownloading: false,
+      apkProgress: 0,
+      apkDownloaded: false,
+      apkBlobUrl: null,
+      pwaMessage: null,
+      deferredPrompt: typeof window !== 'undefined' ? (window.deferredPwaPrompt || null) : null
     };
+  },
+  mounted() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.deferredPwaPrompt = e;
+        this.deferredPrompt = e;
+      });
+    }
   },
   methods: {
     t,
@@ -168,8 +308,6 @@ export default {
     },
     changeLang(lang) {
       setLanguage(lang);
-      // Selecting a language other than English automatically turns on
-      // notice translation, so notices switch immediately.
       if (lang !== 'en') {
         setAutoTranslate(true);
       }
@@ -179,6 +317,80 @@ export default {
     },
     toggleAutoTrans(checked) {
       setAutoTranslate(checked);
+    },
+    async startApkDownload() {
+      this.apkDownloading = true;
+      this.apkProgress = 0;
+      this.apkDownloaded = false;
+
+      try {
+        const response = await axios.get('/downloads/nexfi-bugema.apk', {
+          responseType: 'blob',
+          onDownloadProgress: (progressEvent) => {
+            const total = progressEvent.total || 500000;
+            const percent = Math.round((progressEvent.loaded * 100) / total);
+            this.apkProgress = Math.min(percent, 100);
+          }
+        });
+
+        this.apkProgress = 100;
+        const blob = new Blob([response.data], { type: 'application/vnd.android.package-archive' });
+        this.apkBlobUrl = window.URL.createObjectURL(blob);
+        this.apkDownloaded = true;
+
+        const toast = await toastController.create({
+          message: '📦 APK downloaded (100%)! Tap "Open & Install APK".',
+          duration: 3000,
+          color: 'success',
+          position: 'bottom'
+        });
+        await toast.present();
+      } catch (err) {
+        console.warn('Apk download fallback:', err);
+        this.openDownloadedApk();
+      } finally {
+        this.apkDownloading = false;
+      }
+    },
+    openDownloadedApk() {
+      const apkUrl = this.apkBlobUrl || '/downloads/nexfi-bugema.apk';
+      const link = document.createElement('a');
+      link.href = apkUrl;
+      link.setAttribute('download', 'nexfi-bugema.apk');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    },
+    async installPWA() {
+      const promptEvent = this.deferredPrompt || window.deferredPwaPrompt;
+      if (promptEvent) {
+        promptEvent.prompt();
+        const choiceResult = await promptEvent.userChoice;
+        if (choiceResult.outcome === 'accepted') {
+          this.pwaMessage = '🎉 PWA installed successfully on your home screen!';
+        } else {
+          this.pwaMessage = 'PWA installation cancelled.';
+        }
+        window.deferredPwaPrompt = null;
+        this.deferredPrompt = null;
+      } else {
+        this.pwaMessage = '💡 To install PWA: Open browser menu (⋮ or Share) and select "Add to Home Screen" or "Install App".';
+      }
+    },
+    async copyIosShareLink() {
+      const currentUrl = window.location.origin + window.location.pathname;
+      try {
+        await navigator.clipboard.writeText(currentUrl);
+        const toast = await toastController.create({
+          message: '📋 Link copied! Open in Safari and tap Share ➔ Add to Home Screen.',
+          duration: 3000,
+          color: 'success',
+          position: 'bottom'
+        });
+        await toast.present();
+      } catch (e) {
+        console.warn('Copy link error:', e);
+      }
     }
   }
 };
@@ -349,5 +561,171 @@ export default {
   font-weight: 800;
   border-radius: 12px;
   margin-top: 8px;
+}
+
+/* 📱 Install App Section Styles */
+.install-card {
+  border-color: rgba(218, 165, 32, 0.35);
+  background: linear-gradient(180deg, rgba(218, 165, 32, 0.05) 0%, var(--ion-card-background, #ffffff) 100%);
+}
+
+.install-tabs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.install-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(218, 165, 32, 0.2);
+  background: rgba(218, 165, 32, 0.05);
+  color: var(--ion-text-color, #374151);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.install-tab--active {
+  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  color: #000000 !important;
+  border-color: transparent !important;
+  font-weight: 800 !important;
+  box-shadow: 0 3px 10px rgba(218, 165, 32, 0.3);
+}
+
+.tab-emoji {
+  font-size: 1.2rem;
+}
+
+.install-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.install-info-box {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.install-instruction {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ion-text-color, #374151);
+  line-height: 1.4;
+}
+
+/* Progress Bar */
+.progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background: rgba(218, 165, 32, 0.08);
+  border-radius: 12px;
+  border: 1px solid rgba(218, 165, 32, 0.3);
+}
+
+.progress-info-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #b38209;
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #d4af37, #ffd700);
+  border-radius: 10px;
+  transition: width 0.2s ease-out;
+}
+
+.download-completed-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+
+.ready-badge {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #10b981;
+}
+
+.ready-desc {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.install-action-btn {
+  --background: linear-gradient(135deg, #d4af37, #ffd700);
+  --color: #000000;
+  font-weight: 800;
+  border-radius: 12px;
+  font-size: 0.88rem;
+}
+
+.ios-action-btn {
+  --border-color: #daa520;
+  --color: #daa520;
+  font-weight: 700;
+  border-radius: 12px;
+}
+
+.pwa-btn {
+  --background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  --color: #ffffff;
+}
+
+.pwa-status-msg {
+  font-size: 0.8rem;
+  color: #b38209;
+  margin: 4px 0 0 0;
+  text-align: center;
+  font-weight: 600;
+}
+
+.ios-steps-list {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  font-size: 0.8rem;
+  color: var(--ion-text-color, #374151);
+  line-height: 1.5;
+}
+
+body.dark .install-card {
+  background: linear-gradient(180deg, rgba(218, 165, 32, 0.1) 0%, #16181c 100%) !important;
+}
+
+body.dark .install-info-box {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 </style>

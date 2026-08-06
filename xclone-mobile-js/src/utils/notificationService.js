@@ -513,8 +513,8 @@ class NotificationService {
     async triggerNoticeNotification(payload) {
         if (!payload) return;
 
-        const orgName = payload.org_name || 'Notice Board';
-        const deptName = payload.dept_name || payload.notice?.dept_name || 'General Office';
+        const orgName = payload.org_name || 'Bugema University';
+        const deptName = payload.dept_name || payload.notice?.dept_name || 'Notice Board';
         const title = payload.title || payload.notice?.title || 'New Announcement';
         const rawBody = payload.body || payload.notice?.body || '';
 
@@ -528,19 +528,41 @@ class NotificationService {
 
         console.log('🔔 Triggering Notice System Tray Notification:', { notifTitle, notifBody, targetUrl });
 
+        // Play sound & Haptics vibration unconditionally
+        this.playSound();
+
         const isNative = Capacitor.isNativePlatform();
 
-        // Native (Android): the backend now sends FCM notification+data messages,
-        // which the Android OS renders itself — tray + sound + vibration — in ALL
-        // app states (open, background, killed). Scheduling a local notification
-        // here too would produce duplicates, so native delegates entirely to FCM.
-        if (isNative) return;
+        if (isNative) {
+            // Schedule Local System Tray Notification on Android
+            if (LocalNotifications && LocalNotifications.schedule) {
+                try {
+                    await LocalNotifications.schedule({
+                        notifications: [{
+                            title: notifTitle,
+                            body: notifBody,
+                            id: Math.floor(Date.now() % 1000000),
+                            schedule: { at: new Date(Date.now() + 50) },
+                            channelId: 'notices',
+                            extra: {
+                                url: targetUrl,
+                                org_slug: payload.org_slug || 'bugema',
+                                notice_id: payload.notice_id
+                            }
+                        }]
+                    });
+                    console.log('✅ Android System Tray Notification scheduled successfully');
+                } catch (err) {
+                    console.warn('LocalNotification schedule warning:', err);
+                }
+            }
+            return;
+        }
 
         // Web & Desktop: vibration + sound + tray pop-up
         if ('vibrate' in navigator) {
-            navigator.vibrate([200, 100, 200, 100, 200]);
+            navigator.vibrate([300, 100, 300, 100, 300]);
         }
-        this.playSound();
         this.showWebNotification(notifTitle, notifBody, '/logo.png', {
             url: targetUrl,
             org_slug: payload.org_slug,

@@ -63,67 +63,43 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         super.onMessageReceived(remoteMessage);
         Log.i(TAG, "FCM message received from: " + remoteMessage.getFrom());
 
-        // Combined notification+data messages: Google Play services has ALREADY
-        // rendered the tray notification (using the channel we specify in the
-        // backend's AndroidNotification). Posting another one here would create a
-        // duplicate, so let the system handle those and only build notifications
-        // ourselves for legacy pure data-only messages.
-        if (remoteMessage.getNotification() != null) {
-            Log.d(TAG, "System-displayed notification payload — skipping custom post");
-            return;
-        }
-
-        // Extract title/body exclusively from the DATA payload (data-only strategy)
         String title = null;
         String body = null;
 
-        Map<String, String> data = remoteMessage.getData();
-        if (data != null && !data.isEmpty()) {
-            title = data.get("title");
-            body = data.get("body");
-            Log.d(TAG, "Data payload — title: " + title + ", type: " + data.get("type") + ", org_slug: " + data.get("org_slug"));
-        }
-
-        // Fallback: also check notification payload (defensive, for any legacy messages)
-        if ((title == null || title.isEmpty()) && remoteMessage.getNotification() != null) {
+        if (remoteMessage.getNotification() != null) {
             title = remoteMessage.getNotification().getTitle();
             body = remoteMessage.getNotification().getBody();
         }
 
-        // Final fallback defaults
+        Map<String, String> data = remoteMessage.getData();
+        if (data != null && !data.isEmpty()) {
+            if (title == null || title.isEmpty()) title = data.get("title");
+            if (body == null || body.isEmpty()) body = data.get("body");
+            Log.d(TAG, "Data payload — title: " + title + ", type: " + data.get("type") + ", org_slug: " + data.get("org_slug"));
+        }
+
         if (title == null || title.isEmpty()) title = "Bugema Notice Board";
         if (body == null || body.isEmpty()) body = "A new notice has been posted";
 
-        // Determine channel and notification type
         String type = (data != null) ? data.getOrDefault("type", "notice") : "notice";
         String channelId = getChannelForType(type);
 
-        // Build and show the system tray notification
         showSystemNotification(title, body, channelId, data);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // showSystemNotification — posts a notification to the Android system tray.
-    // Tapping it opens MainActivity (the app) and passes the data as extras so
-    // the JavaScript router can navigate to the right page.
-    // ─────────────────────────────────────────────────────────────────────────
     private void showSystemNotification(String title, String body, String channelId,
                                         Map<String, String> data) {
-        // Ensure channel exists (safe to call multiple times)
         ensureChannelsExist();
 
-        // Intent that opens the app when the notification is tapped
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
 
-        // Pass FCM data to the app so JS can navigate to the right page
         if (data != null) {
             for (Map.Entry<String, String> entry : data.entrySet()) {
                 intent.putExtra(entry.getKey(), entry.getValue());
             }
         }
 
-        // Deep-link path for the notice board (e.g. /tabs/notices/bugema)
         String orgSlug = (data != null) ? data.getOrDefault("org_slug", "bugema") : "bugema";
         intent.putExtra("deepLink", "/tabs/notices/" + orgSlug);
 
@@ -139,8 +115,6 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 flags
         );
 
-        // Choose the small icon — use the app's default notification icon
-        // (ic_stat_icon_config_sample is the Capacitor default; falls back to app icon)
         int smallIconRes;
         try {
             smallIconRes = getResources().getIdentifier(
@@ -163,8 +137,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_EVENT)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)   // sound + vibration
-                .setAutoCancel(true)                            // dismiss on tap
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI)
+                .setVibrate(new long[]{0, 300, 100, 300, 100, 300})
+                .setAutoCancel(true)
                 .setContentIntent(pendingIntent)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
@@ -172,7 +148,6 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
         int notifId = notificationIdCounter.getAndIncrement();
-        // Roll over after 1 million to avoid overflow
         if (notifId > 1_999_999) notificationIdCounter.set(1000);
 
         manager.notify(notifId, builder.build());
