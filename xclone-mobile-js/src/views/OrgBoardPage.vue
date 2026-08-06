@@ -537,9 +537,12 @@
                     </div>
                   </div>
                   <div class="notice-badges">
-                    <!-- ✨ NEW Unread Badge -->
-                    <span v-if="isNoticeUnread(notice)" class="new-unread-badge" title="New notice posted since your last visit">
+                    <!-- ✨ NEW Unread Badge (Clickable to mark as read) -->
+                    <button v-if="isNoticeUnread(notice)" class="new-unread-badge" @click.stop="markNoticeAsRead(notice)" title="Click to mark notice as read">
                       ✨ NEW
+                    </button>
+                    <span v-else class="read-done-badge" title="Notice read">
+                      ✓ Read
                     </span>
                     <span class="cat-badge" :class="'cat-badge--' + (notice.category || 'general').toLowerCase()">
                       {{ notice.category || 'General' }}
@@ -1018,6 +1021,9 @@ export default {
       _pollInterval: null,
       _lastKnownNoticeId: null,
       expandedNotices: {},
+      speakingNoticeId: null,
+      readNoticeIds: new Set(),
+      _ttsAudio: null,
     };
   },
   computed: {
@@ -1163,16 +1169,49 @@ export default {
   },
   methods: {
     isNoticeUnread(notice) {
-      if (!notice || !notice.created_at) return false;
+      if (!notice) return false;
+      if (notice.is_read || (this.readNoticeIds && this.readNoticeIds.has(notice.id))) return false;
+      if (!notice.created_at) return false;
       if (!this.lastVisitTimestamp) return true;
       const createdTime = new Date(notice.created_at).getTime();
       return createdTime > Number(this.lastVisitTimestamp);
     },
-    markAllNoticesAsRead() {
+    async markNoticeAsRead(notice) {
+      if (!notice || !notice.id) return;
+      if (!this.readNoticeIds) this.readNoticeIds = new Set();
+      this.readNoticeIds.add(notice.id);
+      notice.is_read = true;
+      try {
+        await axios.post(`${this.API_URL}/api/boards/mark-read`, {
+          user_id: this.userId,
+          notice_id: notice.id
+        });
+        window.dispatchEvent(new Event('notifications-refresh'));
+      } catch (e) {
+        console.warn('markNoticeAsRead error:', e);
+      }
+    },
+    async markAllNoticesAsRead() {
       const slug = this.org?.slug || this.$route?.params?.slug || 'bugema';
       const now = Date.now();
       localStorage.setItem('last_visit_' + slug, String(now));
       this.lastVisitTimestamp = now;
+      if (!this.readNoticeIds) this.readNoticeIds = new Set();
+      const list = this.allNotices.length ? this.allNotices : (this.notices || []);
+      list.forEach(n => {
+        n.is_read = true;
+        this.readNoticeIds.add(n.id);
+      });
+      try {
+        await axios.post(`${this.API_URL}/api/boards/mark-read`, {
+          user_id: this.userId,
+          org_slug: slug,
+          all: true
+        });
+        window.dispatchEvent(new Event('notifications-refresh'));
+      } catch (e) {
+        console.warn('markAllNoticesAsRead error:', e);
+      }
       toastController.create({
         message: '✨ Marked all notices as read!',
         duration: 2000,
@@ -1572,44 +1611,38 @@ export default {
       link.click();
       document.body.removeChild(link);
     },
+    stopAudioReader() {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        try { window.speechSynthesis.cancel(); } catch (_) {}
+      }
+      if (this._ttsAudio) {
+        try {
+          this._ttsAudio.pause();
+          this._ttsAudio.currentTime = 0;
+        } catch (_) {}
+        this._ttsAudio = null;
+      }
+      this.speakingNoticeId = null;
+    },
     async toggleAudioReader(notice) {
       if (!notice) return;
 
-      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-        const toast = await toastController.create({
-          message: 'Text-to-Speech is not supported on this device/browser.',
-          duration: 2000,
-          color: 'warning',
-          position: 'bottom'
-        });
-        await toast.present();
-        return;
-      }
-
-      // If already reading this notice, stop speech!
       if (this.speakingNoticeId === notice.id) {
-        window.speechSynthesis.cancel();
-        this.speakingNoticeId = null;
+        this.stopAudioReader();
         return;
       }
 
-      // Cancel any ongoing speech and ensure WebView SpeechSynthesis engine is resumed
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-      }
-      window.speechSynthesis.cancel();
+      this.stopAudioReader();
       this.speakingNoticeId = notice.id;
 
       const targetLang = i18nState.lang || 'en'; // 'en', 'sw', 'fr'
 
-      // Clean HTML tags and whitespace from title and body
       let rawTitle = notice.title || '';
       let rawBody = (notice.body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
       let readTitle = rawTitle;
       let readBody = rawBody;
 
-      // Translate text to active user setting language if not English
       if (targetLang !== 'en') {
         try {
           const translated = await translateNotice({ title: rawTitle, body: rawBody }, targetLang);
@@ -1622,65 +1655,140 @@ export default {
         }
       }
 
-      const playSpeech = () => {
-        const textToRead = `${readTitle}. ${readBody}`;
-        const utterance = new SpeechSynthesisUtterance(textToRead);
+      const textToRead = `${readTitle}. ${readBody}`;
 
-        const langCodeMap = {
-          en: 'en-US',
-          sw: 'sw-KE',
-          fr: 'fr-FR'
-        };
-        const targetCode = langCodeMap[targetLang] || 'en-US';
-        utterance.lang = targetCode;
-        utterance.rate = 0.92;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
+      // Tier 1: Try Native Web Speech API
+      const hasSpeech = typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
 
-        const voices = window.speechSynthesis.getVoices();
-        if (voices && voices.length) {
-          const matchedVoice = voices.find(v => 
-            v.lang.toLowerCase() === targetCode.toLowerCase() || 
-            v.lang.toLowerCase().startsWith(targetLang)
-          );
-          if (matchedVoice) {
-            utterance.voice = matchedVoice;
+      let nativeStarted = false;
+
+      if (hasSpeech) {
+        try {
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
           }
+          window.speechSynthesis.cancel();
+
+          const utterance = new SpeechSynthesisUtterance(textToRead);
+          const langCodeMap = { en: 'en-US', sw: 'sw-KE', fr: 'fr-FR' };
+          const targetCode = langCodeMap[targetLang] || 'en-US';
+          utterance.lang = targetCode;
+          utterance.rate = 0.92;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+
+          const voices = window.speechSynthesis.getVoices();
+          if (voices && voices.length) {
+            const matchedVoice = voices.find(v =>
+              v.lang.toLowerCase() === targetCode.toLowerCase() ||
+              v.lang.toLowerCase().startsWith(targetLang)
+            );
+            if (matchedVoice) utterance.voice = matchedVoice;
+          }
+
+          utterance.onstart = () => {
+            nativeStarted = true;
+            console.log('🗣️ Native Web Speech API started');
+          };
+
+          utterance.onend = () => {
+            if (this.speakingNoticeId === notice.id) {
+              this.speakingNoticeId = null;
+            }
+          };
+
+          utterance.onerror = (err) => {
+            console.warn('Native SpeechSynthesis error, switching to Audio fallback:', err);
+            if (!nativeStarted && this.speakingNoticeId === notice.id) {
+              this.playAudioTTSFallback(textToRead, targetLang, notice.id);
+            } else if (this.speakingNoticeId === notice.id) {
+              this.speakingNoticeId = null;
+            }
+          };
+
+          window.speechSynthesis.speak(utterance);
+
+          // Verify if speech starts within 800ms (Android WebView silent voice bug fallback)
+          setTimeout(() => {
+            if (!nativeStarted && this.speakingNoticeId === notice.id) {
+              if (window.speechSynthesis.speaking) {
+                return;
+              }
+              console.log('⚠️ Native SpeechSynthesis silent timeout — triggering Audio TTS fallback');
+              try { window.speechSynthesis.cancel(); } catch (_) {}
+              this.playAudioTTSFallback(textToRead, targetLang, notice.id);
+            }
+          }, 800);
+
+          return;
+        } catch (err) {
+          console.warn('Native TTS execution failed:', err);
+        }
+      }
+
+      // Tier 2 Fallback: Online Audio TTS player
+      this.playAudioTTSFallback(textToRead, targetLang, notice.id);
+    },
+    playAudioTTSFallback(text, lang, noticeId) {
+      if (this.speakingNoticeId !== noticeId) return;
+
+      const langCodeMap = { en: 'en', sw: 'sw', fr: 'fr' };
+      const tl = langCodeMap[lang] || 'en';
+
+      const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+      const chunks = [];
+      let current = '';
+
+      for (const sentence of sentences) {
+        if ((current + ' ' + sentence).length < 140) {
+          current += (current ? ' ' : '') + sentence;
+        } else {
+          if (current) chunks.push(current);
+          current = sentence;
+        }
+      }
+      if (current) chunks.push(current);
+
+      let chunkIndex = 0;
+
+      const playNextChunk = () => {
+        if (this.speakingNoticeId !== noticeId || chunkIndex >= chunks.length) {
+          this.speakingNoticeId = null;
+          this._ttsAudio = null;
+          return;
         }
 
-        utterance.onstart = () => {
-          console.log('🗣️ Text-to-speech started');
+        const chunkText = chunks[chunkIndex];
+        chunkIndex++;
+
+        const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${tl}&q=${encodeURIComponent(chunkText)}`;
+
+        this._ttsAudio = new Audio(ttsUrl);
+        this._ttsAudio.volume = 1.0;
+
+        this._ttsAudio.onended = () => {
+          playNextChunk();
         };
 
-        utterance.onend = () => {
-          if (this.speakingNoticeId === notice.id) {
-            this.speakingNoticeId = null;
-          }
+        this._ttsAudio.onerror = (e) => {
+          console.warn('Audio TTS chunk playback error:', e);
+          playNextChunk();
         };
 
-        utterance.onerror = (err) => {
-          console.warn('SpeechSynthesis error:', err);
-          if (this.speakingNoticeId === notice.id) {
-            this.speakingNoticeId = null;
-          }
-        };
-
-        if (window.speechSynthesis.paused) {
-          window.speechSynthesis.resume();
-        }
-        window.speechSynthesis.speak(utterance);
+        this._ttsAudio.play().catch(err => {
+          console.warn('Audio play blocked:', err);
+          this.speakingNoticeId = null;
+          this._ttsAudio = null;
+          toastController.create({
+            message: '🔊 Tap anywhere on screen to enable audio.',
+            duration: 2000,
+            color: 'warning',
+            position: 'bottom'
+          }).then(t => t.present());
+        });
       };
 
-      // Android WebView voice loading workaround
-      if (window.speechSynthesis.getVoices().length === 0) {
-        window.speechSynthesis.onvoiceschanged = () => {
-          playSpeech();
-          window.speechSynthesis.onvoiceschanged = null;
-        };
-        setTimeout(playSpeech, 150);
-      } else {
-        playSpeech();
-      }
+      playNextChunk();
     },
     handleScroll(event) {
       const scrollTop = event?.detail?.scrollTop || window.scrollY || document.documentElement.scrollTop || 0;

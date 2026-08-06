@@ -180,6 +180,9 @@ export default {
 
     async markRead(notificationId) {
       try {
+        const item = this.notifications.find(n => n.id === notificationId);
+        if (item) item.read = 1;
+        await saveNotificationsOffline(this.notifications);
         await axios.post(`${this.API_URL}/api/notifications/mark_read`, {
           user_id: this.userId,
           notification_id: notificationId
@@ -192,10 +195,11 @@ export default {
 
     async markAllRead() {
       try {
+        this.notifications.forEach(n => { n.read = 1; });
+        await saveNotificationsOffline(this.notifications);
         await axios.post(`${this.API_URL}/api/notifications/mark_all_read`, {
           user_id: this.userId
         });
-        await this.loadNotifications();
         window.dispatchEvent(new Event('notifications-refresh'));
       } catch (e) {
         console.error('Mark all read error:', e);

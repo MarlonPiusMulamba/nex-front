@@ -408,34 +408,32 @@ class NotificationService {
     }
 
     playSound() {
-        if (this.audio) {
-            try {
-                // Reset and maximize volume
-                this.audio.currentTime = 0;
-                this.audio.volume = 1.0;
-
-                // Play with promise handling for mobile browsers
-                const playPromise = this.audio.play();
-
-                if (playPromise !== undefined) {
-                    playPromise
-                        .then(() => {
-                            console.log('✓ Notification sound played');
-                        })
-                        .catch(err => {
-                            console.warn('Sound play blocked (user interaction required):', err);
-                        });
-                }
-
-                // Native Android vibration via Capacitor Haptics plugin
-                if (Capacitor.isNativePlatform()) {
-                    Haptics.vibrate({ duration: 500 }).catch(() => {});
-                } else if ('vibrate' in navigator) {
-                    navigator.vibrate([200, 100, 200, 100, 200]); // Strong vibration pattern
-                }
-            } catch (err) {
-                console.error('Error playing notification sound:', err);
+        try {
+            if (!this.audio) {
+                this.audio = new Audio('/msg-ton.mp3');
             }
+            this.audio.currentTime = 0;
+            this.audio.volume = 1.0;
+
+            const playPromise = this.audio.play();
+
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        console.log('✓ Notification sound played');
+                    })
+                    .catch(err => {
+                        console.warn('Sound play blocked (interaction needed):', err);
+                    });
+            }
+
+            if (Capacitor.isNativePlatform()) {
+                Haptics.vibrate({ duration: 500 }).catch(() => {});
+            } else if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                navigator.vibrate([300, 100, 300, 100, 300]);
+            }
+        } catch (err) {
+            console.error('Error playing notification sound:', err);
         }
     }
 
