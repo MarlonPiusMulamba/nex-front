@@ -1,0 +1,9 @@
+node_modules
+electron
+android
+ios
+platforms
+dist
+.vercel
+.git
+*.map
