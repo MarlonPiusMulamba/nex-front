@@ -75,7 +75,22 @@ self.addEventListener('push', function (event) {
         );
     }
 
-    event.waitUntil(self.registration.showNotification(data.title || 'NexFi', options));
+    // Phoenix-style: heads-up banner over whatever is open, then auto-dismiss ~3s.
+    // Calls stay until answered (requireInteraction), so don't auto-close those.
+    const closeAfterMs = isCall || isMissedCall ? null : 3200;
+
+    event.waitUntil(
+        self.registration.showNotification(data.title || 'NexFi', options).then(() => {
+            if (closeAfterMs) {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        self.registration.getNotifications().then(ns => ns.forEach(n => n.close()));
+                        resolve();
+                    }, closeAfterMs);
+                });
+            }
+        })
+    );
 });
 
 self.addEventListener('notificationclick', function (event) {

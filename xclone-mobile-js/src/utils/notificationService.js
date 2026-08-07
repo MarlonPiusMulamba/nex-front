@@ -608,6 +608,12 @@ class NotificationService {
                         data: { ...extraData, url: targetUrl }
                     });
                     this.playSound(soundType);
+                    // Phoenix-style auto-dismiss ~3s (keep calls until answered)
+                    if (soundType !== 'call') {
+                        setTimeout(() => {
+                            registration.getNotifications().then(ns => ns.forEach(n => n.close()));
+                        }, 3200);
+                    }
                     return;
                 }
             }
@@ -634,6 +640,10 @@ class NotificationService {
                 }
                 notification.close();
             };
+            // Phoenix-style auto-dismiss ~3s (keep calls until answered)
+            if (soundType !== 'call') {
+                setTimeout(() => notification.close(), 3200);
+            }
         } catch (err) {
             console.error('❌ Error showing web notification:', err);
             this.playSound(soundType);
