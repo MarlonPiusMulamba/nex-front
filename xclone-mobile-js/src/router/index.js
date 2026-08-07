@@ -18,7 +18,7 @@ import NoticeBoardPage from '../views/NoticeBoardPage.vue';
 import OrgBoardPage from '../views/OrgBoardPage.vue';
 import OrgAuthPage from '../views/OrgAuthPage.vue';
 
-const standaloneOrg = import.meta.env.VITE_STANDALONE_ORG || null;
+const standaloneOrg = (import.meta.env.VITE_STANDALONE_ORG || '').trim() || null;
 
 // Runtime check: launched from an installed home-screen icon (separate window, no URL bar)
 function isStandaloneMode() {
