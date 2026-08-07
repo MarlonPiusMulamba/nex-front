@@ -630,6 +630,25 @@ export default {
         window._deferredPrompt = null;
         this.deferredPrompt = null;
       } else {
+        // No native install prompt captured. Most common cause: the service worker
+        // isn't controlling the page yet. Register it and refresh once so Chrome
+        // fires beforeinstallprompt on the next load.
+        if ('serviceWorker' in navigator && !navigator.serviceWorker.controller && !sessionStorage.getItem('nexfi_pwa_bootstrap')) {
+          sessionStorage.setItem('nexfi_pwa_bootstrap', '1');
+          try {
+            const reg = await navigator.serviceWorker.register('/sw.js');
+            if (reg) {
+              this.pwaMessage = '🔄 Activating the app installer — refreshing once…';
+              navigator.serviceWorker.ready
+                .then(() => setTimeout(() => window.location.reload(), 400))
+                .catch(() => {});
+              return;
+            }
+          } catch (e) {
+            console.warn('SW bootstrap failed:', e);
+          }
+        }
+
         const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
         if (isIOS) {
           this.pwaMessage = '📱 On iPhone/iPad: Tap the Share button (square with arrow) ➔ "Add to Home Screen".';
@@ -641,10 +660,11 @@ export default {
           });
           await toast.present();
         } else {
-          this.pwaMessage = '📲 If native prompt didn\'t pop up: Tap Chrome menu (⋮ top-right) ➔ Tap "Install App".';
+          // SW is active but the browser still won't offer a real install here
+          this.pwaMessage = 'Chrome isn\'t offering a real install here. Remove any old "NEXFI" home-screen app, then open Chrome menu (⋮) ➔ "Install app".';
           const toast = await toastController.create({
-            message: '📲 Tap Chrome menu (⋮) ➔ "Install App" to complete standalone installation.',
-            duration: 4500,
+            message: 'Remove the old NEXFI icon, then ⋮ ➔ "Install app".',
+            duration: 5000,
             color: 'primary',
             position: 'bottom'
           });

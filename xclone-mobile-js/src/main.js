@@ -190,6 +190,15 @@ router.isReady()
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .then((registration) => {
           console.log('✅ PWA Service Worker Registered, scope:', registration.scope);
+          // Chrome only offers a real PWA install when a service worker is
+          // controlling the page. If it isn't yet, refresh once after the SW
+          // activates so beforeinstallprompt can fire (session-guarded, no loops).
+          if (!navigator.serviceWorker.controller && !sessionStorage.getItem('nexfi_pwa_bootstrap')) {
+            sessionStorage.setItem('nexfi_pwa_bootstrap', '1');
+            navigator.serviceWorker.ready
+              .then(() => setTimeout(() => window.location.reload(), 300))
+              .catch(() => {});
+          }
         })
         .catch((error) => {
           console.warn('[SW] Registration note:', error);
