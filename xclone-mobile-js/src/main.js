@@ -21,6 +21,27 @@ import '@ionic/vue/css/display.css';
 import './theme/variables.css';
 import './theme/desktop.css';
 
+// 🌐 PWA Install — capture the install prompt as early as possible.
+// beforeinstallprompt fires once shortly after page load; if we miss it the
+// "Install App" button can't trigger the native install dialog.
+window._pwaInstallPrompt = null;
+if (typeof window !== 'undefined' && 'onbeforeinstallprompt' in window) {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    window._pwaInstallPrompt = e;
+    // Keep legacy refs in sync for any component that still reads them
+    window.deferredPwaPrompt = e;
+    window._deferredPrompt = e;
+    window.dispatchEvent(new CustomEvent('pwa-install-prompt-ready', { detail: e }));
+  });
+  window.addEventListener('appinstalled', () => {
+    window._pwaInstallPrompt = null;
+    window.deferredPwaPrompt = null;
+    window._deferredPrompt = null;
+    window.dispatchEvent(new CustomEvent('pwa-app-installed'));
+  });
+}
+
 console.log('🚀 Step 1: Imports successful');
 
 import config from './config/index.js';

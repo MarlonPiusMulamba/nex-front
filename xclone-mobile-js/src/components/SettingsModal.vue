@@ -232,17 +232,27 @@
               </div>
             </div>
 
-            <!-- Primary Action Button: Download App -->
-            <ion-button expand="block" class="install-action-btn pwa-btn pulse-glow" @click="installPWA">
+            <!-- Already Installed State -->
+            <div v-if="isPwaInstalled || pwaInstalled" class="download-completed-box">
+              <div class="completed-badge">
+                <span>✅ Bugema Notice Board App is installed</span>
+              </div>
+              <p class="ready-desc" style="margin:0; font-size:0.8rem; color:#6b7280; line-height:1.4;">
+                Open it from your home screen — it runs full-screen just like a native app.
+              </p>
+            </div>
+
+            <!-- Primary Action Button: Install App -->
+            <ion-button v-else expand="block" class="install-action-btn pwa-btn pulse-glow" @click="installPWA">
               <ion-icon :icon="arrowDownCircleOutline" slot="start"></ion-icon>
-              Download App
+              Install App
             </ion-button>
 
             <!-- Installation Guide Card -->
             <div class="manual-install-card pwa-guide-card" style="margin-top: 12px;">
               <h4 class="install-guide-title">📲 How to Install Standalone Web App:</h4>
               <ol class="manual-steps-list">
-                <li>Tap <strong>Download App</strong> above (or Chrome menu <strong>⋮</strong> top-right).</li>
+                <li>Tap <strong>Install App</strong> above (or Chrome menu <strong>⋮</strong> top-right).</li>
                 <li>Tap <strong>"Install app"</strong> (or <em>"Add to Home screen" / "Create shortcut"</em> on local IP).</li>
                 <li>Tap <strong>Install / Add</strong> — Bugema Notice Board will launch as a full-screen app on your phone!</li>
               </ol>
@@ -325,14 +335,6 @@ export default {
       copyOutline,
       phonePortraitOutline,
       i18nState,
-      checkmarkCircle,
-      colorWandOutline,
-      downloadOutline,
-      arrowDownCircleOutline,
-      folderOpenOutline,
-      flashOutline,
-      copyOutline,
-      i18nState,
       activeInstallTab: 'android',
       apkDownloading: false,
       apkProgress: 0,
@@ -347,17 +349,33 @@ export default {
       pwaDownloading: false,
       pwaProgress: 0,
       pwaDownloaded: false,
+      pwaInstalled: false,
       pwaMessage: null,
-      deferredPrompt: typeof window !== 'undefined' ? (window.deferredPwaPrompt || null) : null
+      deferredPrompt: typeof window !== 'undefined' ? (window._pwaInstallPrompt || window.deferredPwaPrompt || null) : null
     };
+  },
+  computed: {
+    isPwaInstalled() {
+      if (typeof window === 'undefined') return false;
+      return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    }
   },
   mounted() {
     if (typeof window !== 'undefined') {
       window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
+        window._pwaInstallPrompt = e;
         window.deferredPwaPrompt = e;
         this.deferredPrompt = e;
       });
+      window.addEventListener('appinstalled', () => {
+        this.pwaInstalled = true;
+        this.deferredPrompt = null;
+        window._pwaInstallPrompt = null;
+        window.deferredPwaPrompt = null;
+        window._deferredPrompt = null;
+      });
+      if (this.isPwaInstalled) this.pwaInstalled = true;
     }
   },
   methods: {
@@ -529,26 +547,33 @@ export default {
       }
     },
     async installPWA() {
-      const promptEvent = this.deferredPrompt || window.deferredPwaPrompt;
+      // Use the globally-captured install prompt if this modal didn't see the event
+      const promptEvent = this.deferredPrompt || window._pwaInstallPrompt || window.deferredPwaPrompt || window._deferredPrompt;
 
-      this.pwaDownloading = true;
-      this.pwaProgress = 0;
+      if (this.isPwaInstalled) {
+        this.pwaMessage = '✅ Bugema Notice Board App is already installed on this device.';
+        return;
+      }
 
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js').catch(() => {});
       }
 
-      for (let i = 25; i <= 100; i += 25) {
-        await new Promise(r => setTimeout(r, 100));
-        this.pwaProgress = i;
-      }
-      this.pwaDownloading = false;
-
       if (promptEvent) {
+        this.pwaDownloading = true;
+        this.pwaProgress = 0;
+
+        for (let i = 25; i <= 100; i += 25) {
+          await new Promise(r => setTimeout(r, 100));
+          this.pwaProgress = i;
+        }
+        this.pwaDownloading = false;
+
         try {
           promptEvent.prompt();
           const choiceResult = await promptEvent.userChoice;
           if (choiceResult.outcome === 'accepted') {
+            this.pwaInstalled = true;
             this.pwaMessage = '🎉 Bugema Notice Board App installed as a Standalone Web App!';
             const toast = await toastController.create({
               message: '🎉 Bugema Notice Board App installed successfully!',
@@ -562,8 +587,11 @@ export default {
           }
         } catch (e) {
           console.warn('PWA prompt error:', e);
+          this.pwaMessage = 'Installation cancelled.';
         }
+        window._pwaInstallPrompt = null;
         window.deferredPwaPrompt = null;
+        window._deferredPrompt = null;
         this.deferredPrompt = null;
       } else {
         this.pwaMessage = '📲 If native prompt didn\'t pop up: Tap Chrome menu (⋮ top-right) ➔ Tap "Install App".';
