@@ -325,10 +325,11 @@ export default {
           username: this.username,
           password: this.password
         });
+        const data = response.data || response;
 
-        if (response.success) {
-          localStorage.setItem('userId', response.user_id);
-          localStorage.setItem('username', response.username);
+        if (data.success) {
+          localStorage.setItem('userId', data.user_id);
+          localStorage.setItem('username', data.username);
           
           this.showSuccess();
           
@@ -337,7 +338,7 @@ export default {
             this.$router.push('/tabs/feed');
           }, 1500);
         } else {
-          this.showAlert(response.message || 'Login failed. Please try again.');
+          this.showAlert(data.message || 'Login failed. Please try again.');
         }
       } catch (error) {
         console.error('Login error:', error);
@@ -392,12 +393,13 @@ export default {
         const response = await api.post('/api/auth/forgot-password', {
           email: this.resetEmail
         });
+        const data = response.data || response;
 
-        if (response.success) {
+        if (data.success) {
           this.resetStep = 2;
           this.showAlert('A verification code has been sent to your email');
         } else {
-          this.showAlert(response.message || 'Failed to send code');
+          this.showAlert(data.message || 'Failed to send code');
         }
       } catch (error) {
         console.error('Send OTP error:', error);
@@ -419,11 +421,12 @@ export default {
           email: this.resetEmail,
           otp: this.resetOTP
         });
+        const data = response.data || response;
 
-        if (response.success) {
+        if (data.success) {
           this.resetStep = 3;
         } else {
-          this.showAlert(response.message || 'Invalid or expired code');
+          this.showAlert(data.message || 'Invalid or expired code');
         }
       } catch (error) {
         console.error('Verify OTP error:', error);
@@ -456,12 +459,13 @@ export default {
           otp: this.resetOTP,
           new_password: this.newPassword
         });
+        const data = response.data || response;
 
-        if (response.success) {
+        if (data.success) {
           this.showAlert('Password reset successful! You can now login with your new password.');
           this.closeForgotPasswordModal();
         } else {
-          this.showAlert(response.message || 'Failed to reset password');
+          this.showAlert(data.message || 'Failed to reset password');
         }
       } catch (error) {
         console.error('Reset password error:', error);
