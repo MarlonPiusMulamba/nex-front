@@ -331,6 +331,10 @@ export default {
           localStorage.setItem('userId', data.user_id);
           localStorage.setItem('username', data.username);
           
+          if (notificationService && notificationService.initialize) {
+            notificationService.initialize(data.user_id).catch(e => console.warn('Notif init warning:', e));
+          }
+
           this.showSuccess();
           
           // Redirect to home after successful login

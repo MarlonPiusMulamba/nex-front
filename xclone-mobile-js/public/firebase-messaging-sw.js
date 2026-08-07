@@ -17,11 +17,10 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Handle background messages (when app is closed or in background)
+// Handle background messages (when app is closed or in background via FCM SDK)
 messaging.onBackgroundMessage(function (payload) {
     console.log('[firebase-messaging-sw.js] Background message received:', payload);
 
-    // Data-only FCM — everything lives in payload.data
     const data = payload.data || {};
     const notification = payload.notification || {};
 
@@ -32,7 +31,6 @@ messaging.onBackgroundMessage(function (payload) {
     const isMissedCall = data.type === 'missed_call';
     const isNotice = data.type === 'notice' || (!isCall && !isMissedCall);
 
-    // Build the target URL — notices go straight to the Bugema board
     const orgSlug = data.org_slug || 'bugema';
     const noticeUrl = `/notices/${orgSlug}`;
 
@@ -53,7 +51,7 @@ messaging.onBackgroundMessage(function (payload) {
             from_user_id: data.from_user_id,
             from_username: data.from_username
         },
-        tag: isCall ? 'nexfi-call' : (isMissedCall ? 'nexfi-missed-call' : `notice-${orgSlug}`),
+        tag: isCall ? 'nexfi-call' : (isMissedCall ? 'nexfi-missed-call' : `notice-${orgSlug}-${Date.now()}`),
         renotify: true,
         silent: false,
         actions: isCall ? [
@@ -62,7 +60,6 @@ messaging.onBackgroundMessage(function (payload) {
         ] : []
     };
 
-    // For calls, broadcast to any open clients to play ringtone
     if (isCall) {
         self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then(clients => {
             clients.forEach(client => {
@@ -74,8 +71,67 @@ messaging.onBackgroundMessage(function (payload) {
         });
     }
 
-    // Show notification in system tray (remains in tray until tapped or cleared)
     return self.registration.showNotification(title, options);
+});
+
+// Fallback Raw Push Event Listener for Chrome Background Web Push
+// Guarantees delivery even if FCM SDK skips onBackgroundMessage when app is completely closed.
+self.addEventListener('push', function (event) {
+    console.log('[firebase-messaging-sw.js] Raw Push Event received:', event);
+    if (!event.data) return;
+
+    let payload = {};
+    try {
+        payload = event.data.json();
+    } catch (e) {
+        payload = { data: { title: 'Bugema Notice Board', body: event.data.text() } };
+    }
+
+    const data = payload.data || {};
+    const notification = payload.notification || {};
+
+    const title = data.title || notification.title || 'Bugema Notice Board';
+    const body = data.body || notification.body || data.message || 'A new notice has been posted';
+
+    const isCall = data.type === 'call';
+    const isMissedCall = data.type === 'missed_call';
+    const isNotice = data.type === 'notice' || (!isCall && !isMissedCall);
+
+    const orgSlug = data.org_slug || 'bugema';
+    const noticeUrl = `/notices/${orgSlug}`;
+
+    const options = {
+        body: body,
+        icon: '/bugema-logo.png',
+        badge: '/bugema-logo.png',
+        vibrate: isCall ? [500, 200, 500, 200, 500] : [300, 100, 300],
+        requireInteraction: isCall,
+        data: {
+            url: isNotice ? noticeUrl : (data.click_action || data.url || '/'),
+            type: data.type,
+            org_slug: orgSlug,
+            call_id: data.call_id,
+            caller_username: data.caller_username
+        },
+        tag: isCall ? 'nexfi-call' : (isMissedCall ? 'nexfi-missed-call' : `notice-${orgSlug}-${Date.now()}`),
+        renotify: true,
+        silent: false
+    };
+
+    event.waitUntil(
+        self.registration.showNotification(title, options)
+    );
+});
+
+// Install & Activate Handlers to keep PWA SW active in background
+self.addEventListener('install', (event) => {
+    console.log('[firebase-messaging-sw.js] Installing...');
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+    console.log('[firebase-messaging-sw.js] Activating...');
+    event.waitUntil(self.clients.claim());
 });
 
 // Handle notification clicks
