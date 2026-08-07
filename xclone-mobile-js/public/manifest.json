@@ -15,25 +15,25 @@
     "categories": ["education", "communication"],
     "icons": [
         {
-            "src": "/logo.png",
+            "src": "/bugema-logo.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/logo.png",
+            "src": "/bugema-logo.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "maskable"
         },
         {
-            "src": "/logo.png",
+            "src": "/bugema-logo.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/logo.png",
+            "src": "/bugema-logo.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"

@@ -268,6 +268,10 @@
               </div>
             </div>
 
+            <ion-button expand="block" fill="outline" size="small" class="pwa-reset-btn" @click="resetPwaInstaller" style="margin-top:8px;">
+              ↺ Reset App Installer (fix stuck installs)
+            </ion-button>
+
             <p v-if="pwaMessage" class="pwa-status-msg" style="margin-top: 8px;">{{ pwaMessage }}</p>
           </div>
 
@@ -671,6 +675,22 @@ export default {
           await toast.present();
         }
       }
+    },
+    async resetPwaInstaller() {
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r => r.unregister()));
+        }
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+        sessionStorage.removeItem('nexfi_pwa_bootstrap');
+      } catch (e) {
+        console.warn('PWA reset error:', e);
+      }
+      window.location.reload();
     },
     async copyIosShareLink() {
       const currentUrl = window.location.origin + window.location.pathname;
