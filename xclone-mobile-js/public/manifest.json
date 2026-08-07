@@ -1,29 +1,42 @@
 {
-    "name": "NexFi — Connect Anywhere",
-    "short_name": "NexFi",
-    "description": "Offline-first P2P messaging. Chat on LAN even without internet.",
+    "name": "Bugema Notice Board",
+    "short_name": "Bugema Notice",
+    "description": "Bugema University Official Digital Notice Board & Campus Platform",
     "id": "/",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",
+    "display_override": ["standalone", "minimal-ui"],
     "orientation": "portrait",
-    "background_color": "#0d0d0f",
+    "background_color": "#0b0f14",
     "theme_color": "#daa520",
     "gcm_sender_id": "60010292286",
     "prefer_related_applications": false,
-    "categories": ["social", "communication"],
+    "categories": ["social", "communication", "education"],
     "icons": [
         {
-            "src": "logo.png",
+            "src": "/logo.png",
             "sizes": "192x192",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "any"
         },
         {
-            "src": "logo.png",
+            "src": "/logo.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "/logo.png",
             "sizes": "512x512",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "any"
+        },
+        {
+            "src": "/logo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
         }
     ],
     "shortcuts": [

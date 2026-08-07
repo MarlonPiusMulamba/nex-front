@@ -18,36 +18,49 @@ const config = {
       import.meta.env.VITE_API_URL || PRODUCTION_BACKEND,
     ].filter(Boolean),
     baseURL: (() => {
-      const envUrl = import.meta.env.VITE_API_URL;
       const isNative = Capacitor.isNativePlatform();
+
+      // 📱 Native Android/iOS APK builds MUST ALWAYS target hosted production backend (https://ssp.bugemauniv.ac.ug)
+      if (isNative) {
+        console.log('📱 Native App (Android/iOS APK) detected! Enforcing hosted backend:', PRODUCTION_BACKEND);
+        return PRODUCTION_BACKEND;
+      }
+
+      const envUrl = import.meta.env.VITE_API_URL;
       const pageHost = typeof window !== 'undefined' ? window.location.hostname : '';
       const isElectron =
         typeof window !== 'undefined' && window.process && window.process.type;
 
-      // Only treat the page as "local dev" if explicitly running a Vite dev server.
-      // Native (Android/iOS/Electron) and Vercel builds always use PRODUCTION_BACKEND.
       const isPageLocal =
-        !isNative &&
         !isElectron &&
         (pageHost === 'localhost' ||
           pageHost === '127.0.0.1' ||
           pageHost.startsWith('10.') ||
           pageHost.startsWith('192.168.') ||
-          pageHost.startsWith('172.'));
+          pageHost.startsWith('172.') ||
+          pageHost.startsWith('100.')); // Tailscale IP range
 
       let apiUrl;
 
-      if (envUrl) {
-        // Production builds: VITE_API_URL is baked in at build time from .env.production
-        // → https://ssp.bugemauniv.ac.ug
+      if (envUrl && envUrl.includes('localhost') && pageHost && pageHost !== 'localhost' && pageHost !== '127.0.0.1') {
+        // If VITE_API_URL is set to localhost but browser is on LAN IP (e.g. 10.129.128.121),
+        // rewrite API target to the host IP for live web testing
+        const port = envUrl.split(':')[2] || '5000';
+        apiUrl = `http://${pageHost}:${port.replace(/[^0-9]/g, '')}`;
+        console.log(`🌐 LAN web client detected! Dynamically binding API baseURL to ${apiUrl}`);
+      } else if (envUrl && !envUrl.includes('localhost')) {
+        // Production or explicit external URL
         apiUrl = envUrl;
         console.log('🔧 Using VITE_API_URL from environment:', envUrl);
       } else if (isPageLocal) {
-        // Vite dev server: use proxy (empty string → relative path)
-        apiUrl = '';
-        console.log('💻 Local development detected, using Vite Proxy');
+        if (pageHost && pageHost !== 'localhost' && pageHost !== '127.0.0.1') {
+          apiUrl = `http://${pageHost}:5000`;
+          console.log('💻 LAN web client detected, using direct LAN backend:', apiUrl);
+        } else {
+          apiUrl = '';
+          console.log('💻 Local development detected, using Vite Proxy');
+        }
       } else {
-        // All other cases (native without .env.production, Vercel SSR, etc.)
         apiUrl = PRODUCTION_BACKEND;
         console.log('🌐 Defaulting to production backend:', PRODUCTION_BACKEND);
       }

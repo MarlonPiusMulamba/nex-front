@@ -69,24 +69,40 @@ export default {
         const currentUserId = localStorage.getItem('userId');
         if (payload && payload.to_user_id == currentUserId) {
           notificationService.handleIncomingNotification({
-            title: 'New Message',
-            message: `${payload.from_username || 'Someone'} sent you a message`,
-            type: 'message'
+            title: `💬 ${payload.from_username || 'New Message'}`,
+            message: payload.text || 'Sent you a direct message',
+            type: 'message',
+            url: '/messages'
           });
         }
       });
 
       socket.on('notification:new', (payload) => {
         notificationService.handleIncomingNotification({
-          title: 'New Notification',
-          message: payload.message || 'You have a new notification',
-          type: payload.type || 'general'
+          title: payload.title || 'New Notification',
+          message: payload.message || 'You have a new update',
+          type: payload.type || 'general',
+          url: payload.url || '/tabs/notifications'
         });
       });
 
       socket.on('notice:new', (payload) => {
         console.log('📢 App received global notice:new event:', payload);
         notificationService.triggerNoticeNotification(payload);
+      });
+
+      socket.on('call:incoming', (payload) => {
+        console.log('📞 App received call:incoming event:', payload);
+        const currentUserId = localStorage.getItem('userId');
+        if (payload && (payload.target_user_id == currentUserId || payload.to_user_id == currentUserId)) {
+          notificationService.showWebNotification(
+            `📞 Incoming Call from ${payload.caller_username || 'Someone'}`,
+            `Incoming ${payload.media || 'voice'} call...`,
+            '/logo.png',
+            { url: `/?incomingCall=1&callId=${payload.call_id}`, ...payload },
+            'call'
+          );
+        }
       });
     }
 

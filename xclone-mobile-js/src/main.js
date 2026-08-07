@@ -164,16 +164,14 @@ router.isReady()
     app.mount('#app');
     console.log('✅ Step 7: App mounted successfully! 🎉');
 
-    // Register Service Worker only in browser (NOT in Capacitor native)
-    // SW can interfere with Capacitor WebView's request handling causing white screen
-    // Only in production — sw.js is cache-first and would serve stale dev modules
-    if (import.meta.env.PROD && 'serviceWorker' in navigator && !Capacitor.isNativePlatform()) {
+    // Register Service Worker in browser for PWA Standalone App support
+    if ('serviceWorker' in navigator && !Capacitor.isNativePlatform()) {
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .then((registration) => {
-          console.log('[SW] Registered, scope:', registration.scope);
+          console.log('✅ PWA Service Worker Registered, scope:', registration.scope);
         })
         .catch((error) => {
-          console.warn('[SW] Registration failed:', error);
+          console.warn('[SW] Registration note:', error);
         });
     } else if (Capacitor.isNativePlatform()) {
       console.log('[SW] Skipping service worker registration in Capacitor native');

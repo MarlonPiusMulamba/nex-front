@@ -12,6 +12,7 @@ const VAPID_PUBLIC_KEY = 'BM4kNY416wmRy8ScGUy04HoAhqv_daS-_atWTLNC0T9GhKJy0SmQxT
 class NotificationService {
     constructor() {
         this.audio = null;
+        this.audioContext = null;
         this.isInitialized = false;
         this.userId = null;
         if (typeof window !== 'undefined') {
@@ -22,34 +23,49 @@ class NotificationService {
     async initialize(userId) {
         this.userId = userId;
 
-        // Load notification sound with higher volume
+        // Preload default notice audio
         this.audio = new Audio('/msg-ton.mp3');
-        this.audio.volume = 1.0; // Maximum volume
-        this.audio.preload = 'auto'; // Preload for faster playback
+        this.audio.volume = 1.0;
+        this.audio.preload = 'auto';
 
-        // Enable audio on first user interaction (required for mobile browsers)
+        // Enable Web Audio & HTML5 audio on first user interaction (click, touch, keydown)
         const enableAudio = () => {
+            try {
+                if (!this.audioContext && (window.AudioContext || window.webkitAudioContext)) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.audioContext = new AudioCtx();
+                }
+                if (this.audioContext && this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
+                }
+            } catch (e) {
+                console.warn('AudioContext init note:', e);
+            }
+
             if (this.audio) {
                 this.audio.play().then(() => {
                     this.audio.pause();
                     this.audio.currentTime = 0;
-                    console.log('✓ Audio enabled for notifications');
+                    console.log('✓ HTML5 Audio & AudioContext unlocked for notifications');
                 }).catch(() => { });
-                // Remove listeners after first interaction
-                document.removeEventListener('click', enableAudio);
-                document.removeEventListener('touchstart', enableAudio);
             }
+
+            document.removeEventListener('click', enableAudio);
+            document.removeEventListener('touchstart', enableAudio);
+            document.removeEventListener('keydown', enableAudio);
         };
+
         document.addEventListener('click', enableAudio, { once: true });
         document.addEventListener('touchstart', enableAudio, { once: true });
+        document.addEventListener('keydown', enableAudio, { once: true });
 
         // Check if we're in a browser environment
         const isSecure = typeof window !== 'undefined' && window.isSecureContext;
-        console.log('🛡️  Secure Context:', isSecure);
+        console.log('🛡️ Secure Context:', isSecure);
         console.log('📢 Notification Supported:', (typeof window !== 'undefined' && 'Notification' in window));
 
         if (typeof window !== 'undefined' && 'Notification' in window) {
-            // Check if we have an old legacy token (JSON format) and clear it to force re-registration
+            // Clear legacy token format if present
             const storedToken = localStorage.getItem('fcm_token');
             if (storedToken && storedToken.trim().startsWith('{')) {
                 console.log('🧹 Clearing legacy Web Push token to force FCM upgrade');
@@ -58,16 +74,11 @@ class NotificationService {
             }
 
             await this.requestWebPermission();
-            // This part is crucial for FCM. It needs a service worker to handle messages.
-            // The Firebase SDK will automatically register its own 'firebase-messaging-sw.js'
-            // or use an existing one if configured correctly.
-            // You might not need to call registerServiceWorker() directly here if Firebase handles it.
-            // However, if you have custom logic in sw.js that needs to run, keep it.
         } else if (typeof window !== 'undefined' && !isSecure) {
             console.warn('⚠️ Notifications disabled because this is not a secure context (HTTPS required)');
         }
 
-        // Initialize mobile push if on a native platform (Android/iOS APK)
+        // Initialize mobile push if on native platform (Android APK)
         const isNative = Capacitor.isNativePlatform();
         console.log('📱 Capacitor isNativePlatform:', isNative);
 
@@ -85,16 +96,136 @@ class NotificationService {
         }, 10000);
     }
 
-    // Keep this if you have custom service worker logic, otherwise Firebase will manage its own.
-    async registerServiceWorker() {
-        // Only register the cache-first sw.js in production to avoid stale dev bundles
-        if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-            try {
-                const registration = await navigator.serviceWorker.register('/sw.js');
-                console.log('✓ Service Worker registered:', registration.scope);
-            } catch (error) {
-                console.error('❌ Service Worker registration failed:', error);
+    // Web Audio API Synthesizer fallback if HTML5 Audio is blocked or missing
+    playSynthBeep(type = 'notice') {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+
+            if (!this.audioContext) {
+                this.audioContext = new AudioCtx();
             }
+
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume();
+            }
+
+            const ctx = this.audioContext;
+            const now = ctx.currentTime;
+
+            if (type === 'call') {
+                // Dual-tone ringing chime
+                [523.25, 659.25, 783.99].forEach((freq, index) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + index * 0.15);
+
+                    gain.gain.setValueAtTime(0, now + index * 0.15);
+                    gain.gain.linearRampToValueAtTime(0.2, now + index * 0.15 + 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.15 + 0.3);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc.start(now + index * 0.15);
+                    osc.stop(now + index * 0.15 + 0.35);
+                });
+            } else if (type === 'message') {
+                // Subtle pop/chirp chime
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(880, now);
+                osc.frequency.exponentialRampToValueAtTime(440, now + 0.15);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.16);
+            } else {
+                // Two-tone announcement chime (Notice)
+                [587.33, 880].forEach((freq, index) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + index * 0.12);
+
+                    gain.gain.setValueAtTime(0, now + index * 0.12);
+                    gain.gain.linearRampToValueAtTime(0.25, now + index * 0.12 + 0.03);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.12 + 0.25);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc.start(now + index * 0.12);
+                    osc.stop(now + index * 0.12 + 0.28);
+                });
+            }
+            console.log(`✓ AudioContext synthesized sound played (${type})`);
+        } catch (err) {
+            console.warn('Web Audio synth playback warning:', err);
+        }
+    }
+
+    // Play notification sound with sound clip + synth fallback & vibration
+    playSound(soundType = 'notice') {
+        try {
+            let soundFile = '/msg-ton.mp3';
+            if (soundType === 'call') {
+                soundFile = '/call-ton.mp3';
+            } else if (soundType === 'message' || soundType === 'dm') {
+                soundFile = '/notify.mp3';
+            }
+
+            const audioToPlay = new Audio(soundFile);
+            audioToPlay.volume = 1.0;
+
+            const playPromise = audioToPlay.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log(`✓ Notification sound played (${soundFile})`);
+                }).catch(err => {
+                    console.warn(`Sound file play blocked (${soundFile}), falling back to synth tone:`, err);
+                    this.playSynthBeep(soundType);
+                });
+            } else {
+                this.playSynthBeep(soundType);
+            }
+
+            // Trigger Vibration / Haptics
+            this.vibrate(soundType);
+        } catch (err) {
+            console.error('Error playing notification sound:', err);
+            this.playSynthBeep(soundType);
+            this.vibrate(soundType);
+        }
+    }
+
+    vibrate(patternType = 'notice') {
+        try {
+            let pattern = [300, 100, 300, 100, 300];
+            if (patternType === 'call') {
+                pattern = [500, 200, 500, 200, 500, 200, 500];
+            } else if (patternType === 'message') {
+                pattern = [200, 80, 200];
+            }
+
+            if (Capacitor.isNativePlatform()) {
+                if (patternType === 'call') {
+                    Haptics.vibrate({ duration: 1000 }).catch(() => {});
+                } else {
+                    Haptics.vibrate({ duration: 500 }).catch(() => {});
+                }
+            } else if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                navigator.vibrate(pattern);
+            }
+        } catch (err) {
+            console.warn('Vibration error:', err);
         }
     }
 
@@ -442,25 +573,26 @@ class NotificationService {
         return Notification.permission;
     }
 
-    async showWebNotification(title, body, icon = '/logo.png', extraData = {}) {
-        console.log('📢 showWebNotification called:', { title, body, extraData });
+    async showWebNotification(title, body, icon = '/logo.png', extraData = {}, soundType = 'notice') {
+        console.log('📢 showWebNotification called:', { title, body, extraData, soundType });
 
         if (!('Notification' in window)) {
-            console.error('❌ Notifications not supported');
-            this.playSound();
+            console.error('❌ Notifications not supported in window context');
+            this.playSound(soundType);
             return;
         }
 
         if (Notification.permission !== 'granted') {
             console.warn('⚠️ Notification permission not granted:', Notification.permission);
-            this.playSound();
+            this.playSound(soundType);
             return;
         }
 
         try {
             const targetUrl = extraData.url || window.location.origin;
+            const vibePattern = soundType === 'call' ? [500, 200, 500, 200, 500] : (soundType === 'message' ? [200, 80, 200] : [300, 100, 300, 100, 300]);
 
-            // Priority: Try using Service Worker registration (more reliable for tray)
+            // Priority: Try using Service Worker registration (more reliable for tray & PWA background)
             if ('serviceWorker' in navigator) {
                 const registration = await navigator.serviceWorker.ready;
                 if (registration && registration.showNotification) {
@@ -469,27 +601,27 @@ class NotificationService {
                         body: body,
                         icon: icon,
                         badge: icon,
-                        vibrate: [300, 100, 300, 100, 300],
-                        requireInteraction: true,
-                        tag: `nexfi-notice-${Date.now()}`,
+                        vibrate: vibePattern,
+                        requireInteraction: soundType === 'call',
+                        tag: `nexfi-${soundType}-${Date.now()}`,
                         renotify: true,
                         data: { ...extraData, url: targetUrl }
                     });
-                    this.playSound();
+                    this.playSound(soundType);
                     return;
                 }
             }
 
             // Fallback: Legacy Notification constructor
-            console.log('✅ Showing notification via Legacy Constructor');
+            console.log('✅ Showing notification via Legacy Notification constructor');
             const notification = new Notification(title, {
                 body: body,
                 icon: icon,
-                requireInteraction: true,
-                vibrate: [300, 100, 300, 100, 300],
+                requireInteraction: soundType === 'call',
+                vibrate: vibePattern,
                 data: { ...extraData, url: targetUrl }
             });
-            this.playSound();
+            this.playSound(soundType);
 
             notification.onclick = () => {
                 window.focus();
@@ -503,8 +635,8 @@ class NotificationService {
                 notification.close();
             };
         } catch (err) {
-            console.error('❌ Error showing notification:', err);
-            this.playSound();
+            console.error('❌ Error showing web notification:', err);
+            this.playSound(soundType);
         }
     }
 
@@ -527,7 +659,7 @@ class NotificationService {
         console.log('🔔 Triggering Notice System Tray Notification:', { notifTitle, notifBody, targetUrl });
 
         // Play sound & Haptics vibration unconditionally
-        this.playSound();
+        this.playSound('notice');
 
         const isNative = Capacitor.isNativePlatform();
 
@@ -557,15 +689,12 @@ class NotificationService {
             return;
         }
 
-        // Web & Desktop: vibration + sound + tray pop-up
-        if ('vibrate' in navigator) {
-            navigator.vibrate([300, 100, 300, 100, 300]);
-        }
+        // Web & PWA: vibration + sound + tray pop-up
         this.showWebNotification(notifTitle, notifBody, '/logo.png', {
             url: targetUrl,
             org_slug: payload.org_slug,
             notice_id: payload.notice_id
-        });
+        }, 'notice');
     }
 
     async checkMissedNotices() {
@@ -608,20 +737,46 @@ class NotificationService {
     }
 
     async showLocalNotification(data) {
-        // For web, use Web Notifications API
-        // For mobile with Capacitor, this would use Local Notifications (requires package installation)
-        this.showWebNotification(data.title || 'New Notification', data.body || '');
+        const soundType = data.soundType || data.type || 'message';
+        const title = data.title || 'New Notification';
+        const body = data.body || data.message || '';
+        const url = data.url || '/tabs/feed';
+
+        const isNative = Capacitor.isNativePlatform();
+        if (isNative && LocalNotifications && LocalNotifications.schedule) {
+            try {
+                await LocalNotifications.schedule({
+                    notifications: [{
+                        title: title,
+                        body: body,
+                        id: Math.floor(Date.now() % 1000000),
+                        schedule: { at: new Date(Date.now() + 50) },
+                        channelId: soundType === 'call' ? 'calls' : (soundType === 'message' ? 'messages' : 'notices'),
+                        extra: { url, ...data }
+                    }]
+                });
+                this.playSound(soundType);
+                return;
+            } catch (err) {
+                console.warn('LocalNotification schedule error:', err);
+            }
+        }
+
+        this.showWebNotification(title, body, '/logo.png', { url, ...data }, soundType);
     }
 
-    // Simulate receiving a notification (for testing or real-time events via Socket.IO)
+    // Handle real-time incoming notification events (DMs, mentions, notices, calls)
     handleIncomingNotification(notification) {
         console.log('📨 Incoming notification received:', notification);
-        console.log('Notification service initialized:', this.isInitialized);
-        console.log('User ID:', this.userId);
+        const title = notification.title || (notification.from_username ? `💬 Message from ${notification.from_username}` : 'New Notification');
+        const body = notification.message || notification.body || notification.text || '';
+        const soundType = notification.type === 'call' ? 'call' : (notification.type === 'message' || notification.type === 'dm' ? 'message' : 'notice');
 
         this.showLocalNotification({
-            title: notification.message || 'New Notification',
-            body: notification.type || ''
+            title: title,
+            body: body,
+            soundType: soundType,
+            url: notification.url || (notification.type === 'message' ? '/messages' : '/tabs/feed')
         });
     }
 }
