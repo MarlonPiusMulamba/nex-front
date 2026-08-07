@@ -74,20 +74,8 @@ messaging.onBackgroundMessage(function (payload) {
         });
     }
 
-    // Phoenix-style: heads-up banner over whatever is open, then auto-dismiss ~3s.
-    // Calls stay until answered (requireInteraction), so don't auto-close those.
-    const closeAfterMs = isCall || isMissedCall ? null : 3200;
-
-    return self.registration.showNotification(title, options).then(() => {
-        if (closeAfterMs) {
-            return new Promise(resolve => {
-                setTimeout(() => {
-                    self.registration.getNotifications().then(ns => ns.forEach(n => n.close()));
-                    resolve();
-                }, closeAfterMs);
-            });
-        }
-    });
+    // Show notification in system tray (remains in tray until tapped or cleared)
+    return self.registration.showNotification(title, options);
 });
 
 // Handle notification clicks

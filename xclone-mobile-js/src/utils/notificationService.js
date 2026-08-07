@@ -608,11 +608,11 @@ class NotificationService {
                         data: { ...extraData, url: targetUrl }
                     });
                     this.playSound(soundType);
-                    // Phoenix-style auto-dismiss ~3s (keep calls until answered)
-                    if (soundType !== 'call') {
-                        setTimeout(() => {
-                            registration.getNotifications().then(ns => ns.forEach(n => n.close()));
-                        }, 3200);
+                    // Emit toast event for WhatsApp-style floating in-app banner
+                    if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('toast:show', {
+                            detail: { title, body, icon, url: targetUrl, soundType }
+                        }));
                     }
                     return;
                 }
@@ -629,6 +629,13 @@ class NotificationService {
             });
             this.playSound(soundType);
 
+            // Emit toast event for WhatsApp-style floating in-app banner
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('toast:show', {
+                    detail: { title, body, icon, url: targetUrl, soundType }
+                }));
+            }
+
             notification.onclick = () => {
                 window.focus();
                 if (targetUrl && targetUrl !== '#') {
@@ -640,10 +647,6 @@ class NotificationService {
                 }
                 notification.close();
             };
-            // Phoenix-style auto-dismiss ~3s (keep calls until answered)
-            if (soundType !== 'call') {
-                setTimeout(() => notification.close(), 3200);
-            }
         } catch (err) {
             console.error('❌ Error showing web notification:', err);
             this.playSound(soundType);
@@ -671,7 +674,18 @@ class NotificationService {
         // Play sound & Haptics vibration unconditionally
         this.playSound('notice');
 
-        const isNative = Capacitor.isNativePlatform();
+        // Always emit toast:show event for WhatsApp-style floating in-app banner
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('toast:show', {
+                detail: {
+                    title: notifTitle,
+                    body: notifBody,
+                    icon: '/logo.png',
+                    url: targetUrl,
+                    soundType: 'notice'
+                }
+            }));
+        }
 
         if (isNative) {
             // Schedule Local System Tray Notification on Android

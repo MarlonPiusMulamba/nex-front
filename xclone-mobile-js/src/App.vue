@@ -4,6 +4,24 @@
       <ion-icon :icon="cloudOfflineOutline"></ion-icon>
       <span style="margin-left: 8px;">Offline Mode - Using cached data</span>
     </div>
+    
+    <!-- 🟢 WhatsApp-Style Floating In-App Toast Banner -->
+    <transition name="slide-down">
+      <div v-if="toast.visible" class="whatsapp-toast" @click="handleToastClick">
+        <div class="toast-avatar">
+          <img :src="toast.icon || '/bugema-logo.png'" alt="Icon" @error="e => e.target.src = '/bugema-logo.png'" />
+        </div>
+        <div class="toast-content">
+          <div class="toast-header">
+            <span class="toast-title">{{ toast.title }}</span>
+            <span class="toast-time">Just now</span>
+          </div>
+          <div class="toast-body">{{ toast.body }}</div>
+        </div>
+        <button class="toast-close" @click.stop="hideToast">✕</button>
+      </div>
+    </transition>
+
     <ion-router-outlet />
     <CallOverlay />
   </ion-app>
@@ -28,7 +46,15 @@ export default {
     return {
       theme: i18nState.theme || 'light',
       isOffline: !navigator.onLine,
-      cloudOfflineOutline
+      cloudOfflineOutline,
+      toast: {
+        visible: false,
+        title: '',
+        body: '',
+        icon: '/bugema-logo.png',
+        url: '',
+        timer: null
+      }
     };
   },
   methods: {
@@ -46,10 +72,43 @@ export default {
     updateOnlineStatus() {
       this.isOffline = !navigator.onLine;
       console.log('📡 Network status changed. Offline:', this.isOffline);
+    },
+    showToast(detail) {
+      if (this.toast.timer) clearTimeout(this.toast.timer);
+      this.toast.title = detail.title || 'NexFi';
+      this.toast.body = detail.body || '';
+      this.toast.icon = detail.icon || '/bugema-logo.png';
+      this.toast.url = detail.url || '';
+      this.toast.visible = true;
+
+      // Auto-hide after 5 seconds (WhatsApp style)
+      this.toast.timer = setTimeout(() => {
+        this.hideToast();
+      }, 5000);
+    },
+    hideToast() {
+      this.toast.visible = false;
+      if (this.toast.timer) clearTimeout(this.toast.timer);
+    },
+    handleToastClick() {
+      if (this.toast.url) {
+        if (this.$router) {
+          this.$router.push(this.toast.url);
+        } else {
+          window.location.href = this.toast.url;
+        }
+      }
+      this.hideToast();
     }
   },
   async mounted() {
     console.log('✅ App mounted successfully');
+
+    window.addEventListener('toast:show', (e) => {
+      if (e && e.detail) {
+        this.showToast(e.detail);
+      }
+    });
     
     // Initialize notification service for all users (logged-in or guest)
     const userId = localStorage.getItem('userId') || '1';
@@ -274,5 +333,99 @@ export default {
 .post-text a:focus {
   outline: 2px auto #2563eb;
   outline-offset: 2px;
+}
+
+/* 🟢 WhatsApp-Style Floating Top Banner Notification */
+.whatsapp-toast {
+  position: fixed;
+  top: 14px;
+  left: 12px;
+  right: 12px;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--ion-card-background, #ffffff);
+  color: var(--ion-card-text, #111827);
+  border: 1px solid var(--ion-border-color, #e5e7eb);
+  border-radius: 16px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.28), 0 8px 10px -6px rgba(0, 0, 0, 0.12);
+  z-index: 999999;
+  cursor: pointer;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.slide-down-enter-active, .slide-down-leave-active {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+}
+.slide-down-enter-from, .slide-down-leave-to {
+  transform: translateY(-130%);
+  opacity: 0;
+}
+
+.toast-avatar img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--ion-border-color, #e5e7eb);
+  flex-shrink: 0;
+}
+
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.toast-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ion-text-color, #111827);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toast-time {
+  font-size: 11px;
+  color: var(--ion-color-medium, #6b7280);
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.toast-body {
+  font-size: 13px;
+  color: var(--ion-color-medium, #4b5563);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--ion-color-medium, #9ca3af);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  color: var(--ion-text-color, #111827);
 }
 </style>

@@ -185,15 +185,16 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
             manager.createNotificationChannel(noticesChannel);
         }
 
-        // Messages channel
+        // Messages channel — IMPORTANCE_MAX = heads-up banner on screen + sound + vibration
         if (manager.getNotificationChannel(CHANNEL_ID_MESSAGES) == null) {
             NotificationChannel msgChannel = new NotificationChannel(
                     CHANNEL_ID_MESSAGES,
                     "Messages",
-                    NotificationManager.IMPORTANCE_HIGH
+                    NotificationManager.IMPORTANCE_MAX
             );
             msgChannel.setDescription("Direct messages");
             msgChannel.enableVibration(true);
+            msgChannel.setVibrationPattern(new long[]{200, 100, 200});
             msgChannel.setShowBadge(true);
             msgChannel.setSound(
                     android.provider.Settings.System.DEFAULT_NOTIFICATION_URI, audioAttr);
