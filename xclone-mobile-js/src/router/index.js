@@ -20,10 +20,23 @@ import OrgAuthPage from '../views/OrgAuthPage.vue';
 
 const standaloneOrg = import.meta.env.VITE_STANDALONE_ORG || null;
 
+// Runtime check: launched from an installed home-screen icon (separate window, no URL bar)
+function isStandaloneMode() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+// The installed "Bugema Notice" app only serves the Bugema noticeboard
+const noticeSlug = () => standaloneOrg || 'bugema';
+
 const routes = [
   {
     path: '/',
-    redirect: () => standaloneOrg ? `/notices/${standaloneOrg}` : '/tabs/feed'
+    redirect: () => {
+      if (standaloneOrg) return `/notices/${standaloneOrg}`;
+      if (isStandaloneMode()) return `/tabs/notices/${noticeSlug()}`;
+      return '/tabs/feed';
+    }
   },
   {
     path: '/login',
@@ -153,12 +166,13 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   console.log('🧭 Navigating to:', to.path);
 
-  if (standaloneOrg) {
+  if (standaloneOrg || isStandaloneMode()) {
     // In standalone mode, only allow the org notice board and its login/register pages
-    const allowedPrefixes = [`/notices/${standaloneOrg}`, `/tabs/notices/${standaloneOrg}`];
+    const org = noticeSlug();
+    const allowedPrefixes = [`/notices/${org}`, `/tabs/notices/${org}`];
     const isAllowed = allowedPrefixes.some(p => to.path.startsWith(p));
     if (!isAllowed) {
-      return next(`/notices/${standaloneOrg}`);
+      return next(`/tabs/notices/${org}`);
     }
   }
 

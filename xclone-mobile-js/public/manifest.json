@@ -1,9 +1,9 @@
 {
-    "name": "Bugema Notice Board",
+    "name": "Bugema Notice",
     "short_name": "Bugema Notice",
-    "description": "Bugema University Official Digital Notice Board & Campus Platform",
-    "id": "/",
-    "start_url": "/",
+    "description": "Bugema University Official Digital Notice Board",
+    "id": "/tabs/notices/bugema",
+    "start_url": "/tabs/notices/bugema",
     "scope": "/",
     "display": "standalone",
     "display_override": ["standalone", "minimal-ui"],
@@ -12,7 +12,7 @@
     "theme_color": "#daa520",
     "gcm_sender_id": "60010292286",
     "prefer_related_applications": false,
-    "categories": ["social", "communication", "education"],
+    "categories": ["education", "communication"],
     "icons": [
         {
             "src": "/logo.png",
@@ -37,13 +37,6 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
-        }
-    ],
-    "shortcuts": [
-        {
-            "name": "Messages",
-            "url": "/tabs/dm",
-            "description": "Open your messages"
         }
     ]
 }
