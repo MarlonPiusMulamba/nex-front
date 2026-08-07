@@ -125,7 +125,7 @@ self.addEventListener('notificationclick', function (event) {
     );
 });
 
-const CACHE_NAME = 'nexfi-v2';
+const CACHE_NAME = 'nexfi-v3';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
@@ -168,16 +168,31 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// Fetch Event - Cache-First Strategy for Assets, Network-First for API
+// Fetch Event - Network-First for HTML navigations, Cache-First for assets
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
-    // Skip API calls and Socket.io requests (handled by offlineDb / Socket.io fallback)
+    // Skip API calls, Socket.io requests, and non-GET (handled by offlineDb / Socket.io fallback)
     if (url.pathname.startsWith('/api') || url.pathname.startsWith('/socket.io') || event.request.method !== 'GET') {
         return;
     }
 
-    // Cache-first strategy for everything else (HTML, JS, CSS, Images)
+    // Network-first for document navigations so users always get the latest build
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request)
+                .then((networkResponse) => {
+                    const responseToCache = networkResponse.clone();
+                    caches.open(CACHE_NAME)
+                        .then((cache) => cache.put(event.request, responseToCache));
+                    return networkResponse;
+                })
+                .catch(() => caches.match('/index.html'))
+        );
+        return;
+    }
+
+    // Cache-first strategy for hashed assets (JS, CSS, Images, manifest)
     event.respondWith(
         caches.match(event.request)
             .then((response) => {
@@ -206,8 +221,6 @@ self.addEventListener('fetch', (event) => {
                 ).catch(() => {
                     // If network fails and we don't have it in cache, return the offline fallback
                     console.log('[Service Worker] Fetch failed; offline and not cached.', event.request.url);
-                    // For document requests, we could return a specific offline page if we had one
-                    // return caches.match('/offline.html');
                     return new Response('Network error occurred (Offline)', {
                         status: 503,
                         statusText: 'Service Unavailable',

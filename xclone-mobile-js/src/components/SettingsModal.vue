@@ -561,19 +561,24 @@ export default {
 
       if (promptEvent) {
         this.pwaDownloading = true;
-        this.pwaProgress = 0;
+        this.pwaProgress = 20;
 
-        for (let i = 25; i <= 100; i += 25) {
-          await new Promise(r => setTimeout(r, 100));
-          this.pwaProgress = i;
-        }
-        this.pwaDownloading = false;
-
+        // NOTE: prompt() MUST be called synchronously within the click's user
+        // gesture, otherwise Chrome rejects it. No awaits before this call.
         try {
           promptEvent.prompt();
+          this.pwaProgress = 40;
+
+          const tick = setInterval(() => {
+            this.pwaProgress = Math.min(this.pwaProgress + 15, 90);
+          }, 300);
+
           const choiceResult = await promptEvent.userChoice;
+          clearInterval(tick);
+
           if (choiceResult.outcome === 'accepted') {
             this.pwaInstalled = true;
+            this.pwaProgress = 100;
             this.pwaMessage = '🎉 Bugema Notice Board App installed as a Standalone Web App!';
             const toast = await toastController.create({
               message: '🎉 Bugema Notice Board App installed successfully!',
@@ -589,19 +594,32 @@ export default {
           console.warn('PWA prompt error:', e);
           this.pwaMessage = 'Installation cancelled.';
         }
+        this.pwaDownloading = false;
         window._pwaInstallPrompt = null;
         window.deferredPwaPrompt = null;
         window._deferredPrompt = null;
         this.deferredPrompt = null;
       } else {
-        this.pwaMessage = '📲 If native prompt didn\'t pop up: Tap Chrome menu (⋮ top-right) ➔ Tap "Install App".';
-        const toast = await toastController.create({
-          message: '📲 Tap Chrome menu (⋮) ➔ "Install App" to complete standalone installation.',
-          duration: 4500,
-          color: 'primary',
-          position: 'bottom'
-        });
-        await toast.present();
+        const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+        if (isIOS) {
+          this.pwaMessage = '📱 On iPhone/iPad: Tap the Share button (square with arrow) ➔ "Add to Home Screen".';
+          const toast = await toastController.create({
+            message: '📱 On iPhone: Share ➔ "Add to Home Screen". It runs full-screen.',
+            duration: 4500,
+            color: 'primary',
+            position: 'bottom'
+          });
+          await toast.present();
+        } else {
+          this.pwaMessage = '📲 If native prompt didn\'t pop up: Tap Chrome menu (⋮ top-right) ➔ Tap "Install App".';
+          const toast = await toastController.create({
+            message: '📲 Tap Chrome menu (⋮) ➔ "Install App" to complete standalone installation.',
+            duration: 4500,
+            color: 'primary',
+            position: 'bottom'
+          });
+          await toast.present();
+        }
       }
     },
     async copyIosShareLink() {
