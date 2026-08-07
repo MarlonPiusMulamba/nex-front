@@ -34,7 +34,7 @@ const routes = [
     path: '/',
     redirect: () => {
       if (standaloneOrg) return `/notices/${standaloneOrg}`;
-      if (isStandaloneMode()) return `/tabs/notices/${noticeSlug()}`;
+      if (isStandaloneMode()) return `/notices/${noticeSlug()}`;
       return '/tabs/feed';
     }
   },
@@ -172,7 +172,7 @@ router.beforeEach((to, from, next) => {
     const allowedPrefixes = [`/notices/${org}`, `/tabs/notices/${org}`];
     const isAllowed = allowedPrefixes.some(p => to.path.startsWith(p));
     if (!isAllowed) {
-      return next(`/tabs/notices/${org}`);
+      return next(`/notices/${org}`);
     }
   }
 
