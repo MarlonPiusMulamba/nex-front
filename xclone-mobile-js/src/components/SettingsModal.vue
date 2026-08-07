@@ -252,12 +252,19 @@
             <div class="manual-install-card pwa-guide-card" style="margin-top: 12px;">
               <h4 class="install-guide-title">📲 How to Install Standalone Web App:</h4>
               <ol class="manual-steps-list">
-                <li>Tap <strong>Install App</strong> above (or Chrome menu <strong>⋮</strong> top-right).</li>
-                <li>Tap <strong>"Install app"</strong> (or <em>"Add to Home screen" / "Create shortcut"</em> on local IP).</li>
-                <li>Tap <strong>Install / Add</strong> — Bugema Notice Board will launch as a full-screen app on your phone!</li>
+                <li>Tap <strong>Install App</strong> above.</li>
+                <li>Chrome shows a dialog — on Android it may say <strong>"Add to Home screen"</strong>. That is the REAL install, not a shortcut.</li>
+                <li>Tap <strong>Install / Add</strong> — Bugema Notice Board launches full-screen, no browser URL bar.</li>
               </ol>
               <div class="pwa-note-box" style="margin-top: 8px; font-size: 0.75rem; color: #6b7280; line-height: 1.35;">
-                💡 <em>Note: On local IP addresses (http), Chrome labels the prompt "Add to Home screen" or "Create shortcut". On the HTTPS live site (https://ssp.bugemauniv.ac.ug), Chrome labels it "Install app". Both place the full Bugema Notice Board app on your phone!</em>
+                💡 <em>Shortcut vs App: a home-screen <strong>shortcut</strong> opens in the browser with a URL bar. A <strong>real install</strong> opens in its own window with no URL bar. On Android, the dialog from "Install App" above is a real install.</em>
+              </div>
+            </div>
+
+            <!-- Live Diagnostic -->
+            <div class="pwa-diagnostic-box" style="margin-top: 10px; padding: 8px 10px; background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;">
+              <div v-for="(line, i) in pwaStatusLines" :key="i" style="display:flex; gap:6px; align-items:flex-start; font-size:0.72rem; line-height:1.35; color:#9ca3af; padding:2px 0;">
+                <span>{{ line.ok ? '✅' : '⚠️' }}</span><span>{{ line.text }}</span>
               </div>
             </div>
 
@@ -358,6 +365,29 @@ export default {
     isPwaInstalled() {
       if (typeof window === 'undefined') return false;
       return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    },
+    pwaStatusLines() {
+      const lines = [];
+      const secure = typeof window !== 'undefined' && window.isSecureContext === true;
+      lines.push({
+        ok: secure,
+        text: secure ? 'Secure HTTPS context — real PWA install is allowed' : 'Not a secure context (http/IP) — Chrome only allows shortcuts here'
+      });
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        const swActive = !!navigator.serviceWorker.controller;
+        lines.push({
+          ok: swActive,
+          text: swActive ? 'Service worker active — this page is controlled by the app shell' : 'Service worker not controlling this page yet — reload once to activate it'
+        });
+      } else {
+        lines.push({ ok: false, text: 'Service worker not supported in this browser' });
+      }
+      const hasPrompt = typeof window !== 'undefined' && 'onbeforeinstallprompt' in window && !!this.deferredPrompt;
+      lines.push({
+        ok: hasPrompt,
+        text: hasPrompt ? 'Native install prompt captured — "Install App" will trigger a REAL standalone install' : 'No install prompt captured — this browser will only add a home-screen shortcut'
+      });
+      return lines;
     }
   },
   mounted() {
