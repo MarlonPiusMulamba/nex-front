@@ -190,4 +190,18 @@ router.beforeEach((to, from, next) => {
   }
 });
 
+router.afterEach((to) => {
+  if (typeof document === 'undefined') return;
+  const isBugemaNotice = to.path.startsWith('/notices/bugema');
+  const isNoticeBoard = to.path.startsWith('/notices/');
+
+  if (isBugemaNotice) {
+    document.title = 'Bugema University Notice Board';
+  } else if (isNoticeBoard) {
+    document.title = 'Campus Notice Board';
+  } else {
+    document.title = 'NexFi - Connect, Share & Communicate';
+  }
+});
+
 export default router;

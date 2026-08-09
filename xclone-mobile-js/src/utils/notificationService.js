@@ -601,29 +601,38 @@ class NotificationService {
             const vibePattern = soundType === 'call' ? [500, 200, 500, 200, 500] : (soundType === 'message' ? [200, 80, 200] : [300, 100, 300, 100, 300]);
 
             // Priority: Try using Service Worker registration (more reliable for tray & PWA background)
+            let registration = null;
             if ('serviceWorker' in navigator) {
-                const registration = await navigator.serviceWorker.ready;
-                if (registration && registration.showNotification) {
-                    console.log('✅ Showing tray notification via Service Worker registration');
-                    await registration.showNotification(title, {
-                        body: body,
-                        icon: icon,
-                        badge: icon,
-                        vibrate: vibePattern,
-                        requireInteraction: soundType === 'call',
-                        tag: `nexfi-${soundType}-${Date.now()}`,
-                        renotify: true,
-                        data: { ...extraData, url: targetUrl }
-                    });
-                    this.playSound(soundType);
-                    // Emit toast event for WhatsApp-style floating in-app banner
-                    if (typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('toast:show', {
-                            detail: { title, body, icon, url: targetUrl, soundType }
-                        }));
-                    }
-                    return;
+                try {
+                    registration = await Promise.race([
+                        navigator.serviceWorker.ready,
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('SW ready timeout')), 1500))
+                    ]);
+                } catch (e) {
+                    console.warn('⚠️ ServiceWorker ready timeout/error, using legacy fallback:', e);
                 }
+            }
+
+            if (registration && registration.showNotification) {
+                console.log('✅ Showing tray notification via Service Worker registration');
+                await registration.showNotification(title, {
+                    body: body,
+                    icon: icon,
+                    badge: icon,
+                    vibrate: vibePattern,
+                    requireInteraction: soundType === 'call',
+                    tag: `nexfi-${soundType}-${Date.now()}`,
+                    renotify: true,
+                    data: { ...extraData, url: targetUrl }
+                });
+                this.playSound(soundType);
+                // Emit toast event for WhatsApp-style floating in-app banner
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('toast:show', {
+                        detail: { title, body, icon, url: targetUrl, soundType }
+                    }));
+                }
+                return;
             }
 
             // Fallback: Legacy Notification constructor

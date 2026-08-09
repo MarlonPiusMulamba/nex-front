@@ -2521,7 +2521,8 @@ export default {
       console.log('🧪 Triggering test notification for user:', this.userId);
       try {
         const res = await axios.post(`${this.API_URL}/api/test/notification`, {
-          user_id: this.userId
+          user_id: this.userId,
+          push: true
         }, { timeout: 10000 });
         
         if (res.data.success) {
