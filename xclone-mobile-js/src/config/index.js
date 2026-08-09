@@ -42,8 +42,8 @@ const config = {
 
       let apiUrl;
 
-      if (envUrl && envUrl.includes('localhost') && pageHost && pageHost !== 'localhost' && pageHost !== '127.0.0.1') {
-        // If VITE_API_URL is set to localhost but browser is on LAN IP (e.g. 10.129.128.121),
+      if (isPageLocal && envUrl && envUrl.includes('localhost') && pageHost !== 'localhost' && pageHost !== '127.0.0.1') {
+        // If VITE_API_URL is set to localhost and browser is on a LAN IP (e.g. 10.129.128.121),
         // rewrite API target to the host IP for live web testing
         const port = envUrl.split(':')[2] || '5000';
         apiUrl = `http://${pageHost}:${port.replace(/[^0-9]/g, '')}`;
