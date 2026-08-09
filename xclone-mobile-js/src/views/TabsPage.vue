@@ -54,10 +54,6 @@
           </router-link>
 
 
-          <div class="nav-item" @click="showSettingsModal = true">
-            <ion-icon :icon="settingsOutline" class="nav-icon"></ion-icon>
-            <span class="nav-label">{{ t('settings') }}</span>
-          </div>
 
           <!-- Logout Button (Desktop only) -->
           <div class="nav-item logout-item" @click="logout">
@@ -131,10 +127,6 @@
               <ion-label class="tab-lbl">Club</ion-label>
             </ion-tab-button>
 
-            <div class="tab-btn custom-settings-tab" @click="showSettingsModal = true">
-              <ion-icon :icon="settingsOutline"></ion-icon>
-              <ion-label class="tab-lbl">{{ t('settings') }}</ion-label>
-            </div>
 
           </ion-tab-bar>
         </ion-tabs>

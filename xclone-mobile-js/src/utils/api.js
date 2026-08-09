@@ -55,7 +55,19 @@ api.interceptors.response.use(
     if (import.meta.env.DEV) {
       console.log('✅ API Response:', response.config.url, response.status);
     }
-    return response;
+    const resData = response.data;
+    if (resData && typeof resData === 'object' && !('data' in resData)) {
+      try {
+        Object.defineProperty(resData, 'data', {
+          get() { return this; },
+          enumerable: false,
+          configurable: true
+        });
+      } catch (e) {
+        // ignore if frozen object
+      }
+    }
+    return resData;
   },
   async (error) => {
     const requestConfig = error.config;

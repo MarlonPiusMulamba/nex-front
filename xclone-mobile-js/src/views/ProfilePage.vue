@@ -827,11 +827,11 @@ export default {
     },
 
     async loadProfile() {
-      if (!this.username) return;
+      const targetUsername = (typeof this.$route?.params?.username === 'string' && this.$route.params.username) || this.username || localStorage.getItem('username');
+      if (!targetUsername) return;
       
       try {
         this.loading = true;
-        const targetUsername = (typeof this.$route?.params?.username === 'string' && this.$route.params.username) || this.username;
         
         // Handle offline
         if (isNetworkOffline()) {
