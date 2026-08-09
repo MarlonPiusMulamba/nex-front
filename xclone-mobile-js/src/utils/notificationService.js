@@ -457,31 +457,39 @@ class NotificationService {
                 }).catch(() => {});
             });
 
-            PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-                console.log('Push notification action performed:', action);
-                const data = action.notification?.data || action.notification?.extra;
-                if (data && data.org_slug) {
-                    const targetPath = `/tabs/notices/${data.org_slug}`;
+            const routeTap = (rawExtra) => {
+                const data = rawExtra || {};
+                console.log('📱 Notification tap payload:', data);
+                let targetPath = null;
+                if (data.type === 'message' && data.from_user_id) {
+                    targetPath = `/tabs/dm?userId=${data.from_user_id}&username=${data.from_username || 'User'}`;
+                } else if ((data.type === 'call' || data.type === 'missed_call') && (data.from_user_id || data.caller_id)) {
+                    const callerId = data.from_user_id || data.caller_id;
+                    targetPath = `/tabs/dm?userId=${callerId}&username=${data.caller_username || data.from_username || 'User'}`;
+                } else if (data.org_slug) {
+                    targetPath = `/tabs/notices/${data.org_slug}`;
+                } else if (data.url) {
+                    targetPath = data.url;
+                }
+
+                if (targetPath) {
                     if (window.appRouter) {
                         window.appRouter.push(targetPath);
                     } else {
                         window.location.href = targetPath;
                     }
                 }
+            };
+
+            PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+                console.log('Push notification action performed:', action);
+                routeTap(action.notification?.data || action.notification?.extra);
             });
 
             if (LocalNotifications && LocalNotifications.addListener) {
                 LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
                     console.log('📱 Local tray notification tapped:', action);
-                    const extra = action.notification?.extra || action.notification?.data;
-                    if (extra && extra.org_slug) {
-                        const targetPath = `/tabs/notices/${extra.org_slug}`;
-                        if (window.appRouter) {
-                            window.appRouter.push(targetPath);
-                        } else {
-                            window.location.href = targetPath;
-                        }
-                    }
+                    routeTap(action.notification?.extra || action.notification?.data);
                 });
             }
 

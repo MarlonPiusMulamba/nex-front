@@ -4,7 +4,7 @@
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button @click="goToProfile">
-            <img src="/nexfi-logo.png" class="header-logo-img" alt="NexFi" style="border-radius: 8px; object-fit: cover;" />
+            <img src="/logo.png" class="header-logo-img" alt="NexFi" style="border-radius: 0; object-fit: contain; background: transparent; box-shadow: none;" />
           </ion-button>
         </ion-buttons>
         <ion-title class="feed-title">NexFi</ion-title>
@@ -2825,10 +2825,11 @@ ion-toolbar {
 .header-logo-img {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: #fff;
-  padding: 2px;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
 }
 
 /* Feed Tabs */

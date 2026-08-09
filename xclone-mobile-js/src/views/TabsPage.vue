@@ -6,6 +6,7 @@
         <!-- Logo -->
         <div class="sidebar-logo">
           <img src="/logo.png" alt="NexFi" class="sidebar-logo-img" />
+          <span class="sidebar-logo-text">NexFi</span>
         </div>
 
         <!-- Navigation -->
@@ -284,10 +285,6 @@ export default {
             (total, conv) => total + (conv.unread_count || 0), 
             0
           );
-
-          if (nextCount > this.prevUnreadCount) {
-            this.playNotificationSound();
-          }
 
           this.unreadCount = nextCount;
           this.prevUnreadCount = nextCount;

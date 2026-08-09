@@ -505,15 +505,15 @@ export default {
 }
 
 .logo-image {
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 20px;
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 14px;
   display: block;
-  object-fit: cover;
-  border-radius: 50%;
-  background: #fff;
-  padding: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  object-fit: contain;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
 }
 
 .brand-name {
