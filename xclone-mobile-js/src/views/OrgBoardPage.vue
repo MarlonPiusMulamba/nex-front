@@ -53,6 +53,15 @@
               <ion-icon v-else :icon="personOutline" class="profile-thumb-icon"></ion-icon>
             </div>
           </button>
+          <!-- More options menu (Action Sheet for Bugema Notice Board PWA install, notifications, etc.) -->
+          <button 
+            class="header-settings-btn" 
+            @click="showHeaderActionSheet = true"
+            title="Notice Board Options"
+          >
+            <ion-icon :icon="ellipsisVertical" class="header-settings-icon"></ion-icon>
+            <span v-if="notificationPermission !== 'granted'" class="perm-badge">!</span>
+          </button>
           <!-- Admin settings gear -->
           <ion-button v-if="isAdmin" @click="showAdminPanel = true" class="settings-btn">
             <ion-icon slot="icon-only" :icon="settingsOutline"></ion-icon>
@@ -920,6 +929,12 @@
       </div>
     </Teleport>
 
+    <ion-action-sheet
+      :is-open="showHeaderActionSheet"
+      :buttons="boardActionSheetButtons"
+      @didDismiss="showHeaderActionSheet = false"
+    ></ion-action-sheet>
+
   </ion-page>
 </template>
 
@@ -928,7 +943,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, 
   IonBackButton, IonSpinner, IonButton, IonIcon, IonBadge, IonChip,
   IonSelect, IonSelectOption, IonRefresher, IonRefresherContent,
-  IonLabel, IonSearchbar, alertController, toastController
+  IonLabel, IonSearchbar, IonActionSheet
 } from '@ionic/vue';
 import { 
   settingsOutline, lockClosedOutline, megaphoneOutline, 
@@ -940,7 +955,8 @@ import {
   createOutline, peopleOutline, businessOutline, logInOutline, searchOutline,
   closeCircleOutline, documentOutline, closeCircle, expandOutline,
   arrowUpOutline, closeOutline, refresh, cloudOfflineOutline,
-  volumeHigh, volumeMediumOutline, shareSocialOutline, downloadOutline
+  volumeHigh, volumeMediumOutline, shareSocialOutline, downloadOutline,
+  ellipsisVertical, notificationsCircleOutline, refreshOutline, phonePortraitOutline, close
 } from 'ionicons/icons';
 import api from '@/utils/api.js';
 import config from '@/config';
@@ -959,7 +975,7 @@ export default {
     IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, 
     IonBackButton, IonSpinner, IonButton, IonIcon, IonBadge, IonChip,
     IonSelect, IonSelectOption, IonRefresher, IonRefresherContent,
-    IonLabel, IonSearchbar,
+    IonLabel, IonSearchbar, IonActionSheet,
     OrgAdminPanel,
     NoticeComposerModal,
     SettingsModal
@@ -975,6 +991,9 @@ export default {
       createOutline, peopleOutline, businessOutline, logInOutline, searchOutline,
       closeCircleOutline, documentOutline, closeCircle, expandOutline, arrowUpOutline, closeOutline, refresh, cloudOfflineOutline,
       volumeHigh, volumeMediumOutline, shareSocialOutline, downloadOutline,
+      ellipsisVertical, notificationsCircleOutline, refreshOutline, phonePortraitOutline, close,
+      showHeaderActionSheet: false,
+      notificationPermission: 'default',
       dismissedTicker: false,
       lastVisitTimestamp: null,
       isOfflineMode: false,
@@ -1051,6 +1070,46 @@ export default {
     },
     canPost() {
       return ['org_admin', 'dept_manager'].includes(this.membership?.role);
+    },
+    boardActionSheetButtons() {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+      const boardTitle = this.org ? (this.org.name || 'Notice Board') : 'Bugema Notice Board';
+
+      const buttons = [
+        {
+          text: 'Refresh Notice Board',
+          icon: refreshOutline,
+          handler: () => {
+            this.fetchOrgData();
+          }
+        },
+        {
+          text: 'Trigger Test Notification',
+          icon: notificationsCircleOutline,
+          handler: () => {
+            this.triggerTestNotification();
+          }
+        }
+      ];
+
+      if (!isStandalone) {
+        buttons.push({
+          text: `Install ${boardTitle}`,
+          icon: isIOS ? phonePortraitOutline : downloadOutline,
+          handler: () => {
+            this.installPWA('bugema');
+          }
+        });
+      }
+
+      buttons.push({
+        text: 'Cancel',
+        role: 'cancel',
+        icon: close
+      });
+
+      return buttons;
     },
     filteredNotices() {
       let list = this.allNotices.length ? this.allNotices : (this.notices || []);
@@ -1168,6 +1227,61 @@ export default {
     }
   },
   methods: {
+    installPWA(target = 'bugema') {
+      const isBugema = target === 'bugema' || this.$route.path.includes('/bugema');
+      const appName = isBugema ? 'Bugema Notice Board' : 'NexFi App';
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+      try {
+        let manifestTag = document.getElementById('manifest-link');
+        if (!manifestTag) {
+          manifestTag = document.querySelector('link[rel="manifest"]');
+        }
+        if (manifestTag) {
+          manifestTag.setAttribute('href', isBugema ? '/manifest-bugema.json' : '/manifest.json');
+        }
+      } catch (_) {}
+      
+      const promptEvent = window._pwaInstallPrompt;
+      if (promptEvent) {
+        console.log(`✨ Triggering native PWA install prompt for ${appName}...`);
+        promptEvent.prompt();
+        promptEvent.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log(`✅ User accepted ${appName} PWA install`);
+          } else {
+            console.log(`❌ User dismissed ${appName} PWA install`);
+          }
+          window._pwaInstallPrompt = null;
+        });
+      } else if (isIOS) {
+        alert(`📱 To install ${appName} on your iPhone/iPad:\n\n1. Tap the Share button (square with arrow)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap Add at the top right.`);
+      } else {
+        const isSecure = window.isSecureContext;
+        if (!isSecure && window.location.hostname !== 'localhost') {
+            alert(`🔐 Security Requirement: PWA installation requires a secure HTTPS connection. Please ensure you are using https:// and not an IP address.`);
+        } else {
+            alert(`ℹ️ Installation Tip for ${appName}:\n\nIf the "Install" button didn't trigger automatically:\n1. Open your browser menu (three dots at the top right).\n2. Look for "Install app" or "Add to Home screen".`);
+        }
+      }
+    },
+
+    async triggerTestNotification() {
+      try {
+        if ('Notification' in window && Notification.permission !== 'granted') {
+          await Notification.requestPermission();
+        }
+        const title = this.org ? `${this.org.name} Notice Test` : 'Bugema Notice Test';
+        notificationService.sendNotification(title, {
+          body: '🔔 Test notice notification triggered successfully!',
+          icon: this.org?.logo_url || '/bugema-logo.png',
+          url: window.location.href
+        });
+      } catch (e) {
+        console.error('Test notification error:', e);
+      }
+    },
+
     isNoticeUnread(notice) {
       if (!notice) return false;
       if (notice.is_read || (this.readNoticeIds && this.readNoticeIds.has(notice.id))) return false;

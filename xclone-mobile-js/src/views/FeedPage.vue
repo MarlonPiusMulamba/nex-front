@@ -1002,11 +1002,12 @@ export default {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
       if (!isStandalone) {
+        const isBugemaContext = this.$route.path.includes('/bugema') || this.$route.query.q === 'bugema';
         buttons.push({
-          text: 'Install NexFi App',
+          text: isBugemaContext ? 'Install Bugema Notice Board' : 'Install NexFi App',
           icon: isIOS ? phonePortraitOutline : downloadOutline,
           handler: () => {
-            this.installPWA();
+            this.installPWA(isBugemaContext ? 'bugema' : 'nexfi');
           }
         });
       }
@@ -2571,29 +2572,43 @@ export default {
       console.log('🔔 Current notification permission:', this.notificationPermission);
     },
 
-    installPWA() {
+    installPWA(target = 'nexfi') {
+      const isBugema = target === 'bugema' || this.$route.path.includes('/bugema');
+      const appName = isBugema ? 'Bugema Notice Board' : 'NexFi App';
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+      try {
+        let manifestTag = document.getElementById('manifest-link');
+        if (!manifestTag) {
+          manifestTag = document.querySelector('link[rel="manifest"]');
+        }
+        if (manifestTag) {
+          manifestTag.setAttribute('href', isBugema ? '/manifest-bugema.json' : '/manifest.json');
+        }
+      } catch (_) {}
       
-      if (this.deferredPrompt) {
-        console.log('✨ Triggering native PWA install prompt...');
-        this.deferredPrompt.prompt();
-        this.deferredPrompt.userChoice.then((choiceResult) => {
+      const promptEvent = this.deferredPrompt || window._pwaInstallPrompt;
+      if (promptEvent) {
+        console.log(`✨ Triggering native PWA install prompt for ${appName}...`);
+        promptEvent.prompt();
+        promptEvent.userChoice.then((choiceResult) => {
           if (choiceResult.outcome === 'accepted') {
-            console.log('✅ User accepted PWA install');
+            console.log(`✅ User accepted ${appName} PWA install`);
           } else {
-            console.log('❌ User dismissed PWA install');
+            console.log(`❌ User dismissed ${appName} PWA install`);
           }
           this.deferredPrompt = null;
+          window._pwaInstallPrompt = null;
         });
       } else if (isIOS) {
-        alert('📱 To install NexFi on your iPhone/iPad:\n\n1. Tap the Share button (square with arrow)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap Add at the top right.');
+        alert(`📱 To install ${appName} on your iPhone/iPad:\n\n1. Tap the Share button (square with arrow)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap Add at the top right.`);
       } else {
         // Broad fallback for Android/Chrome/Desktop when beforeinstallprompt hasn't fired
         const isSecure = window.isSecureContext;
         if (!isSecure && window.location.hostname !== 'localhost') {
-            alert('🔐 Security Requirement: PWA installation requires a secure HTTPS connection. Please ensure you are using https:// and not an IP address.');
+            alert(`🔐 Security Requirement: PWA installation requires a secure HTTPS connection. Please ensure you are using https:// and not an IP address.`);
         } else {
-            alert('ℹ️ Installation Tip:\n\nIf the "Install" button didn\'t trigger automatically:\n1. Open your browser menu (three dots at the top right).\n2. Look for "Install app" or "Add to Home screen".');
+            alert(`ℹ️ Installation Tip for ${appName}:\n\nIf the "Install" button didn't trigger automatically:\n1. Open your browser menu (three dots at the top right).\n2. Look for "Install app" or "Add to Home screen".`);
         }
       }
     },
