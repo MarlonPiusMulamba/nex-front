@@ -3067,15 +3067,17 @@ ion-toolbar {
   margin: 8px 0;
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid var(--ion-border-color, #eff3f4);
+  border: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.08));
+  background: #080c10;
 }
 
 .media-img {
-  width: 100%;
-  display: block;
-  max-height: 650px;
+  width: 100% !important;
+  height: auto !important;
+  max-height: 750px !important;
   object-fit: contain !important;
-  background: #080c10;
+  display: block !important;
+  margin: 0 auto !important;
 }
 
 .media-grid {
@@ -3085,38 +3087,44 @@ ion-toolbar {
 
 .media-grid.count-1 {
   grid-template-columns: 1fr;
+  width: 100%;
   background: #080c10;
 }
 
 .media-grid.count-1 .media-item {
+  width: 100%;
+  min-height: 0 !important;
+  max-height: 750px;
   display: flex;
   align-items: center;
   justify-content: center;
-  max-height: 650px;
 }
 
 .media-grid.count-1 .media-item img {
-  width: 100%;
-  height: auto;
-  max-height: 650px;
+  width: 100% !important;
+  height: auto !important;
+  max-height: 750px !important;
   object-fit: contain !important;
-  display: block;
+  display: block !important;
+  margin: 0 auto !important;
 }
 
 .media-grid.count-2 {
   grid-template-columns: 1fr 1fr;
+  height: 280px;
 }
 
 .media-grid.count-3,
 .media-grid.count-4 {
   grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  height: 320px;
 }
 
-.media-item {
+.media-grid:not(.count-1) .media-item {
   position: relative;
   overflow: hidden;
-  /* Ensure video containers don't collapse */
-  min-height: 160px;
+  height: 100%;
 }
 
 .media-grid:not(.count-1) .media-item img {
