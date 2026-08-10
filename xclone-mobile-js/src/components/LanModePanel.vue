@@ -18,12 +18,47 @@
 
         <!-- Status row -->
         <div class="lan-status-row">
-          <div class="lan-ip-chip">
-            <span class="chip-label">Your LAN IP</span>
-            <span class="chip-value">{{ localIP || 'Detecting…' }}</span>
+          <div class="lan-ip-chip clickable" @click="openIpModal" title="Tap to set or edit your LAN IP address">
+            <div class="chip-header-row">
+              <span class="chip-label">YOUR LAN IP</span>
+              <span class="chip-edit-badge">✏️ Set / Edit IP</span>
+            </div>
+            <span class="chip-value">{{ localIP || 'Detecting… (tap to set)' }}</span>
           </div>
           <div class="lan-status-dot" :class="statusDotClass"></div>
         </div>
+
+        <!-- Inline IP Edit Modal / Card -->
+        <transition name="lan-expand">
+          <div v-if="showIpModal" class="ip-editor-card">
+            <div class="editor-header">
+              <span>🌐 Custom LAN IP Address</span>
+              <button class="close-editor-btn" @click="showIpModal = false">✕</button>
+            </div>
+            <p class="editor-hint">
+              Enter your device IP (from <code>ipconfig</code> on PC or Wi-Fi info on Mobile e.g. 192.168.1.15) to bypass detection delays:
+            </p>
+            <div class="ip-input-group">
+              <input 
+                v-model="customIpInput" 
+                type="text" 
+                placeholder="e.g. 192.168.1.15" 
+                class="ip-input-field" 
+                @keyup.enter="saveCustomIp(customIpInput)"
+              />
+              <button class="lan-btn primary save-ip-btn" @click="saveCustomIp(customIpInput)">
+                Save IP
+              </button>
+            </div>
+            <p v-if="ipErrorMsg" class="ip-error-text">{{ ipErrorMsg }}</p>
+            <div class="ip-preset-chips">
+              <button class="preset-chip" @click="saveCustomIp('192.168.1.')">192.168.1.x</button>
+              <button class="preset-chip" @click="saveCustomIp('192.168.0.')">192.168.0.x</button>
+              <button class="preset-chip" @click="saveCustomIp('10.0.0.')">10.0.0.x</button>
+              <button class="preset-chip auto-btn" @click="resetCustomIp">🔄 Auto Detect</button>
+            </div>
+          </div>
+        </transition>
 
         <!-- Offline scan status -->
         <div v-if="!$online && lanEnabled" class="scan-status-row">
@@ -256,6 +291,9 @@ export default {
       lanEnabled: false,
       panelOpen: true,
       localIP: null,
+      showIpModal: false,
+      customIpInput: '',
+      ipErrorMsg: '',
       step: 'idle',      // idle | generating | showing_offer | scanning | showing_answer | connected | error
       scanMode: 'offer', // 'offer' | 'answer'
       offerQrUrl: null,
@@ -331,11 +369,56 @@ export default {
     },
 
     async init() {
-      this.localIP = await getLocalIP();
+      // Check memory cache / custom IP first for instant loading
+      const customIP = localStorage.getItem('custom_lan_ip');
+      const cachedIP = localStorage.getItem('detected_lan_ip');
+      this.localIP = customIP || cachedIP || null;
+
+      // Run async multi-stage detection in background to refine IP
+      getLocalIP().then(ip => {
+        if (ip) {
+          this.localIP = ip;
+          this.announcePresence();
+        }
+      });
+
       await this.loadStoredPeers();
       await this.loadKnownContacts();
       this.updateConnectedCount();
       this.startDiscoveryLoops();
+    },
+
+    openIpModal() {
+      this.customIpInput = this.localIP || '';
+      this.ipErrorMsg = '';
+      this.showIpModal = !this.showIpModal;
+    },
+
+    saveCustomIp(ipStr) {
+      const ip = (ipStr || '').trim();
+      if (ip && !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) {
+        this.ipErrorMsg = 'Please enter a valid IPv4 address (e.g. 192.168.1.15)';
+        return;
+      }
+      if (ip) {
+        localStorage.setItem('custom_lan_ip', ip);
+        this.localIP = ip;
+      } else {
+        localStorage.removeItem('custom_lan_ip');
+      }
+      this.showIpModal = false;
+      this.ipErrorMsg = '';
+      this.announcePresence();
+    },
+
+    async resetCustomIp() {
+      localStorage.removeItem('custom_lan_ip');
+      localStorage.removeItem('detected_lan_ip');
+      this.localIP = null;
+      this.showIpModal = false;
+      this.ipErrorMsg = '';
+      this.localIP = await getLocalIP();
+      this.announcePresence();
     },
 
     startDiscoveryLoops() {
@@ -747,10 +830,11 @@ export default {
 .lan-panel {
   margin: 16px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(218, 165, 32, 0.2);
+  background: var(--ion-card-background, var(--ion-background-color, #ffffff));
+  border: 1.5px solid rgba(218, 165, 32, 0.4);
+  box-shadow: 0 4px 18px rgba(218, 165, 32, 0.12);
   overflow: hidden;
-  backdrop-filter: blur(12px);
+  transition: all 0.3s ease;
 }
 
 /* ── Header ───────────────────────────────────── */
@@ -761,6 +845,7 @@ export default {
   padding: 14px 18px;
   cursor: pointer;
   user-select: none;
+  background: rgba(218, 165, 32, 0.06);
 }
 
 .lan-title-row {
@@ -773,9 +858,14 @@ export default {
 
 .lan-title {
   font-size: 15px;
-  font-weight: 700;
-  color: #daa520;
+  font-weight: 800;
+  color: #b8860b;
   letter-spacing: 0.05em;
+}
+
+:global(body.dark) .lan-title,
+:global(.ion-palette-dark) .lan-title {
+  color: #ffd700;
 }
 
 .lan-live-badge {
@@ -797,18 +887,18 @@ export default {
 
 /* ── Toggle ──────────────────────────────────── */
 .lan-toggle-track {
-  width: 44px;
-  height: 24px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  width: 46px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--ion-color-light-shade, #cbd5e1);
+  border: 1.5px solid var(--ion-color-medium-tint, #94a3b8);
   position: relative;
   transition: all 0.3s ease;
   cursor: pointer;
 }
 
 .lan-toggle-track.active {
-  background: rgba(218, 165, 32, 0.25);
+  background: linear-gradient(135deg, #daa520, #b8860b);
   border-color: #daa520;
 }
 
@@ -816,22 +906,23 @@ export default {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 18px;
-  height: 18px;
+  width: 19px;
+  height: 19px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.4);
+  background: #ffffff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
   transition: all 0.3s ease;
 }
 
 .lan-toggle-track.active .lan-toggle-thumb {
-  left: 20px;
-  background: #daa520;
-  box-shadow: 0 0 8px rgba(218, 165, 32, 0.6);
+  left: 21px;
+  background: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
 /* ── Body ────────────────────────────────────── */
 .lan-body {
-  padding: 0 18px 18px;
+  padding: 14px 18px 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -852,15 +943,16 @@ export default {
 
 .chip-label {
   font-size: 10px;
-  opacity: 0.45;
+  font-weight: 700;
+  color: var(--ion-color-medium, #64748b);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .chip-value {
   font-size: 13px;
-  font-weight: 600;
-  color: #daa520;
+  font-weight: 700;
+  color: #b8860b;
   font-variant-numeric: tabular-nums;
 }
 
@@ -872,7 +964,7 @@ export default {
 
 .dot-live { background: #00c96b; box-shadow: 0 0 8px #00c96b; animation: livePulse 1.5s ease-in-out infinite; }
 .dot-ready { background: #daa520; box-shadow: 0 0 6px rgba(218,165,32,0.5); }
-.dot-off { background: rgba(255,255,255,0.2); }
+.dot-off { background: rgba(148, 163, 184, 0.4); }
 
 /* ── Peers List ───────────────────────────────── */
 .lan-peers {
@@ -885,9 +977,10 @@ export default {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
-  background: rgba(255,255,255,0.04);
-  border-radius: 10px;
+  padding: 10px 14px;
+  background: var(--ion-color-light, rgba(0, 0, 0, 0.03));
+  border-radius: 12px;
+  border: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.06));
 }
 
 .peer-avatar {
@@ -895,7 +988,7 @@ export default {
   height: 30px;
   border-radius: 50%;
   background: rgba(218,165,32,0.2);
-  color: #daa520;
+  color: #b8860b;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -904,11 +997,11 @@ export default {
   flex-shrink: 0;
 }
 
-.peer-name { flex: 1; font-size: 13px; font-weight: 500; }
+.peer-name { flex: 1; font-size: 13px; font-weight: 700; color: var(--ion-text-color, #0f1419); }
 
 .peer-status { font-size: 10px; font-weight: 700; }
 .peer-live { color: #00c96b; }
-.peer-stored { color: rgba(255,255,255,0.35); }
+.peer-stored { color: var(--ion-color-medium, #64748b); }
 
 /* ── Action Buttons ───────────────────────────── */
 .lan-actions {
@@ -940,14 +1033,14 @@ export default {
 .lan-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(218,165,32,0.4); }
 
 .lan-btn.secondary {
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.85);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: var(--ion-color-light, rgba(0, 0, 0, 0.05));
+  color: var(--ion-text-color, #0f1419);
+  border: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.12));
 }
 
 .lan-btn.ghost {
   background: transparent;
-  color: rgba(255,255,255,0.4);
+  color: var(--ion-color-medium, #64748b);
   font-size: 12px;
   flex: none;
   padding: 8px 16px;
@@ -970,8 +1063,144 @@ export default {
 
 .step-label {
   font-size: 13px;
+  font-weight: 700;
+  color: var(--ion-text-color, #0f1419);
+}
+
+/* ── Custom IP Editor ─────────────────────────── */
+.lan-ip-chip.clickable {
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--ion-color-light, rgba(218, 165, 32, 0.08));
+  border: 1px dashed rgba(218, 165, 32, 0.4);
+  transition: all 0.2s ease;
+}
+
+.lan-ip-chip.clickable:hover {
+  background: rgba(218, 165, 32, 0.15);
+  border-style: solid;
+}
+
+.chip-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.chip-edit-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #b8860b;
+  background: rgba(218, 165, 32, 0.2);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.ip-editor-card {
+  background: var(--ion-color-light, #f8fafc);
+  border: 1.5px solid rgba(218, 165, 32, 0.4);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #b8860b;
+}
+
+.close-editor-btn {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: var(--ion-color-medium, #64748b);
+  cursor: pointer;
+}
+
+.editor-hint {
+  font-size: 12px;
+  color: var(--ion-color-medium, #64748b);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.editor-hint code {
+  background: rgba(218, 165, 32, 0.15);
+  color: #b8860b;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.ip-input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.ip-input-field {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--ion-border-color, #cbd5e1);
+  background: var(--ion-background-color, #ffffff);
+  color: var(--ion-text-color, #0f1419);
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: 700;
+  outline: none;
+}
+
+.ip-input-field:focus {
+  border-color: #daa520;
+  box-shadow: 0 0 0 2px rgba(218, 165, 32, 0.2);
+}
+
+.save-ip-btn {
+  flex: none;
+  padding: 0 16px;
+}
+
+.ip-error-text {
+  font-size: 11px;
+  color: #ef4444;
+  margin: 0;
+}
+
+.ip-preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset-chip {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
   font-weight: 600;
-  color: rgba(255,255,255,0.7);
+  background: var(--ion-color-step-100, rgba(0, 0, 0, 0.05));
+  border: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.1));
+  color: var(--ion-text-color, #0f1419);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preset-chip:hover {
+  background: rgba(218, 165, 32, 0.2);
+  color: #b8860b;
+}
+
+.preset-chip.auto-btn {
+  color: #00c96b;
+  border-color: rgba(0, 201, 107, 0.4);
+  background: rgba(0, 201, 107, 0.1);
 }
 
 .step-actions {

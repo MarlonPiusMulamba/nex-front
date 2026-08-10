@@ -17,7 +17,34 @@ import api from './api.js';
 //  Discover own local IP via WebRTC SDP trick (no server needed)
 // ─────────────────────────────────────────────────────────────
 export async function getLocalIP() {
-    // 1. If in Electron (Desktop), use Node's os module
+    // 0. Manual Override IP check in localStorage first!
+    const customIP = localStorage.getItem('custom_lan_ip');
+    if (customIP && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(customIP.trim())) {
+        return customIP.trim();
+    }
+
+    // 1. Check if backend URL / current window location host has an IPv4 LAN IP
+    try {
+        const host = window.location.hostname;
+        if (host && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host) && host !== '127.0.0.1' && host !== '0.0.0.0') {
+            localStorage.setItem('detected_lan_ip', host);
+            return host;
+        }
+    } catch (_) {}
+
+    // 2. Query backend `/api/lan/my_ip` (Fast network response if connected)
+    try {
+        const res = await api.get('/api/lan/my_ip', { timeout: 1500 });
+        if (res?.data?.success && res?.data?.ip && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(res.data.ip)) {
+            const ip = res.data.ip;
+            if (ip !== '127.0.0.1' && ip !== '0.0.0.0') {
+                localStorage.setItem('detected_lan_ip', ip);
+                return ip;
+            }
+        }
+    } catch (_) {}
+
+    // 3. Electron / Desktop Node check
     const isElectron = navigator.userAgent.toLowerCase().includes(' electron/');
     if (isElectron) {
         try {
@@ -27,6 +54,7 @@ export async function getLocalIP() {
                 for (const name of Object.keys(interfaces)) {
                     for (const iface of interfaces[name]) {
                         if (iface.family === 'IPv4' && !iface.internal) {
+                            localStorage.setItem('detected_lan_ip', iface.address);
                             return iface.address;
                         }
                     }
@@ -37,34 +65,49 @@ export async function getLocalIP() {
         }
     }
 
-    // 2. WebRTC Trick (Browser fallback)
-    return new Promise((resolve) => {
+    // 4. WebRTC SDP Candidates check (Fast 1.2s timeout)
+    const webrtcPromise = new Promise((resolve) => {
         try {
-            const pc = new RTCPeerConnection({ iceServers: [] });
+            const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
             pc.createDataChannel('ip-detect');
             pc.createOffer().then(offer => pc.setLocalDescription(offer)).catch(() => {});
 
             const found = new Set();
             pc.onicecandidate = (e) => {
                 if (!e.candidate) {
-                    pc.close();
+                    try { pc.close(); } catch (_) {}
                     const ips = [...found].filter(ip => ip !== '127.0.0.1' && ip !== '0.0.0.0');
                     resolve(ips[0] || null);
                     return;
                 }
-                const match = e.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+                const match = e.candidate.candidate.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
                 if (match) found.add(match[1]);
             };
 
             setTimeout(() => {
                 try { pc.close(); } catch (_) {}
                 const ips = [...found].filter(ip => ip !== '127.0.0.1' && ip !== '0.0.0.0');
-                resolve(ips[0] || null);
-            }, 3000);
+                const lanIp = ips.find(ip => /^192\.168\.|^10\.|^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) || ips[0];
+                resolve(lanIp || null);
+            }, 1200);
         } catch (e) {
             resolve(null);
         }
     });
+
+    const webrtcIp = await webrtcPromise;
+    if (webrtcIp) {
+        localStorage.setItem('detected_lan_ip', webrtcIp);
+        return webrtcIp;
+    }
+
+    // 5. Fallback to cached detected IP from prior run
+    const cachedIP = localStorage.getItem('detected_lan_ip');
+    if (cachedIP && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(cachedIP)) {
+        return cachedIP;
+    }
+
+    return null;
 }
 
 // ─────────────────────────────────────────────────────────────
