@@ -46,7 +46,7 @@ jobs:
           cache-dependency-path: xclone-mobile-js/package-lock.json
 
       - name: 📦 Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: 🏗️ Build NexFi web assets
         env:
@@ -144,7 +144,7 @@ jobs:
           cache-dependency-path: xclone-mobile-js/package-lock.json
 
       - name: 📦 Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: 🏗️ Build Bugema web assets (standalone mode)
         env:
