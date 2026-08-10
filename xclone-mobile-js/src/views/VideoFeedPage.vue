@@ -27,11 +27,13 @@
         :key="video.post_id"
         class="video-slide"
         :data-index="index"
-        :ref="el => setSlideRef(el, index)"
+        :data-post-id="video.post_id"
+        :ref="el => setSlideRef(el, video.post_id)"
       >
-        <!-- Video element -->
+        <!-- Video element keyed by post_id to prevent element recycling mismatch -->
         <video
-          :ref="el => setVideoRef(el, index)"
+          :key="'video-player-' + video.post_id"
+          :ref="el => setVideoRef(el, video.post_id)"
           :src="getVideoSrc(video)"
           class="fullscreen-video"
           playsinline
@@ -71,14 +73,14 @@
             <img :src="getImageUrl(video.profile_pic)" class="author-avatar" alt="Avatar" @error="handleAvatarError" />
             <div class="author-info">
               <span class="author-name">
-                {{ video.first_name || video.last_name ? `${video.first_name} ${video.last_name}`.trim() : video.username }}
+                {{ getAuthorDisplayName(video) }}
                 <span v-if="video.verification_tier && video.verification_tier !== 'none'" class="badge-inline">
                   <ion-icon v-if="video.verification_tier === 'blue'" :icon="shieldCheckmark" class="badge-icon blue"></ion-icon>
                   <ion-icon v-else-if="video.verification_tier === 'silver'" :icon="shieldCheckmark" class="badge-icon silver"></ion-icon>
                   <ion-icon v-else-if="video.verification_tier === 'gold'" :icon="star" class="badge-icon gold"></ion-icon>
                 </span>
               </span>
-              <span class="author-handle">@{{ video.username }}</span>
+              <span class="author-handle">@{{ video.username || 'user' }}</span>
             </div>
           </div>
           <div class="video-caption" v-if="video.content">{{ video.content }}</div>
@@ -209,11 +211,24 @@ export default {
     }
   },
   methods: {
-    setVideoRef(el, index) {
-      this.videoRefs[index] = el;
+    setVideoRef(el, postId) {
+      if (el && postId) {
+        this.videoRefs[postId] = el;
+      }
     },
-    setSlideRef(el, index) {
-      this.slideRefs[index] = el;
+    setSlideRef(el, postId) {
+      if (el && postId) {
+        this.slideRefs[postId] = el;
+      }
+    },
+
+    getAuthorDisplayName(video) {
+      if (!video) return 'User';
+      if (video.is_anonymous) return 'Anonymous User';
+      if (video.first_name || video.last_name) {
+        return `${video.first_name || ''} ${video.last_name || ''}`.trim();
+      }
+      return video.username || 'User';
     },
 
     async loadVideos() {
@@ -237,7 +252,11 @@ export default {
             const seedRes = await axios.get(`${this.API_URL}/api/posts/${startPostId}`, {
               params: { user_id: this.userId || 0 }
             });
-            if (seedRes.data.success) seedPost = seedRes.data.post;
+            if (seedRes.data.success && seedRes.data.post) {
+              seedPost = seedRes.data.post;
+              seedPost.post_id = String(seedPost.post_id);
+              seedPost.is_liked = seedPost.liked || seedPost.is_liked || false;
+            }
           } catch (e) {
             console.error('Failed to load seed post:', e);
           }
@@ -247,7 +266,10 @@ export default {
           params: { user_id: this.userId || 0, limit: 20, offset: 0 }
         });
 
-        let feedVideos = res.data.videos || [];
+        let feedVideos = (res.data.videos || []).map(v => {
+          v.post_id = String(v.post_id);
+          return v;
+        });
 
         if (seedPost) {
           this.videos = [seedPost, ...feedVideos.filter(v => String(v.post_id) !== String(startPostId))];
@@ -288,12 +310,13 @@ export default {
       this.observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
           const index = parseInt(entry.target.dataset.index);
+          const postId = entry.target.dataset.postId;
           if (isNaN(index)) return;
 
           if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-            this.onSlideVisible(index);
+            this.onSlideVisible(index, postId);
           } else if (!entry.isIntersecting) {
-            this.onSlideHidden(index);
+            this.onSlideHidden(index, postId);
           }
         });
       }, {
@@ -306,8 +329,8 @@ export default {
       });
 
       // Play first video immediately
-      if (this.slideRefs[0] && this.videoRefs[0]) {
-        this.onSlideVisible(0);
+      if (this.videos.length > 0) {
+        this.onSlideVisible(0, this.videos[0].post_id);
       }
     },
 
@@ -318,30 +341,47 @@ export default {
       }
     },
 
-    onSlideVisible(index) {
-      // Pause all others
-      Object.keys(this.videoRefs).forEach(i => {
-        if (parseInt(i) !== index) this.pauseVideoAt(parseInt(i));
-      });
+    onSlideVisible(index, postId) {
+      const targetPostId = postId || (this.videos[index] && this.videos[index].post_id);
+      if (!targetPostId) return;
 
       this.currentIndex = index;
-      this.playVideoAt(index);
+
+      // Pause all other videos
+      Object.keys(this.videoRefs).forEach(id => {
+        if (String(id) !== String(targetPostId)) {
+          this.pauseVideoByPostId(id);
+        }
+      });
+
+      this.playVideoByPostId(targetPostId);
 
       // Load more when approaching the end
       if (index >= this.videos.length - 3) this.loadMore();
     },
 
-    onSlideHidden(index) {
+    onSlideHidden(index, postId) {
+      const targetPostId = postId || (this.videos[index] && this.videos[index].post_id);
       if (this.playingStates[index]) {
         this.reportVideoDwell(index);
       }
-      this.pauseVideoAt(index);
+      if (targetPostId) {
+        this.pauseVideoByPostId(targetPostId);
+      }
     },
 
     playVideoAt(index) {
-      const video = this.videoRefs[index];
       const videoData = this.videos[index];
-      if (!video) return;
+      if (videoData) {
+        this.playVideoByPostId(videoData.post_id);
+      }
+    },
+
+    playVideoByPostId(postId) {
+      const video = this.videoRefs[postId];
+      const videoData = this.videos.find(v => String(v.post_id) === String(postId));
+      const index = this.videos.findIndex(v => String(v.post_id) === String(postId));
+      if (!video || !videoData) return;
 
       // Ensure src is set
       const src = this.getVideoSrc(videoData);
@@ -360,7 +400,7 @@ export default {
           this.isMuted = true;
           video.play().catch(() => {});
         });
-        this.playingStates[index] = true;
+        if (index !== -1) this.playingStates[index] = true;
       };
 
       if (video.readyState >= 2) {
@@ -379,13 +419,21 @@ export default {
     },
 
     pauseVideoAt(index) {
-      const video = this.videoRefs[index];
+      const videoData = this.videos[index];
+      if (videoData) {
+        this.pauseVideoByPostId(videoData.post_id);
+      }
+    },
+
+    pauseVideoByPostId(postId) {
+      const video = this.videoRefs[postId];
+      const index = this.videos.findIndex(v => String(v.post_id) === String(postId));
       if (video && !video.paused) video.pause();
-      this.playingStates[index] = false;
+      if (index !== -1) this.playingStates[index] = false;
     },
 
     pauseAll() {
-      Object.keys(this.videoRefs).forEach(i => this.pauseVideoAt(parseInt(i)));
+      Object.keys(this.videoRefs).forEach(postId => this.pauseVideoByPostId(postId));
     },
 
     togglePlay(index) {
