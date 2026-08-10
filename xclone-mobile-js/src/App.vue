@@ -152,8 +152,13 @@ export default {
 
       socket.on('call:incoming', (payload) => {
         console.log('📞 App received call:incoming event:', payload);
-        const currentUserId = localStorage.getItem('userId');
-        if (payload && (payload.target_user_id == currentUserId || payload.to_user_id == currentUserId)) {
+        const currentUserId = String(localStorage.getItem('userId') || '');
+        if (!currentUserId || currentUserId === '0' || currentUserId === 'null' || currentUserId === 'undefined') return;
+        const targetUserId = String(payload?.callee_id || payload?.target_user_id || payload?.to_user_id || '');
+        const callerId = String(payload?.caller_id || '');
+        
+        if (callerId && callerId === currentUserId) return;
+        if (targetUserId && targetUserId === currentUserId) {
           notificationService.showWebNotification(
             `📞 Incoming Call from ${payload.caller_username || 'Someone'}`,
             `Incoming ${payload.media || 'voice'} call...`,

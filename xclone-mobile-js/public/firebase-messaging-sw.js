@@ -151,18 +151,18 @@ self.addEventListener('notificationclick', function (event) {
         });
     }
 
-    // Default: use the URL stored in notification data (notice board URL for notices)
-    let targetUrl = event.notification.data?.url || '/notices/bugema';
+    const notifType = event.notification.data?.type;
+    let targetUrl = event.notification.data?.url;
 
-    if (event.action === 'accept') {
-        // Build URL with call parameters to open the call UI
-        const callData = event.notification.data;
-        targetUrl = `/?incomingCall=1&callId=${callData.call_id}&media=${callData.media}&caller=${callData.caller_username}&callerId=${callData.caller_id || ''}`;
+    if (notifType === 'call' || event.action === 'accept') {
+        const callData = event.notification.data || {};
+        targetUrl = `/?incomingCall=1&callId=${callData.call_id || ''}&media=${callData.media || 'voice'}&caller=${callData.caller_username || ''}&callerId=${callData.caller_id || ''}`;
     } else if (event.action === 'decline') {
-        // Just close the notification, don't open the app
         return;
-    } else if (event.notification.data?.type === 'message') {
-        targetUrl = `/messages`;
+    } else if (notifType === 'message') {
+        targetUrl = targetUrl || '/messages';
+    } else if (!targetUrl) {
+        targetUrl = '/notices/bugema';
     }
 
     event.waitUntil(

@@ -724,14 +724,27 @@ export default {
     getImageUrl(imageData) {
       if (!imageData || imageData === '') return this.defaultAvatar;
       if (typeof imageData !== 'string') return this.defaultAvatar;
-      if (imageData.startsWith('http')) return imageData;
-      if (imageData.startsWith('data:image')) return imageData;
-      if (imageData.startsWith('/static/')) return `${api.defaults.baseURL}${imageData}`;
-      // Fix: Handle base64 images properly
-      if (imageData.length > 100 && !imageData.startsWith('http') && !imageData.startsWith('data:image') && !imageData.startsWith('/static/')) {
-        return `data:image/png;base64,${imageData}`;
+
+      const cleanImg = imageData.trim();
+      if (!cleanImg) return this.defaultAvatar;
+
+      if (cleanImg.startsWith('http://') || cleanImg.startsWith('https://')) {
+        return cleanImg;
       }
-      return imageData;
+      if (cleanImg.startsWith('data:image/')) {
+        return cleanImg;
+      }
+      if (cleanImg.length > 100 && !cleanImg.includes('/') && !cleanImg.includes('.')) {
+        return `data:image/png;base64,${cleanImg}`;
+      }
+
+      let relativePath = cleanImg;
+      if (!relativePath.startsWith('/')) {
+        relativePath = '/' + relativePath;
+      }
+
+      const baseURL = (api.defaults?.baseURL || config.api?.baseURL || config.baseURL || '').replace(/\/+$/, '');
+      return `${baseURL}${relativePath}`;
     },
 
     formatTime(timestamp) {
@@ -966,36 +979,39 @@ export default {
     },
 
     async loadMessages(otherUserId) {
-      if (!otherUserId || this.loadingMessages) return;
+      if (!otherUserId) return;
       
       try {
-        this.loadingMessages = true;
         console.log('📡 Loading messages for chat:', otherUserId);
-        
-        // Handle offline: Fetch from IndexedDB
-        if (isNetworkOffline()) {
-          console.log('📡 OFFLINE: Fetching messages from IndexedDB');
-          const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
-          this.messages = cachedMessages || [];
+
+        // 1. Instant Cache-First Load from IndexedDB (0ms instant UI display)
+        const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
+        if (cachedMessages && cachedMessages.length > 0) {
+          this.messages = cachedMessages;
+          this.loadingMessages = false;
           this.$nextTick(() => this.scrollToBottom());
+        } else {
+          this.loadingMessages = true;
+        }
+        
+        if (isNetworkOffline()) {
+          this.loadingMessages = false;
           return;
         }
 
+        // 2. Background sync fresh messages from server
         const res = await api.get(`/api/messages/${otherUserId}`, {
           params: { user_id: this.userId }
         });
         
-        // Normalize statuses: when fetching from server, any message NOT already in local DB 
-        // with a different status should probably be marked 'synced'.
         const serverMessages = (res.messages || []).map(m => ({
           ...m,
-          status: m.status || 'synced' // server-fetched are by definition synced
+          status: m.status || 'synced'
         }));
 
         this.messages = serverMessages;
         console.log(`✅ Loaded ${this.messages.length} messages`);
 
-        // Save to offline DB
         if (this.messages.length > 0) {
           await saveMessagesOffline(this.messages);
         }
@@ -1003,9 +1019,8 @@ export default {
         this.$nextTick(() => this.scrollToBottom());
       } catch (err) {
         console.error('❌ Load messages error:', err);
-        // Fallback to offline on error
         const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
-        if (cachedMessages) this.messages = cachedMessages;
+        if (cachedMessages && cachedMessages.length > 0) this.messages = cachedMessages;
       } finally {
         this.loadingMessages = false;
       }
@@ -1586,20 +1601,24 @@ export default {
 
     async loadConversations() {
       try {
-        this.isLoading = true;
         console.log('📡 Loading conversations for user:', this.userId);
         
-        // Handle offline
-        if (isNetworkOffline()) {
-           console.log('📡 OFFLINE: Loading conversations from IndexedDB');
-           const cachedConv = await getOfflineConversations();
-           if (cachedConv && cachedConv.length > 0) {
-             this.conversations = cachedConv;
-             this.filteredConversations = [...this.conversations];
-             return;
-           }
+        // 1. Instant Cache-First Load from IndexedDB
+        const cachedConv = await getOfflineConversations();
+        if (cachedConv && cachedConv.length > 0) {
+          this.conversations = cachedConv;
+          this.filteredConversations = [...this.conversations];
+          this.isLoading = false;
+        } else {
+          this.isLoading = true;
         }
 
+        if (isNetworkOffline()) {
+          this.isLoading = false;
+          return;
+        }
+
+        // 2. Fetch fresh conversations from server
         const res = await api.get('/api/conversations', {
           params: { user_id: this.userId }
         });
@@ -1608,34 +1627,30 @@ export default {
         this.filteredConversations = [...this.conversations];
         console.log(`✅ Loaded ${this.conversations.length} conversations`);
 
-        // Update online status for all
-        const allIds = this.conversations.map(c => c.user_id);
-        if (allIds.length > 0) {
-          const statusRes = await api.post('/api/users/online-status', { user_ids: allIds });
-          if (statusRes.success && statusRes.statuses) {
-            this.conversations.forEach(c => {
-              const s = statusRes.statuses[String(c.user_id)];
-              if (s) c.online = s.online;
-            });
-          }
-        }
-
-        // Save to offline DB
         if (this.conversations.length > 0) {
           await saveConversationsOffline(this.conversations);
+        }
+
+        // 3. Update online status asynchronously in the background
+        const allIds = this.conversations.map(c => c.user_id);
+        if (allIds.length > 0) {
+          api.post('/api/users/online-status', { user_ids: allIds }).then(statusRes => {
+            if (statusRes && statusRes.success && statusRes.statuses) {
+              this.conversations.forEach(c => {
+                const s = statusRes.statuses[String(c.user_id)];
+                if (s) c.online = s.online;
+              });
+            }
+          }).catch(() => {});
         }
 
         window.dispatchEvent(new Event('dm-refresh'));
       } catch (err) {
         console.error('❌ Load conversations error:', err);
-        // Fallback to offline on error
         const cachedConv = await getOfflineConversations();
-        if (cachedConv) {
+        if (cachedConv && cachedConv.length > 0) {
           this.conversations = cachedConv;
           this.filteredConversations = [...this.conversations];
-        } else {
-          this.conversations = [];
-          this.filteredConversations = [];
         }
       } finally {
         this.isLoading = false;

@@ -514,13 +514,15 @@ class NotificationService {
         try {
             const apiUrl = config.api?.baseURL || config.baseURL;
             const currentPref = prefDeptId !== undefined ? prefDeptId : (localStorage.getItem('pref_dept_bugema') || null);
+            const rawUid = this.userId || localStorage.getItem('userId');
+            const cleanUid = (rawUid && rawUid !== '0' && rawUid !== 'null' && rawUid !== 'undefined') ? Number(rawUid) : null;
             await axios.post(`${apiUrl}/api/notifications/register-token`, {
-                user_id: this.userId || localStorage.getItem('userId') || 0,
+                user_id: cleanUid,
                 token: token,
                 device_type: deviceType,
                 pref_dept_id: currentPref ? Number(currentPref) : null
             });
-            console.log(`✓ ${deviceType} notification token registered (pref_dept_id: ${currentPref})`);
+            console.log(`✓ ${deviceType} notification token registered (user_id: ${cleanUid}, pref_dept_id: ${currentPref})`);
         } catch (error) {
             console.error('Error registering notification token:', error);
         }

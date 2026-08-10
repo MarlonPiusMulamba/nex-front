@@ -7,6 +7,9 @@
   >
     <div class="call-screen" :class="[callStatus, { 'video-mode': callMedia === 'video' }]">
 
+      <!-- Remote Audio (ALWAYS present to output remote speaker/voice for both voice and video calls) -->
+      <audio ref="remoteAudio" autoplay playsinline style="display: none;"></audio>
+
       <!-- ══════════════════════════════════════════════════
            VIDEO STREAMS (video calls only)
       ══════════════════════════════════════════════════ -->
@@ -325,6 +328,24 @@ export default {
 
       this._socketCallIncomingHandler = (payload) => {
         if (this.callStatus !== 'idle') return;
+        const currentUserId = String(this.userId || localStorage.getItem('userId') || '');
+        const targetUserId = String(payload.callee_id || payload.target_user_id || payload.to_user_id || '');
+        const callerId = String(payload.caller_id || '');
+
+        if (!currentUserId || currentUserId === '0' || currentUserId === 'null' || currentUserId === 'undefined') {
+          return;
+        }
+
+        // Ignore incoming call popup if we are the caller
+        if (callerId && callerId === currentUserId) {
+          return;
+        }
+
+        // Ignore incoming call popup if explicitly targeted to another user
+        if (targetUserId && targetUserId !== currentUserId) {
+          return;
+        }
+
         this.incomingCall({
           call_id: payload.call_id,
           caller_id: payload.caller_id,
@@ -430,9 +451,10 @@ export default {
     },
 
     async pollIncomingCalls() {
-      if (!this.userId) return;
+      const uid = String(this.userId || localStorage.getItem('userId') || '');
+      if (!uid || uid === '0' || uid === 'null' || uid === 'undefined') return;
       try {
-        const res = await axios.get(`${this.API_URL}/api/call/incoming`, { params: { user_id: this.userId } });
+        const res = await axios.get(`${this.API_URL}/api/call/incoming`, { params: { user_id: uid } });
         const calls = (res.data && res.data.calls) || [];
         if (calls.length > 0) this.incomingCall(calls[0]);
       } catch (_) {}
@@ -552,6 +574,9 @@ export default {
         }
 
         this.callStatus = 'in_call';
+        if (this.$refs.remoteAudio && this.$refs.remoteAudio.srcObject) {
+          this.$refs.remoteAudio.play().catch(() => {});
+        }
 
         if (!this.isLanCall) {
           this.callPollInterval = setInterval(() => this.pollCallState(), 2000);
@@ -697,11 +722,18 @@ export default {
       this.localStream.getTracks().forEach(track => this.pc.addTrack(track, this.localStream));
 
       this.pc.ontrack = (event) => {
-        const stream = event.streams[0];
+        console.log('🎵 Remote WebRTC track received:', event.track?.kind, event.streams);
+        const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+
+        if (this.$refs.remoteAudio) {
+          this.$refs.remoteAudio.srcObject = stream;
+          this.$refs.remoteAudio.volume = 1.0;
+          this.$refs.remoteAudio.play().catch(e => console.warn('Remote audio play warning:', e));
+        }
+
         if (this.callMedia === 'video' && this.$refs.remoteVideo) {
           this.$refs.remoteVideo.srcObject = stream;
-        } else if (this.$refs.remoteAudio) {
-          this.$refs.remoteAudio.srcObject = stream;
+          this.$refs.remoteVideo.play().catch(e => console.warn('Remote video play warning:', e));
         }
       };
 
