@@ -12,7 +12,7 @@
               {{ pendingInvitations.length }}
             </ion-badge>
           </ion-button>
-          <ion-button @click="showSearchModal = true">
+          <ion-button @click="openSearchModal">
             <ion-icon :icon="search"></ion-icon>
           </ion-button>
         </ion-buttons>
@@ -87,7 +87,7 @@
           <ion-icon :icon="chatbubbles" class="empty-icon"></ion-icon>
           <h3>No messages yet</h3>
           <p>Start a conversation by searching for users</p>
-          <ion-button @click="showSearchModal = true" fill="solid" class="gold-btn">
+          <ion-button @click="openSearchModal" fill="solid" class="gold-btn">
             <ion-icon :icon="search" slot="start"></ion-icon>
             Find Users
           </ion-button>
@@ -155,10 +155,22 @@
           <div
             v-for="msg in messages"
             :key="msg.id"
+            :id="'msg-' + msg.id"
+            :data-msg-id="msg.id"
             :class="['msg-row', msg.sent_by_me ? 'sent' : 'received']"
             @touchstart="onMsgTouchStart(msg, $event)"
             @touchend="onMsgTouchEnd"
-            @contextmenu.prevent="replyToMessage(msg)">
+            @contextmenu.prevent="replyToMessage(msg)"
+            @dblclick="replyToMessage(msg)">
+
+            <!-- Quick Reply Action Button (WhatsApp Style) -->
+            <button 
+              class="msg-quick-reply-btn"
+              @click.stop="replyToMessage(msg)"
+              title="Reply to message"
+            >
+              <ion-icon :icon="arrowUndoOutline"></ion-icon>
+            </button>
 
             <!-- Mood badge -->
             <div v-if="msg.mood" class="mood-label" :class="'mood-' + msg.mood">
@@ -171,10 +183,18 @@
             ]"
             :style="msg.mood && moodMap[msg.mood] ? { '--msg-glow': moodMap[msg.mood].glow } : {}"
             >
-              <!-- Reply Quote -->
-              <div v-if="msg.reply_to_preview" class="msg-reply-quote" @click="scrollToMsg(msg.reply_to_id)">
+              <!-- Reply Quote (WhatsApp Style) -->
+              <div 
+                v-if="msg.reply_to_preview || msg.reply_to_text" 
+                class="msg-reply-quote"
+                @click.stop="scrollToMsg(msg.reply_to_id)"
+                title="Click to jump to original message"
+              >
                 <div class="reply-quote-bar"></div>
-                <span class="reply-quote-text">{{ msg.reply_to_preview }}</span>
+                <div class="reply-quote-content">
+                  <span class="reply-quote-sender">{{ msg.reply_to_username || 'Quoted Message' }}</span>
+                  <span class="reply-quote-text">{{ msg.reply_to_preview || msg.reply_to_text }}</span>
+                </div>
               </div>
 
               <img v-if="msg.image" :src="getImageUrl(msg.image)" class="message-image" alt="Image" />
@@ -249,15 +269,18 @@
           </div>
         </transition>
 
-        <!-- Reply Bar -->
+        <!-- Reply Bar (WhatsApp Style Preview Above Composer) -->
         <transition name="slide-up">
           <div v-if="replyingTo" class="vd-reply-bar">
             <div class="reply-bar-accent"></div>
             <div class="reply-bar-body">
-              <span class="reply-bar-label">{{ replyingTo.timestampSec != null ? `Replying to ${fmtRepSec(replyingTo.timestampSec)}` : 'Replying' }}</span>
-              <span class="reply-bar-preview">{{ replyingTo.preview }}</span>
+              <span class="reply-bar-label">
+                <ion-icon :icon="arrowUndoOutline" class="reply-bar-icon"></ion-icon>
+                Replying to <strong class="reply-bar-user">@{{ replyingTo.username }}</strong>
+              </span>
+              <span class="reply-bar-preview">{{ replyingTo.preview || replyingTo.text }}</span>
             </div>
-            <button class="reply-bar-close" @click="clearReply">✕</button>
+            <button class="reply-bar-close" @click="clearReply" title="Cancel reply">✕</button>
           </div>
         </transition>
 
@@ -283,6 +306,7 @@
 
           <div class="textarea-wrap">
             <ion-textarea
+              ref="messageInput"
               v-model="messageText"
               :placeholder="inputPlaceholder"
               :auto-grow="true"
@@ -391,20 +415,21 @@
     </ion-content>
 
     <!-- Search Users Modal -->
-    <ion-modal :is-open="showSearchModal" @did-dismiss="closeSearchModal">
+    <ion-modal :is-open="showSearchModal" @will-present="onSearchModalWillPresent" @did-dismiss="closeSearchModal">
       <ion-header>
         <ion-toolbar>
           <ion-buttons slot="start">
             <ion-button @click="closeSearchModal">Cancel</ion-button>
           </ion-buttons>
-          <ion-title>New Message</ion-title>
+          <ion-title>Find Users</ion-title>
         </ion-toolbar>
         <ion-toolbar>
           <ion-searchbar 
             v-model="userSearchQuery"
-            placeholder="Search by username"
-            @ionInput="searchUsers"
-            :debounce="300">
+            placeholder="Search by username or name..."
+            @ionInput="searchUsers($event)"
+            @ionChange="searchUsers($event)"
+            :debounce="150">
           </ion-searchbar>
         </ion-toolbar>
       </ion-header>
@@ -413,19 +438,21 @@
           <ion-spinner></ion-spinner>
         </div>
         
-        <div v-else-if="searchResults.length === 0 && userSearchQuery.length >= 2" class="empty-search">
-          <p>No users found matching "{{ userSearchQuery }}"</p>
+        <div v-else-if="searchResults.length === 0" class="empty-search" style="text-align: center; padding: 40px 20px; color: #888;">
+          <ion-icon :icon="search" style="font-size: 44px; opacity: 0.4; margin-bottom: 12px;"></ion-icon>
+          <p v-if="userSearchQuery.trim()" style="font-size: 15px; font-weight: 500;">No users found matching "{{ userSearchQuery }}"</p>
+          <p v-else style="font-size: 15px; font-weight: 500;">No suggested users found</p>
         </div>
 
         <div 
           v-for="user in searchResults" 
-          :key="user.user_id"
+          :key="user.user_id || user.id"
           class="search-result-item"
           @click="startNewChat(user)">
           <img :src="getImageUrl(user.profile_pic)" class="result-avatar" alt="Avatar" />
           <div class="result-info">
             <div class="result-username">
-              {{ user.full_name || user.username }}
+              {{ user.full_name || (user.first_name ? (user.first_name + ' ' + (user.last_name || '')).trim() : user.username) }}
               <VerificationBadge :tier="user.verification_tier" />
             </div>
             <div class="result-handle">@{{ user.username }}</div>
@@ -551,7 +578,7 @@ import {
 import { 
   search, arrowBack, send, mic, add, call, videocam, chatbubbles,
   checkmark, checkmarkDone, happy, flash, eye, eyeOff,
-  stop, trash, play, pause
+  stop, trash, play, pause, arrowUndoOutline
 } from 'ionicons/icons';
 import api from '@/utils/api.js';
 import EmojiPicker from '@/components/EmojiPicker.vue';
@@ -599,7 +626,7 @@ export default {
       showEmojiPicker: false,
       search, arrowBack, send, mic, add, call, videocam, chatbubbles,
       checkmark, checkmarkDone, happy, flash, eye, eyeOff,
-      stop, trash, play, pause,
+      stop, trash, play, pause, arrowUndoOutline,
       defaultAvatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E',
       _socketNewMessageHandler: null,
       // Voice Recording State
@@ -759,35 +786,58 @@ export default {
       );
     },
 
-    async searchUsers() {
-      const rawQuery = (this.userSearchQuery || '').trim();
+    onSearchModalWillPresent() {
+      this.userSearchQuery = '';
+      this.searchUsers();
+    },
 
-      // Require at least 2 non-space characters before hitting the API
-      if (!rawQuery || rawQuery.length < 2) {
-        this.searchResults = [];
-        return;
+    openSearchModal() {
+      this.showSearchModal = true;
+      this.userSearchQuery = '';
+      this.searchUsers();
+    },
+
+    closeSearchModal() {
+      this.showSearchModal = false;
+      this.userSearchQuery = '';
+      this.searchResults = [];
+    },
+
+    async searchUsers(event = null) {
+      let rawQuery = this.userSearchQuery || '';
+      if (event && event.detail && typeof event.detail.value === 'string') {
+        rawQuery = event.detail.value;
+      } else if (event && event.target && typeof event.target.value === 'string') {
+        rawQuery = event.target.value;
       }
+      this.userSearchQuery = rawQuery;
+      const queryToSend = rawQuery.trim();
 
       try {
         this.searchingUsers = true;
-        console.log('📡 Searching users with query:', rawQuery);
+        console.log('📡 Searching users with query:', queryToSend);
         const res = await api.get('/api/search/users', {
           params: { 
-            q: rawQuery,
-            limit: 20,
+            q: queryToSend,
+            limit: 30,
             user_id: this.userId
           }
         });
         
-        // Defensive: Handle both res.users and res.data.users
-        // API wrapper returns response.data directly, but structure may vary
-        const users = res.users || res.data?.users || res?.data || [];
-        this.searchResults = Array.isArray(users) ? users : [];
-        
-        console.log(`✅ Search results: ${this.searchResults.length} users`, res);
+        let users = [];
+        if (Array.isArray(res)) {
+          users = res;
+        } else if (res && Array.isArray(res.users)) {
+          users = res.users;
+        } else if (res && res.data && Array.isArray(res.data.users)) {
+          users = res.data.users;
+        }
+
+        // Filter out current logged in user from results
+        this.searchResults = users.filter(u => String(u.user_id || u.id) !== String(this.userId));
+        console.log(`✅ Loaded ${this.searchResults.length} search results for "${queryToSend}"`);
       } catch (err) {
-        console.error('❌ Search error:', err);
-        console.error('Error response:', err.response?.data);
+        console.error('❌ Search users error:', err);
         this.searchResults = [];
       } finally {
         this.searchingUsers = false;
@@ -969,8 +1019,9 @@ export default {
       const moodToSend = this.selectedMood;
       const localId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const timestamp = new Date().toISOString();
-      const replyToId      = this.replyingTo?.msg?.id || null;
-      const replyToPreview = this.replyingTo?.preview || null;
+      const replyToId       = this.replyingTo?.msg?.id || this.replyingTo?.id || null;
+      const replyToPreview  = this.replyingTo?.preview || this.replyingTo?.text || null;
+      const replyToUsername = this.replyingTo?.username || (this.replyingTo?.msg?.sent_by_me ? 'You' : (this.selectedChat?.username || 'User'));
 
       // Clear reply state
       this.clearReply();
@@ -987,7 +1038,9 @@ export default {
           image: imageToSend || '',
           mood: moodToSend || null,
           reply_to_id: replyToId,
+          reply_to_text: replyToPreview,
           reply_to_preview: replyToPreview,
+          reply_to_username: replyToUsername,
           timestamp: timestamp,
           read: false,
           sent_by_me: true,
@@ -1366,18 +1419,42 @@ export default {
     },
 
     replyToMessage(msg) {
-      const preview = msg.voice
-        ? (msg.transcript ? msg.transcript.slice(0, 60) : '🎙 Voice Drop')
-        : (msg.text || '').slice(0, 80);
-      this.replyingTo = { msg, preview, timestampSec: null };
+      if (!msg) return;
+      const isMe = msg.sent_by_me || String(msg.from_user_id) === String(this.userId);
+      const username = isMe ? 'You' : (this.selectedChat?.username || 'User');
+      let preview = msg.text || '';
+      if (!preview && msg.image) preview = '📸 Photo';
+      if (!preview && msg.voice) preview = msg.transcript ? `🎤 ${msg.transcript.slice(0, 60)}` : '🎤 Voice Drop';
+      if (preview.length > 80) preview = preview.slice(0, 80) + '...';
+
+      this.replyingTo = {
+        id: msg.id,
+        username,
+        preview,
+        text: preview,
+        msg
+      };
+
+      // Focus message input box automatically
+      this.$nextTick(() => {
+        const inputEl = this.$refs.messageInput;
+        if (inputEl) {
+          if (inputEl.$el) {
+            const nativeInput = inputEl.$el.querySelector('input, textarea');
+            if (nativeInput) nativeInput.focus();
+          } else if (typeof inputEl.focus === 'function') {
+            inputEl.focus();
+          }
+        }
+      });
     },
 
     onVoiceTimestampReply({ msg, seconds, excerpt }) {
-      this.replyingTo = {
-        msg,
-        preview: excerpt || '🎙 Voice Drop',
-        timestampSec: seconds,
-      };
+      this.replyToMessage(msg);
+      if (this.replyingTo && seconds != null) {
+        this.replyingTo.timestampSec = seconds;
+        this.replyingTo.preview = excerpt || this.replyingTo.preview;
+      }
     },
 
     clearReply() {
@@ -1390,7 +1467,7 @@ export default {
     },
 
     onMsgTouchStart(msg, e) {
-      this.longPressTimer = setTimeout(() => { this.replyToMessage(msg); }, 500);
+      this.longPressTimer = setTimeout(() => { this.replyToMessage(msg); }, 450);
     },
 
     onMsgTouchEnd() {
@@ -1399,8 +1476,12 @@ export default {
 
     scrollToMsg(id) {
       if (!id) return;
-      const el = document.querySelector(`[data-msg-id="${id}"]`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const el = document.getElementById(`msg-${id}`) || document.querySelector(`[data-msg-id="${id}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('msg-highlight');
+        setTimeout(() => el.classList.remove('msg-highlight'), 1800);
+      }
     },
 
     async sendReflection() {
@@ -2798,58 +2879,123 @@ export default {
   display: flex; align-items: center; gap: 8px;
 }
 
-/* ── Reply Bar (above input) ──────────────────────────────── */
+/* ── Reply Bar (above input - WhatsApp Style) ──────────────── */
 .vd-reply-bar {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px;
-  background: rgba(218,165,32,0.06);
-  border-top: 1px solid rgba(218,165,32,0.15);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px;
+  background: rgba(20, 26, 34, 0.95);
+  border-top: 1px solid rgba(218, 165, 32, 0.25);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   animation: slideUp 0.18s ease;
 }
 .reply-bar-accent {
   width: 3px; flex-shrink: 0;
-  height: 36px; border-radius: 2px;
+  height: 38px; border-radius: 2px;
   background: #daa520;
 }
 .reply-bar-body {
   flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0;
 }
 .reply-bar-label {
-  font-size: 9px; font-weight: 700;
-  color: #daa520; text-transform: uppercase; letter-spacing: 0.07em;
+  font-size: 11px; font-weight: 700;
+  color: #daa520; display: flex; align-items: center; gap: 5px;
+}
+.reply-bar-icon {
+  font-size: 12px;
+}
+.reply-bar-user {
+  color: #fff; font-weight: 700;
 }
 .reply-bar-preview {
-  font-size: 12px; color: rgba(255,255,255,0.55);
+  font-size: 12px; color: rgba(255,255,255,0.7);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .reply-bar-close {
-  background: none; border: none;
-  color: rgba(255,255,255,0.35); font-size: 15px;
-  cursor: pointer; padding: 4px 8px; flex-shrink: 0;
-  transition: color 0.2s;
+  background: rgba(255, 255, 255, 0.08); border: none;
+  color: rgba(255,255,255,0.6); font-size: 14px;
+  border-radius: 50%; width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+  transition: all 0.2s ease;
 }
-.reply-bar-close:hover { color: #f87171; }
+.reply-bar-close:hover { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
 
-/* ── Reply Quote (inside message card) ───────────────────── */
+/* ── Reply Quote (inside message card - WhatsApp Style) ─────── */
+.msg-row {
+  position: relative;
+  transition: background 0.3s ease;
+  border-radius: 12px;
+}
+.msg-row.msg-highlight {
+  animation: msgPulseGlow 1.8s ease;
+}
+@keyframes msgPulseGlow {
+  0% { background: rgba(218, 165, 32, 0.35); }
+  50% { background: rgba(218, 165, 32, 0.2); }
+  100% { background: transparent; }
+}
+
+.msg-quick-reply-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid rgba(218, 165, 32, 0.3);
+  color: #daa520;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+.msg-row.received .msg-quick-reply-btn {
+  right: -38px;
+}
+.msg-row.sent .msg-quick-reply-btn {
+  left: -38px;
+}
+.msg-row:hover .msg-quick-reply-btn,
+.msg-row:active .msg-quick-reply-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .msg-reply-quote {
   display: flex; align-items: stretch; gap: 8px;
   margin-bottom: 8px;
-  padding: 6px 8px;
-  background: rgba(255,255,255,0.05);
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.25);
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.15s;
+  border-left: 3px solid #daa520;
+  transition: background 0.15s ease;
 }
-.msg-reply-quote:hover { background: rgba(218,165,32,0.1); }
-.reply-quote-bar {
-  width: 2px; flex-shrink: 0;
-  border-radius: 2px;
-  background: #daa520;
+.msg-card.sent-card .msg-reply-quote {
+  background: rgba(0, 0, 0, 0.2);
+  border-left-color: #ffd700;
+}
+.msg-reply-quote:hover { background: rgba(218, 165, 32, 0.15); }
+.reply-quote-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.reply-quote-sender {
+  font-size: 11px;
+  font-weight: 700;
+  color: #daa520;
+  margin-bottom: 2px;
 }
 .reply-quote-text {
-  font-size: 11px; color: rgba(255,255,255,0.45);
-  line-height: 1.4;
+  font-size: 11px; color: rgba(255,255,255,0.75);
+  line-height: 1.3;
   overflow: hidden; display: -webkit-box;
   -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }

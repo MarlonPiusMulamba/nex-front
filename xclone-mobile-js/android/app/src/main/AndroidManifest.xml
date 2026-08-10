@@ -17,6 +17,8 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
             android:exported="true">
 
             <intent-filter>
@@ -47,6 +49,20 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             CallNotificationReceiver — handles Accept / Decline button taps
+             on the full-screen incoming call notification when the app is
+             killed or locked. Passes the action to MainActivity via intent.
+             ═══════════════════════════════════════════════════════════════════ -->
+        <receiver
+            android:name=".CallNotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.xclone.app.ACTION_ACCEPT_CALL" />
+                <action android:name="org.xclone.app.ACTION_DECLINE_CALL" />
+            </intent-filter>
+        </receiver>
 
         <!-- Default notification channel for FCM data-only messages -->
         <meta-data
@@ -80,4 +96,9 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>
+

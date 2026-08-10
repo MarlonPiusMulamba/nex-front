@@ -3,22 +3,22 @@ setlocal enabledelayedexpansion
 
 echo.
 echo =======================================================
-echo   Bugema Notice Board APK Builder
-echo   Builds the standalone Bugema Notice Board app
+echo   NexFi Campus APK Builder
+echo   Builds the NEXFI app (full social campus platform)
 echo =======================================================
 echo.
 
 cd /d "%~dp0"
 
-echo [1/5] Setting app name to "Bugema Notices"...
-powershell -Command "(Get-Content 'android\app\src\main\res\values\strings.xml') -replace '<string name=\"app_name\">.*?</string>', '<string name=\"app_name\">Bugema Notices</string>' -replace '<string name=\"title_activity_main\">.*?</string>', '<string name=\"title_activity_main\">Bugema Notices</string>' | Set-Content 'android\app\src\main\res\values\strings.xml'"
+echo [1/5] Setting app name to "NexFi"...
+powershell -Command "(Get-Content 'android\app\src\main\res\values\strings.xml') -replace '<string name=\"app_name\">.*?</string>', '<string name=\"app_name\">NexFi</string>' -replace '<string name=\"title_activity_main\">.*?</string>', '<string name=\"title_activity_main\">NexFi</string>' | Set-Content 'android\app\src\main\res\values\strings.xml'"
 echo   Done.
 
-echo [2/5] Building Web Assets (Bugema Standalone mode)...
-set VITE_STANDALONE_ORG=bugema
+echo [2/5] Building Web Assets (NexFi mode)...
+set VITE_STANDALONE_ORG=
 set VITE_API_URL=https://ssp.bugemauniv.ac.ug
-set VITE_APP_TITLE=Bugema Notice Board
-set VITE_APP_NAME=Bugema Notices
+set VITE_APP_TITLE=NexFi - Campus Platform
+set VITE_APP_NAME=NexFi
 set VITE_ENABLE_SOCKETIO=true
 set NODE_ENV=production
 call npx vite build
@@ -51,12 +51,12 @@ cd ..
 echo   Compile done.
 
 echo [5/5] Copying APK to project root...
-copy /Y "android\app\build\outputs\apk\debug\app-debug.apk" "Bugema_Notice_Board.apk"
+copy /Y "android\app\build\outputs\apk\debug\app-debug.apk" "NexFi_Campus.apk"
 
 echo.
 echo =======================================================
-echo  SUCCESS! Bugema APK is ready:
-echo  Bugema_Notice_Board.apk
+echo  SUCCESS! NexFi APK is ready:
+echo  NexFi_Campus.apk
 echo =======================================================
 echo.
 pause
