@@ -971,7 +971,11 @@ export default {
       loadingSuggestions: false,
       
       // Current user anonymity state
-      isAnonymous: false
+      isAnonymous: false,
+      
+      // Reactive ticker for dynamic relative time updates
+      currentTime: Date.now(),
+      _timeTickerInterval: null
     };
   },
   computed: {
@@ -1445,29 +1449,33 @@ export default {
     },
     _normalizeMediaUrl(url) {
       if (!url || typeof url !== 'string') return '';
-      if (url.startsWith('data:')) return url;
+      let cleaned = url.trim();
+      while (cleaned.endsWith('?')) {
+        cleaned = cleaned.substring(0, cleaned.length - 1);
+      }
+      if (cleaned.startsWith('data:')) return cleaned;
 
-      // Supabase CDN URLs — return as-is
-      if (url.includes('supabase.co')) return url;
+      // Supabase CDN URLs — return clean URL
+      if (cleaned.includes('supabase.co')) return cleaned;
 
       // Handle legacy domains or local IP URLs containing /static/
-      const staticIndex = url.indexOf('/static/');
+      const staticIndex = cleaned.indexOf('/static/');
       if (staticIndex !== -1) {
-        const relativePath = url.substring(staticIndex);
+        const relativePath = cleaned.substring(staticIndex);
         return `${this.API_URL}${relativePath}`;
       }
 
-      if (url.startsWith('static/')) {
-        return `${this.API_URL}/${url}`;
+      if (cleaned.startsWith('static/')) {
+        return `${this.API_URL}/${cleaned}`;
       }
 
-      if (url.startsWith('/')) {
-        return `${this.API_URL}${url}`;
+      if (cleaned.startsWith('/')) {
+        return `${this.API_URL}${cleaned}`;
       }
 
-      if (url.startsWith('http')) return url;
+      if (cleaned.startsWith('http')) return cleaned;
 
-      return url;
+      return cleaned;
     },
 
     getImageUrl(imageData) {
@@ -1503,6 +1511,16 @@ export default {
     },
 
     
+    scrollToTop() {
+      try {
+        if (this.$refs.content && typeof this.$refs.content.scrollToTop === 'function') {
+          this.$refs.content.scrollToTop(300);
+        } else if (this.$refs.content?.$el && typeof this.$refs.content.$el.scrollToTop === 'function') {
+          this.$refs.content.$el.scrollToTop(300);
+        }
+      } catch (_) {}
+    },
+
     formatRelativeTime(timestamp) {
       try {
         // Normalize timestamp to a timezone-aware Date so local offsets don't skew the
@@ -1532,7 +1550,8 @@ export default {
         };
 
         const postDate = normalizeTimestamp(timestamp);
-        const now = new Date();
+        // Use reactive currentTime property so Vue re-renders relative times dynamically every 10 seconds
+        const now = this.currentTime ? new Date(this.currentTime) : new Date();
         const diffMs = now - postDate;
         
         if (isNaN(diffMs) || diffMs < 0) {
@@ -2659,12 +2678,17 @@ export default {
         this._socketNewPostHandler = async (payload) => {
           try {
             const incomingPostId = payload?.post_id;
+            const authorId = payload?.user_id;
             if (incomingPostId && this.latestPostId && String(incomingPostId) === String(this.latestPostId)) {
               return;
             }
 
-            if (this._isNearTop) {
+            const isMyPost = authorId && String(authorId) === String(this.userId);
+
+            // Auto-refresh and scroll to top if user is near top OR if the user posted it themselves
+            if (this._isNearTop !== false || isMyPost) {
               await this.refreshFeed(null, true);
+              this.scrollToTop();
             } else {
               this.showNewPostsBanner = true;
             }
@@ -2698,6 +2722,11 @@ export default {
       console.error('Feed socket setup failed:', e);
     }
 
+    // Start 10-second ticker interval to update relative timestamps dynamically
+    this._timeTickerInterval = setInterval(() => {
+      this.currentTime = Date.now();
+    }, 10000);
+
     this.setupDwellObserver();
     
     window.addEventListener('themeChanged', (e) => {
@@ -2709,8 +2738,9 @@ export default {
     };
     window.addEventListener('open-post-modal', this._globalPostHandler);
 
-    this._feedRefreshHandler = () => {
-      this.refreshFeed(null, true);
+    this._feedRefreshHandler = async () => {
+      await this.refreshFeed(null, true);
+      this.scrollToTop();
     };
     window.addEventListener('feed-refresh', this._feedRefreshHandler);
   },
@@ -2723,6 +2753,11 @@ export default {
     if (this._newPostsInterval) {
       clearInterval(this._newPostsInterval);
       this._newPostsInterval = null;
+    }
+
+    if (this._timeTickerInterval) {
+      clearInterval(this._timeTickerInterval);
+      this._timeTickerInterval = null;
     }
 
     if (this.dwellObserver) {

@@ -674,7 +674,9 @@ export default {
       followLoading: false,
       happy,
       add,
-      remove
+      remove,
+      currentTime: Date.now(),
+      _timeTickerInterval: null
     };
   },
   
@@ -700,12 +702,16 @@ export default {
 
     _normalizeMediaUrl(url) {
       if (!url || typeof url !== 'string') return url;
-      const STATIC_MARKER = '/static/';
-      const idx = url.indexOf(STATIC_MARKER);
-      if (url.startsWith('http') && idx !== -1) {
-        return `${this.API_URL}${url.substring(idx)}`;
+      let cleaned = url.trim();
+      while (cleaned.endsWith('?')) {
+        cleaned = cleaned.substring(0, cleaned.length - 1);
       }
-      return url;
+      const STATIC_MARKER = '/static/';
+      const idx = cleaned.indexOf(STATIC_MARKER);
+      if (cleaned.startsWith('http') && idx !== -1) {
+        return `${this.API_URL}${cleaned.substring(idx)}`;
+      }
+      return cleaned;
     },
 
     getImageUrl(imageData) {
@@ -811,17 +817,47 @@ export default {
 
     formatPostTime(timestamp) {
       try {
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const normalizeTimestamp = (value) => {
+          if (typeof value === 'number') {
+            return value > 1000000000000 ? new Date(value) : new Date(value * 1000);
+          }
 
-        if (diffHours < 1) return 'Just now';
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      } catch {
+          if (typeof value === 'string') {
+            const trimmed = value.trim();
+            const hasZone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(trimmed);
+            const looksIso = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(trimmed);
+
+            if (looksIso && !hasZone) {
+              const iso = trimmed.replace(' ', 'T') + 'Z';
+              return new Date(iso);
+            }
+
+            return new Date(trimmed);
+          }
+
+          return new Date();
+        };
+
+        const postDate = normalizeTimestamp(timestamp);
+        const now = this.currentTime ? new Date(this.currentTime) : new Date();
+        const diffMs = now - postDate;
+        
+        if (isNaN(diffMs) || diffMs < 0) {
+          return 'now';
+        }
+        
+        const diffSec = Math.floor(diffMs / 1000);
+        const diffMin = Math.floor(diffSec / 60);
+        const diffHr = Math.floor(diffMin / 60);
+        const diffDay = Math.floor(diffHr / 24);
+
+        if (diffSec < 10) return 'now';
+        if (diffSec < 60) return `${diffSec}s`;
+        if (diffMin < 60) return `${diffMin}m`;
+        if (diffHr < 24) return `${diffHr}h`;
+        if (diffDay < 7) return `${diffDay}d`;
+        return postDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      } catch (err) {
         return '';
       }
     },
@@ -1462,6 +1498,17 @@ export default {
         }
       }
     }
+  },
+  mounted() {
+    this._timeTickerInterval = setInterval(() => {
+      this.currentTime = Date.now();
+    }, 10000);
+  },
+  beforeUnmount() {
+    if (this._timeTickerInterval) {
+      clearInterval(this._timeTickerInterval);
+      this._timeTickerInterval = null;
+    }
   }
 };
 </script>
@@ -1853,80 +1900,115 @@ export default {
 }
 
 .posts-section {
-  padding: 16px;
+  padding: 0;
 }
 
-.post-item {
-  padding: 16px 0;
+.post-card-container {
+  display: flex;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--ion-border-color, #eff3f4);
+  background: var(--ion-background-color, #fff);
+  position: relative;
+  transition: background-color 0.2s ease;
 }
 
+.post-card-container:hover {
+  background-color: var(--ion-color-light, rgba(0, 0, 0, 0.02));
+}
+
+.post-avatar {
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.avatar-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.post-content-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Post Header */
 .post-header {
-  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
 }
 
-.post-time {
-  font-size: 13px;
+.post-user-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.post-user-info .display-name {
+  font-weight: 700;
+  color: var(--ion-text-color, #0f1419);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+  font-size: 15px;
+}
+
+.handle, .separator, .timestamp {
+  color: var(--ion-color-medium, #536471);
+  font-size: 15px;
+}
+
+.more-btn {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  margin: -8px -8px 0 0;
   color: var(--ion-color-medium, #536471);
 }
 
-.post-content {
+/* Post Content */
+.post-text {
   font-size: 15px;
   line-height: 20px;
   color: var(--ion-text-color, #0f1419);
   white-space: pre-wrap;
   word-wrap: break-word;
+  margin-bottom: 8px;
 }
 
-.post-content .post-link {
+.post-text .post-link {
   color: #daa520;
   text-decoration: none;
 }
 
-.post-content .post-link:hover {
+.post-text .post-link:hover {
   text-decoration: underline;
 }
 
-.post-content .hashtag,
-.post-content .mention {
+.post-text .hashtag,
+.post-text .mention {
   color: #daa520;
   cursor: pointer;
 }
 
-.post-image {
-  width: 100%;
-  border-radius: 16px;
-  margin: 12px 0;
-  cursor: pointer;
-}
-
-.post-media-container {
-  margin: 12px 0;
-}
-
-.post-media-grid {
-  display: grid;
-  gap: 2px;
+/* Post Media Grid (Identical to FeedPage) */
+.post-media {
+  margin: 8px 0;
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid var(--ion-border-color, #eff3f4);
-}
-
-.post-media-grid.count-1 {
-  grid-template-columns: 1fr;
+  border: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.08));
   background: #080c10;
 }
 
-.post-media-grid.count-1 .media-wrapper {
-  width: 100%;
-  max-height: 750px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #080c10;
-}
-
-.post-media-grid.count-1 .post-media-img {
+.media-img,
+.post-image {
   width: 100% !important;
   height: auto !important;
   max-height: 750px !important;
@@ -1935,77 +2017,73 @@ export default {
   margin: 0 auto !important;
 }
 
-.post-media-grid.count-2 { grid-template-columns: 1fr 1fr; aspect-ratio: 16/9; }
-.post-media-grid.count-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; aspect-ratio: 16/9; }
-.post-media-grid.count-3 .media-wrapper:first-child { grid-row: 1 / span 2; }
-.post-media-grid.count-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; aspect-ratio: 16/9; }
-
-.media-wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  cursor: pointer;
-  overflow: hidden;
+.media-grid {
+  display: grid;
+  gap: 2px;
 }
 
-.post-media-grid:not(.count-1) .post-media-img,
-.post-media-video {
+.media-grid.count-1 {
+  grid-template-columns: 1fr;
+  width: 100%;
+  background: #080c10;
+}
+
+.media-grid.count-1 .media-item {
+  width: 100%;
+  min-height: 0 !important;
+  max-height: 750px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.media-grid.count-1 .media-item img {
+  width: 100% !important;
+  height: auto !important;
+  max-height: 750px !important;
+  object-fit: contain !important;
+  display: block !important;
+  margin: 0 auto !important;
+}
+
+.media-grid.count-2 {
+  grid-template-columns: 1fr 1fr;
+  height: 280px;
+}
+
+.media-grid.count-3,
+.media-grid.count-4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  height: 320px;
+}
+
+.media-grid:not(.count-1) .media-item {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+}
+
+.media-grid:not(.count-1) .media-item img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.video-preview {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-.video-overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(0,0,0,0.5);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
-.post-stats {
-  display: flex;
-  gap: 16px;
-  margin-top: 12px;
-  color: var(--ion-color-medium, #536471);
-  font-size: 13px;
-}
-
-.post-stats span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.post-stats ion-icon {
-  font-size: 16px;
-}
-
+/* Actions Row */
 .post-actions {
   display: flex;
   justify-content: space-between;
-  margin-top: 12px;
-  max-width: 400px;
+  max-width: 425px;
+  margin-top: 4px;
 }
 
 .action-btn {
   --color: var(--ion-color-medium, #536471);
-  --padding-start: 8px;
-  --padding-end: 8px;
+  --padding-start: 0;
+  --padding-end: 0;
+  margin: 0;
   font-size: 13px;
   transition: all 0.2s ease;
 }
@@ -2020,7 +2098,7 @@ export default {
 }
 
 .action-btn:hover {
-  --color: var(--ion-color-primary, #1D9BF0);
+  --color: var(--ion-color-primary, #daa520);
 }
 
 .like-btn.liked {
