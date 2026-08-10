@@ -1,0 +1,219 @@
+name: Build iOS IPA (NexFi + Bugema)
+
+# Triggers: manual run OR push to main/master
+on:
+  workflow_dispatch:
+    inputs:
+      build_target:
+        description: 'Which app to build?'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - nexfi
+          - bugema
+  push:
+    branches: [main, master]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+
+jobs:
+  # ══════════════════════════════════════════════════════════════
+  # JOB 1: Build NexFi IPA
+  # ══════════════════════════════════════════════════════════════
+  build-nexfi-ipa:
+    name: 🚀 Build NexFi IPA
+    runs-on: macos-latest
+    if: ${{ github.event.inputs.build_target == 'nexfi' || github.event.inputs.build_target == 'both' || github.event_name == 'push' }}
+
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗️ Build NexFi web assets
+        env:
+          VITE_API_URL: https://ssp.bugemauniv.ac.ug
+          VITE_APP_TITLE: NexFi - Campus Platform
+          VITE_APP_NAME: NexFi
+          VITE_ENABLE_SOCKETIO: true
+          NODE_ENV: production
+        run: npm run build
+
+      - name: 📱 Add Capacitor iOS platform
+        run: |
+          # Add iOS platform if not present
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+
+      - name: 🔄 Sync assets to iOS
+        run: npx cap sync ios
+
+      - name: 🍎 Select Xcode version
+        run: sudo xcode-select -switch /Applications/Xcode.app
+
+      - name: 💎 Install xcpretty
+        run: gem install xcpretty --no-document
+
+      - name: 🔧 Set app name to NexFi
+        run: |
+          INFO_PLIST="ios/App/App/Info.plist"
+          if [ -f "$INFO_PLIST" ]; then
+            /usr/libexec/PlistBuddy -c "Set :CFBundleName NexFi" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleName string NexFi" "$INFO_PLIST"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName NexFi" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string NexFi" "$INFO_PLIST"
+          fi
+
+      - name: 🔨 Build unsigned IPA (NexFi)
+        run: |
+          cd ios/App
+          
+          # Create ExportOptions.plist for unsigned build
+          cat > ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>development</string>
+              <key>compileBitcode</key>
+              <false/>
+              <key>signingStyle</key>
+              <string>manual</string>
+          </dict>
+          </plist>
+          EOF
+
+          # Build the Xcode archive (unsigned)
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -archivePath build/NexFi.xcarchive \
+            -destination "generic/platform=iOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            PRODUCT_BUNDLE_IDENTIFIER=org.xclone.nexfi \
+            MARKETING_VERSION=1.0 \
+            CURRENT_PROJECT_VERSION=1 \
+            archive | xcpretty || true
+
+          # Package xcarchive → IPA
+          mkdir -p build/Payload
+          cp -r build/NexFi.xcarchive/Products/Applications/App.app build/Payload/
+          cd build
+          zip -r NexFi_Campus.ipa Payload/
+          echo "✅ NexFi IPA created!"
+          ls -lh NexFi_Campus.ipa
+
+      - name: 📤 Upload NexFi IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NexFi_Campus_IPA
+          path: ios/App/build/NexFi_Campus.ipa
+          retention-days: 30
+
+  # ══════════════════════════════════════════════════════════════
+  # JOB 2: Build Bugema Notice Board IPA
+  # ══════════════════════════════════════════════════════════════
+  build-bugema-ipa:
+    name: 🎓 Build Bugema Notice Board IPA
+    runs-on: macos-latest
+    if: ${{ github.event.inputs.build_target == 'bugema' || github.event.inputs.build_target == 'both' || github.event_name == 'push' }}
+
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗️ Build Bugema web assets (standalone mode)
+        env:
+          VITE_STANDALONE_ORG: bugema
+          VITE_API_URL: https://ssp.bugemauniv.ac.ug
+          VITE_APP_TITLE: Bugema Notice Board
+          VITE_APP_NAME: Bugema Notices
+          VITE_ENABLE_SOCKETIO: true
+          NODE_ENV: production
+        run: npm run build
+
+      - name: 📱 Add Capacitor iOS platform
+        run: |
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+
+      - name: 🔄 Sync assets to iOS
+        run: npx cap sync ios
+
+      - name: 🍎 Select Xcode version
+        run: sudo xcode-select -switch /Applications/Xcode.app
+
+      - name: 💎 Install xcpretty
+        run: gem install xcpretty --no-document
+
+      - name: 🔧 Set app name to Bugema Notices
+        run: |
+          INFO_PLIST="ios/App/App/Info.plist"
+          if [ -f "$INFO_PLIST" ]; then
+            /usr/libexec/PlistBuddy -c "Set :CFBundleName 'Bugema Notices'" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleName string 'Bugema Notices'" "$INFO_PLIST"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'Bugema Notices'" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'Bugema Notices'" "$INFO_PLIST"
+          fi
+
+      - name: 🔨 Build unsigned IPA (Bugema)
+        run: |
+          cd ios/App
+          
+          # Build the Xcode archive (unsigned)
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -archivePath build/Bugema.xcarchive \
+            -destination "generic/platform=iOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            PRODUCT_BUNDLE_IDENTIFIER=org.xclone.bugema \
+            MARKETING_VERSION=1.0 \
+            CURRENT_PROJECT_VERSION=1 \
+            archive | xcpretty || true
+
+          # Package xcarchive → IPA
+          mkdir -p build/Payload
+          cp -r build/Bugema.xcarchive/Products/Applications/App.app build/Payload/
+          cd build
+          zip -r Bugema_Notice_Board.ipa Payload/
+          echo "✅ Bugema IPA created!"
+          ls -lh Bugema_Notice_Board.ipa
+
+      - name: 📤 Upload Bugema IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bugema_Notice_Board_IPA
+          path: ios/App/build/Bugema_Notice_Board.ipa
+          retention-days: 30
