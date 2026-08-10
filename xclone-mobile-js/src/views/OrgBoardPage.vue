@@ -3687,6 +3687,89 @@ export default {
 }
 
 /* Attachment */
+/* ── Notice Media & Flyers ──────────────────────────── */
+.notice-media-grid {
+  margin: 10px 16px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(218, 165, 32, 0.18);
+  background: #080c10;
+  display: grid;
+  gap: 2px;
+}
+
+.notice-media-grid.nm-count-1 {
+  grid-template-columns: 1fr;
+  max-height: 650px;
+}
+
+.notice-media-grid.nm-count-1 .nm-cell {
+  width: 100%;
+  max-height: 650px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #080c10;
+}
+
+.notice-media-grid.nm-count-1 .nm-img {
+  width: 100%;
+  height: auto;
+  max-height: 650px;
+  object-fit: contain !important;
+  display: block;
+}
+
+.notice-media-grid.nm-count-2 {
+  grid-template-columns: 1fr 1fr;
+  max-height: 380px;
+}
+
+.notice-media-grid.nm-count-3,
+.notice-media-grid.nm-count-4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  max-height: 420px;
+}
+
+.nm-cell {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  background: #080c10;
+}
+
+.nm-count-2 .nm-cell,
+.nm-count-3 .nm-cell,
+.nm-count-4 .nm-cell {
+  height: 190px;
+}
+
+.nm-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.25s ease;
+}
+
+.nm-cell:hover .nm-img {
+  transform: scale(1.02);
+}
+
+.nm-more-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  color: #ffffff;
+  font-size: 1.4rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
 .notice-attachment {
   display: flex;
   align-items: center;

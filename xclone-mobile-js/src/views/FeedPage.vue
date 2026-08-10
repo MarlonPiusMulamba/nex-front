@@ -3073,8 +3073,9 @@ ion-toolbar {
 .media-img {
   width: 100%;
   display: block;
-  max-height: 500px;
-  object-fit: cover;
+  max-height: 650px;
+  object-fit: contain !important;
+  background: #080c10;
 }
 
 .media-grid {
@@ -3084,6 +3085,22 @@ ion-toolbar {
 
 .media-grid.count-1 {
   grid-template-columns: 1fr;
+  background: #080c10;
+}
+
+.media-grid.count-1 .media-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 650px;
+}
+
+.media-grid.count-1 .media-item img {
+  width: 100%;
+  height: auto;
+  max-height: 650px;
+  object-fit: contain !important;
+  display: block;
 }
 
 .media-grid.count-2 {
@@ -3102,7 +3119,7 @@ ion-toolbar {
   min-height: 160px;
 }
 
-.media-item img {
+.media-grid:not(.count-1) .media-item img {
   width: 100%;
   height: 100%;
   object-fit: cover;
