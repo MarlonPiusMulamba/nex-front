@@ -1,6 +1,10 @@
 {
     "rewrites": [
         {
+            "source": "/share/notice/:id",
+            "destination": "https://nex-back-3-stoz.onrender.com/share/notice/:id"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }

@@ -1571,7 +1571,10 @@ export default {
       const cleanBody = (notice.body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
       const summary = cleanBody.length > 140 ? cleanBody.substring(0, 140) + '...' : cleanBody;
       
-      const noticeShareUrl = `${this.API_URL || 'https://nex-back-3-stoz.onrender.com'}/share/notice/${notice.id}`;
+      const frontendBase = (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost'))
+        ? window.location.origin
+        : 'https://bugema-notice.vercel.app';
+      const noticeShareUrl = `${frontendBase}/share/notice/${notice.id}`;
       const shareText = `📢 *${orgName.toUpperCase()} DIGITAL NOTICE BOARD*\n📌 *Dept:* ${deptName}\n\n*Title:* ${title}\n\n${summary}\n\n🔗 *Read Full Notice:* ${noticeShareUrl}`;
 
       const canWebShare = typeof navigator !== 'undefined' && Boolean(navigator.share);
