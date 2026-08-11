@@ -362,7 +362,7 @@
 
             <!-- Admin / Auth actions -->
             <div class="sidebar-auth-box" v-if="canPost">
-              <ion-button @click="showComposer = true" expand="block" class="sidebar-post-btn">
+              <ion-button @click="openNewComposer()" expand="block" class="sidebar-post-btn">
                 <ion-icon :icon="add" slot="start"></ion-icon>
                 Post Notice
               </ion-button>
@@ -633,6 +633,10 @@
                       <span v-if="speakingNoticeId === notice.id" class="audio-wave-dot"></span>
                     </button>
 
+                    <ion-button fill="clear" size="small" v-if="canEditNotice(notice)" @click="editNotice(notice)" class="edit-btn" title="Edit Announcement">
+                      <ion-icon slot="icon-only" :icon="createOutline"></ion-icon>
+                    </ion-button>
+
                     <ion-button fill="clear" size="small" v-if="isAdmin || isAuthor(notice)" @click="deleteNotice(notice.id)" class="delete-btn">
                       <ion-icon slot="icon-only" :icon="trashOutline"></ion-icon>
                     </ion-button>
@@ -797,7 +801,7 @@
           </div>
 
           <!-- Post Notice (Admins/Managers only) -->
-          <button v-if="canPost" class="mobile-nav-btn mobile-post-nav-btn" @click="showComposer = true">
+          <button v-if="canPost" class="mobile-nav-btn mobile-post-nav-btn" @click="openNewComposer()">
             <div class="post-icon-wrap">
               <ion-icon :icon="add"></ion-icon>
             </div>
@@ -831,6 +835,7 @@
         :org="org"
         :membership="membership"
         :departments="departments"
+        :notice-to-edit="noticeToEdit"
         @success="fetchNotices"
       />
 
@@ -896,7 +901,7 @@
 
     <!-- Fixed notice post button — teleported to body so it's never clipped by ion-page -->
     <Teleport to="body">
-      <button v-if="canPost" class="notice-post-btn" @click="showComposer = true">
+      <button v-if="canPost" class="notice-post-btn" @click="openNewComposer()">
         <ion-icon :icon="add"></ion-icon>
       </button>
     </Teleport>
@@ -1015,6 +1020,7 @@ export default {
       categories: ['All', 'General', 'Academic', 'Finance', 'Events', 'Urgent'],
       showAdminPanel: false,
       showComposer: false,
+      noticeToEdit: null,
       showProfilePanel: false,
       showSettingsModal: false,
       i18nState,
@@ -1957,6 +1963,40 @@ export default {
       const item = this.allNotices.find(n => n.id === payload.notice_id);
       if (item) item.is_pinned = payload.pin;
     },
+    handleSocketNoticeUpdate(payload) {
+      if (!payload) return;
+      const updated = payload.notice || payload;
+      if (!updated || !updated.id) return;
+      const updateInList = (list) => {
+        const idx = list.findIndex(n => n.id === updated.id);
+        if (idx !== -1) {
+          list.splice(idx, 1, { ...list[idx], ...updated });
+        }
+      };
+      updateInList(this.allNotices);
+      updateInList(this.notices);
+      updateInList(this.pendingNotices);
+    },
+    canEditNotice(notice) {
+      if (!notice) return false;
+      if (this.isAdmin) return true;
+      if (this.isAuthor(notice)) return true;
+      const isDeptManager = this.membership?.role === 'dept_manager';
+      if (isDeptManager) {
+        if (!notice.dept_id || notice.dept_id === this.membership?.dept_id) {
+          return true;
+        }
+      }
+      return false;
+    },
+    editNotice(notice) {
+      this.noticeToEdit = notice;
+      this.showComposer = true;
+    },
+    openNewComposer() {
+      this.noticeToEdit = null;
+      this.showComposer = true;
+    },
     async fetchNoticesSilent() {
       if (this.locked || !this.org) return;
       try {
@@ -2557,10 +2597,29 @@ export default {
     },
     updateDynamicFaviconAndTitle(org) {
       if (!org) return;
-      this.originalTitle = document.title;
-      document.title = `${org.name} - Digital Notice Board`;
+      const titleText = `${org.name} - Digital Notice Board`;
+      const descText = `Official Digital Notice Board for ${org.name}. View official announcements, academic notices, and campus communications.`;
+      const logoUrl = org.logo_url || '/bugema-logo.png';
 
-      const logo = org.logo_url || this.defaultLogo;
+      this.originalTitle = document.title;
+      document.title = titleText;
+
+      const setMeta = (id, prop, val) => {
+        let el = document.getElementById(id) || document.querySelector(`meta[property='${prop}']`) || document.querySelector(`meta[name='${prop}']`);
+        if (el) el.setAttribute('content', val);
+      };
+
+      setMeta('meta-title', 'title', titleText);
+      setMeta('og-title', 'og:title', titleText);
+      setMeta('twitter-title', 'twitter:title', titleText);
+
+      setMeta('meta-desc', 'description', descText);
+      setMeta('og-desc', 'og:description', descText);
+      setMeta('twitter-desc', 'twitter:description', descText);
+
+      setMeta('og-image', 'og:image', logoUrl);
+      setMeta('twitter-image', 'twitter:image', logoUrl);
+
       let link = document.querySelector("link[rel*='icon']");
       if (!link) {
         link = document.createElement('link');
@@ -2568,7 +2627,7 @@ export default {
         document.getElementsByTagName('head')[0].appendChild(link);
       }
       this.originalFavicon = link.href;
-      link.href = logo;
+      link.href = logoUrl;
     },
     restoreFaviconAndTitle() {
       if (this.originalTitle) document.title = this.originalTitle;
@@ -2689,6 +2748,7 @@ export default {
       socket.on('notice:new', this.handleSocketNoticeNew);
       socket.on('notice:delete', this.handleSocketNoticeDelete);
       socket.on('notice:pin', this.handleSocketNoticePin);
+      socket.on('notice:update', this.handleSocketNoticeUpdate);
     }
   },
   ionViewWillEnter() {
@@ -2742,6 +2802,7 @@ export default {
       socket.off('notice:new', this.handleSocketNoticeNew);
       socket.off('notice:delete', this.handleSocketNoticeDelete);
       socket.off('notice:pin', this.handleSocketNoticePin);
+      socket.off('notice:update', this.handleSocketNoticeUpdate);
     }
     this.restoreFaviconAndTitle();
   }

@@ -5,11 +5,11 @@
         <ion-buttons slot="start">
           <ion-button @click="$emit('update:isOpen', false)">Cancel</ion-button>
         </ion-buttons>
-        <ion-title>Create Notice</ion-title>
+        <ion-title>{{ isEditMode ? 'Edit Notice' : 'Create Notice' }}</ion-title>
         <ion-buttons slot="end">
           <ion-button :disabled="!isValid || uploading" @click="submit" color="gold">
             <ion-spinner v-if="uploading" name="crescent"></ion-spinner>
-            <span v-else>Post</span>
+            <span v-else>{{ isEditMode ? 'Save' : 'Post' }}</span>
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -95,9 +95,9 @@
 
           <!-- Action buttons row -->
           <div class="attach-actions">
-            <button class="attach-action-btn" @click="triggerImageInput" :disabled="imageFiles.length >= 4" type="button">
+            <button class="attach-action-btn" @click="triggerImageInput" :disabled="imagePreviews.length >= 4" type="button">
               <ion-icon :icon="imagesOutline"></ion-icon>
-              <span>Images ({{ imageFiles.length }}/4)</span>
+              <span>Images ({{ imagePreviews.length }}/4)</span>
             </button>
             <button class="attach-action-btn" @click="triggerPdfInput" type="button">
               <ion-icon :icon="documentTextOutline"></ion-icon>
@@ -169,15 +169,19 @@ export default {
     isOpen: Boolean,
     org: Object,
     membership: Object,
-    departments: Array
+    departments: Array,
+    noticeToEdit: {
+      type: Object,
+      default: null
+    }
   },
   data() {
     return {
       attachOutline, documentOutline, closeCircle,
       informationCircleOutline, imagesOutline, documentTextOutline,
       uploading: false,
-      imageFiles: [],      // File objects for images
-      imagePreviews: [],   // data-URL previews
+      imageFiles: [],      // File objects for new images
+      imagePreviews: [],   // data-URL or existing URL previews
       pdfFile: null,       // single PDF/doc File object
       formData: {
         title: '',
@@ -198,9 +202,45 @@ export default {
     },
     isAdmin() {
       return this.membership?.role === 'org_admin';
+    },
+    isEditMode() {
+      return !!this.noticeToEdit;
+    }
+  },
+  watch: {
+    isOpen(newVal) {
+      if (newVal) {
+        if (this.noticeToEdit) {
+          this.populateForEdit(this.noticeToEdit);
+        } else {
+          this.reset();
+        }
+      }
+    },
+    noticeToEdit: {
+      immediate: true,
+      handler(notice) {
+        if (notice && this.isOpen) {
+          this.populateForEdit(notice);
+        }
+      }
     }
   },
   methods: {
+    populateForEdit(notice) {
+      this.formData = {
+        title: notice.title || '',
+        body: notice.body || '',
+        category: notice.category || 'General',
+        dept_id: notice.dept_id || null,
+        is_pinned: !!notice.is_pinned,
+        urgent_duration: '24h',
+        custom_expires_at: notice.expires_at || ''
+      };
+      this.imageFiles = [];
+      this.imagePreviews = notice.media_urls ? [...notice.media_urls] : [];
+      this.pdfFile = null;
+    },
     applyFormatting(type) {
       const textareaComponent = this.$refs.bodyTextarea;
       const nativeTextarea = textareaComponent?.$el?.querySelector('textarea') || textareaComponent;
@@ -248,29 +288,34 @@ export default {
       if (el) el.click();
     },
     onImagesSelected(e) {
-      const selected = Array.from(e.target.files || []);
-      const remaining = 4 - this.imageFiles.length;
-      const toAdd = selected.slice(0, remaining);
-      for (const f of toAdd) {
-        if (f.size > 10 * 1024 * 1024) { alert(`${f.name} is too large (max 10MB)`); continue; }
-        this.imageFiles.push(f);
+      const files = Array.from(e.target.files || []);
+      const remainingSlots = 4 - this.imagePreviews.length;
+      const toAdd = files.slice(0, remainingSlots);
+
+      for (const file of toAdd) {
+        this.imageFiles.push(file);
         const reader = new FileReader();
-        reader.onload = ev => this.imagePreviews.push(ev.target.result);
-        reader.readAsDataURL(f);
+        reader.onload = (evt) => {
+          this.imagePreviews.push(evt.target.result);
+        };
+        reader.readAsDataURL(file);
       }
-      // Reset input so same file can be re-selected if removed
       e.target.value = '';
     },
     onPdfSelected(e) {
-      const f = e.target.files[0];
-      if (!f) return;
-      if (f.size > 20 * 1024 * 1024) { alert('Document too large (max 20MB)'); return; }
-      this.pdfFile = f;
+      const file = e.target.files?.[0];
+      if (file) {
+        this.pdfFile = file;
+      }
       e.target.value = '';
     },
     removeImage(index) {
-      this.imageFiles.splice(index, 1);
+      const item = this.imagePreviews[index];
+      // If removing an image, remove from imageFiles if it was newly added, or from imagePreviews if existing
       this.imagePreviews.splice(index, 1);
+      if (typeof item !== 'string' || item.startsWith('data:')) {
+        this.imageFiles.splice(index, 1);
+      }
     },
     async submit() {
       this.uploading = true;
@@ -307,28 +352,46 @@ export default {
           payload.append('expires_at', calculatedExpiresAt);
         }
 
-        // Append images under key "files" (supports multiple)
+        // Send existing media URLs if in edit mode
+        if (this.isEditMode && this.imagePreviews.length > 0) {
+          for (const preview of this.imagePreviews) {
+            if (typeof preview === 'string' && !preview.startsWith('data:')) {
+              payload.append('existing_media_urls', preview);
+            }
+          }
+        }
+
+        // Append new images under key "files"
         for (const img of this.imageFiles) {
           payload.append('files', img);
         }
-        // Append PDF under key "files" too — backend separates by extension
+        // Append PDF under key "files" too
         if (this.pdfFile) payload.append('files', this.pdfFile);
 
-        const res = await axios.post(
-          `${this.API_URL}/api/boards/${this.org.slug}/notices`,
-          payload,
-          { headers: { 'Content-Type': 'multipart/form-data' } }
-        );
+        let res;
+        if (this.isEditMode) {
+          res = await axios.put(
+            `${this.API_URL}/api/boards/notices/${this.noticeToEdit.id}`,
+            payload,
+            { headers: { 'Content-Type': 'multipart/form-data' } }
+          );
+        } else {
+          res = await axios.post(
+            `${this.API_URL}/api/boards/${this.org.slug}/notices`,
+            payload,
+            { headers: { 'Content-Type': 'multipart/form-data' } }
+          );
+        }
 
         if (res.data.success) {
           this.$emit('success');
           this.reset();
           this.$emit('update:isOpen', false);
         } else {
-          alert(res.data.error || 'Failed to post notice');
+          alert(res.data.error || 'Failed to save notice');
         }
       } catch (err) {
-        alert(err.response?.data?.error || 'Failed to post notice');
+        alert(err.response?.data?.error || 'Failed to save notice');
       } finally {
         this.uploading = false;
       }

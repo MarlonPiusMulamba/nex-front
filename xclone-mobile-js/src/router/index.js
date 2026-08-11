@@ -192,15 +192,15 @@ router.beforeEach((to, from, next) => {
 
 router.afterEach((to) => {
   if (typeof document === 'undefined') return;
-  const isBugemaNotice = to.path.startsWith('/notices/bugema');
-  const isNoticeBoard = to.path.startsWith('/notices/');
+  const isBugemaNotice = to.path.startsWith('/notices/bugema') || standaloneOrg === 'bugema';
+  const isNoticeBoard = to.path.startsWith('/notices/') || !!standaloneOrg;
 
   if (isBugemaNotice) {
-    document.title = 'Bugema University Notice Board';
+    document.title = 'Bugema University - Digital Notice Board';
   } else if (isNoticeBoard) {
-    document.title = 'Campus Notice Board';
+    document.title = 'Digital Notice Board';
   } else {
-    document.title = 'NexFi - Connect, Share & Communicate';
+    document.title = 'Bugema University - Digital Notice Board';
   }
 });
 
