@@ -939,7 +939,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, 
   IonBackButton, IonSpinner, IonButton, IonIcon, IonBadge, IonChip,
   IonSelect, IonSelectOption, IonRefresher, IonRefresherContent,
-  IonLabel, IonSearchbar, IonActionSheet
+  IonLabel, IonSearchbar, IonActionSheet, alertController, toastController
 } from '@ionic/vue';
 import { 
   settingsOutline, lockClosedOutline, megaphoneOutline, 
