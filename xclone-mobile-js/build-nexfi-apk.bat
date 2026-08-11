@@ -10,8 +10,10 @@ echo.
 
 cd /d "%~dp0"
 
-echo [1/5] Setting app name to "NexFi"...
+echo [1/5] Setting app name and ID to "NexFi" (org.xclone.app)...
 powershell -Command "(Get-Content 'android\app\src\main\res\values\strings.xml') -replace '<string name=\"app_name\">.*?</string>', '<string name=\"app_name\">NexFi</string>' -replace '<string name=\"title_activity_main\">.*?</string>', '<string name=\"title_activity_main\">NexFi</string>' | Set-Content 'android\app\src\main\res\values\strings.xml'"
+powershell -Command "(Get-Content 'capacitor.config.json') -replace '\"appId\": \".*?\"', '\"appId\": \"org.xclone.app\"' -replace '\"appName\": \".*?\"', '\"appName\": \"NexFi\"' | Set-Content 'capacitor.config.json'"
+powershell -Command "(Get-Content 'android\app\build.gradle') -replace 'applicationId \".*?\"', 'applicationId \"org.xclone.app\"' | Set-Content 'android\app\build.gradle'"
 echo   Done.
 
 echo [2/5] Building Web Assets (NexFi mode)...

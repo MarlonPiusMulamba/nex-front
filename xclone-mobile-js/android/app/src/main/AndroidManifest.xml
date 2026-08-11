@@ -13,7 +13,7 @@
 
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
-            android:name=".MainActivity"
+            android:name="org.xclone.app.MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
@@ -43,7 +43,7 @@
              and posts them as Android system tray notifications.
              ═══════════════════════════════════════════════════════════════════ -->
         <service
-            android:name=".MyFirebaseMessagingService"
+            android:name="org.xclone.app.MyFirebaseMessagingService"
             android:exported="false">
             <intent-filter android:priority="9999">
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
@@ -56,11 +56,11 @@
              killed or locked. Passes the action to MainActivity via intent.
              ═══════════════════════════════════════════════════════════════════ -->
         <receiver
-            android:name=".CallNotificationReceiver"
+            android:name="org.xclone.app.CallNotificationReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="org.xclone.app.ACTION_ACCEPT_CALL" />
-                <action android:name="org.xclone.app.ACTION_DECLINE_CALL" />
+                <action android:name="${applicationId}.ACTION_ACCEPT_CALL" />
+                <action android:name="${applicationId}.ACTION_DECLINE_CALL" />
             </intent-filter>
         </receiver>
 

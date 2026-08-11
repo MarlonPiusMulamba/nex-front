@@ -1002,12 +1002,11 @@ export default {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
       if (!isStandalone) {
-        const isBugemaContext = this.$route.path.includes('/bugema') || this.$route.query.q === 'bugema';
         buttons.push({
-          text: isBugemaContext ? 'Install Bugema Notice Board' : 'Install NexFi App',
+          text: 'Install NexFi App',
           icon: isIOS ? phonePortraitOutline : downloadOutline,
           handler: () => {
-            this.installPWA(isBugemaContext ? 'bugema' : 'nexfi');
+            this.installPWA('nexfi');
           }
         });
       }

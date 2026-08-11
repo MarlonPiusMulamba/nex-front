@@ -10,8 +10,10 @@ echo.
 
 cd /d "%~dp0"
 
-echo [1/5] Setting app name to "Bugema Notices"...
+echo [1/5] Setting app name and ID to "Bugema Notices" (org.bugema.noticeboard)...
 powershell -Command "(Get-Content 'android\app\src\main\res\values\strings.xml') -replace '<string name=\"app_name\">.*?</string>', '<string name=\"app_name\">Bugema Notices</string>' -replace '<string name=\"title_activity_main\">.*?</string>', '<string name=\"title_activity_main\">Bugema Notices</string>' | Set-Content 'android\app\src\main\res\values\strings.xml'"
+powershell -Command "(Get-Content 'capacitor.config.json') -replace '\"appId\": \".*?\"', '\"appId\": \"org.bugema.noticeboard\"' -replace '\"appName\": \".*?\"', '\"appName\": \"Bugema Notices\"' | Set-Content 'capacitor.config.json'"
+powershell -Command "(Get-Content 'android\app\build.gradle') -replace 'applicationId \".*?\"', 'applicationId \"org.bugema.noticeboard\"' | Set-Content 'android\app\build.gradle'"
 echo   Done.
 
 echo [2/5] Building Web Assets (Bugema Standalone mode)...

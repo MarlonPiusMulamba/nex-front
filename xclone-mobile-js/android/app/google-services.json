@@ -53,6 +53,29 @@
           "registered_versions": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:60010292286:android:0d14ed5485608114e65d6f",
+        "android_client_info": {
+          "package_name": "org.bugema.noticeboard"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDI_JDpri2TG0HE4kjnDx6PkVVgPCaa8Q4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        },
+        "cloud_messaging": {
+          "status": 1,
+          "registered_versions": []
+        }
+      }
     }
   ],
   "configuration_version": "1"

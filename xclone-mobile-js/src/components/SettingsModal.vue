@@ -581,6 +581,13 @@ export default {
       }
     },
     async installPWA() {
+      try {
+        let manifestTag = document.getElementById('manifest-link') || document.querySelector('link[rel="manifest"]');
+        if (manifestTag) {
+          manifestTag.setAttribute('href', '/manifest-bugema.json');
+        }
+      } catch (_) {}
+
       // Use the globally-captured install prompt if this modal didn't see the event
       const promptEvent = this.deferredPrompt || window._pwaInstallPrompt || window.deferredPwaPrompt || window._deferredPrompt;
 
