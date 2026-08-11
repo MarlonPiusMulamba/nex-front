@@ -16,12 +16,14 @@ const api = axios.create({
 
 console.log('📡 API baseURL:', api.defaults.baseURL, '| Platform:', isNative ? 'native' : 'web', '| VITE_API_URL:', import.meta.env.VITE_API_URL || 'not set');
 
-const MAX_RETRIES = 2;
+const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
 
 function shouldRetry(error) {
-  // Do NOT retry network errors more than once — if server is unreachable, retrying just wastes time
-  if (!error.response) return (error.config?._retryCount || 0) < 1;
+  const candidates = config.api?.candidateURLs || [];
+  const maxAllowed = Math.max(MAX_RETRIES, candidates.length);
+  // Allow retrying network errors across all candidate backends
+  if (!error.response) return (error.config?._retryCount || 0) < maxAllowed;
   // Retry on Render cold-start / server error codes
   const retryableCodes = [500, 502, 503, 504];
   return retryableCodes.includes(error.response.status);
@@ -74,15 +76,17 @@ api.interceptors.response.use(
     if (!requestConfig) return Promise.reject(error);
 
     requestConfig._retryCount = requestConfig._retryCount || 0;
+    const candidates = config.api?.candidateURLs || [];
+    const maxRetries = Math.max(MAX_RETRIES, candidates.length);
 
-    if (shouldRetry(error) && requestConfig._retryCount < MAX_RETRIES) {
+    if (shouldRetry(error) && requestConfig._retryCount < maxRetries) {
       requestConfig._retryCount += 1;
 
       // Failover to next candidate backend URL if request failed
-      const candidates = config.api.candidateURLs || [];
       if (candidates.length > 1) {
-        const currentIdx = candidates.indexOf(api.defaults.baseURL);
-        const nextIdx = (currentIdx + 1) % candidates.length;
+        const curBase = (api.defaults.baseURL || '').replace(/\/$/, '');
+        const currentIdx = candidates.findIndex(c => (c || '').replace(/\/$/, '') === curBase);
+        const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % candidates.length;
         const nextUrl = candidates[nextIdx];
 
         console.warn(`🚨 Switching API backend from ${api.defaults.baseURL} to ${nextUrl}...`);

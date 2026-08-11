@@ -693,6 +693,10 @@ export default {
       showPendingInvitationsModal: false,
       pendingInvitations: [],
       loadingPendingInvitations: false,
+      // Polling fallback
+      _msgPollInterval: null,
+      _convPollInterval: null,
+      _seenMessageIds: new Set(),
     };
   },
   computed: {
@@ -978,19 +982,19 @@ export default {
       this.messageText += emoji;
     },
 
-    async loadMessages(otherUserId) {
+    async loadMessages(otherUserId, silent = false) {
       if (!otherUserId) return;
       
       try {
-        console.log('📡 Loading messages for chat:', otherUserId);
+        if (!silent) console.log('📡 Loading messages for chat:', otherUserId);
 
         // 1. Instant Cache-First Load from IndexedDB (0ms instant UI display)
         const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
-        if (cachedMessages && cachedMessages.length > 0) {
+        if (cachedMessages && cachedMessages.length > 0 && !silent) {
           this.messages = cachedMessages;
           this.loadingMessages = false;
           this.$nextTick(() => this.scrollToBottom());
-        } else {
+        } else if (!silent) {
           this.loadingMessages = true;
         }
         
@@ -1001,7 +1005,8 @@ export default {
 
         // 2. Background sync fresh messages from server
         const res = await api.get(`/api/messages/${otherUserId}`, {
-          params: { user_id: this.userId }
+          params: { user_id: this.userId },
+          timeout: 10000
         });
         
         const serverMessages = (res.messages || []).map(m => ({
@@ -1009,18 +1014,33 @@ export default {
           status: m.status || 'synced'
         }));
 
-        this.messages = serverMessages;
-        console.log(`✅ Loaded ${this.messages.length} messages`);
-
-        if (this.messages.length > 0) {
-          await saveMessagesOffline(this.messages);
+        if (silent) {
+          // Silent poll: only append NEW messages (avoid flicker)
+          const currentIds = new Set(this.messages.map(m => String(m.id)));
+          const newMsgs = serverMessages.filter(m => !currentIds.has(String(m.id)) && !String(m.id).startsWith('local-'));
+          if (newMsgs.length > 0) {
+            this.messages.push(...newMsgs);
+            this.$nextTick(() => this.scrollToBottom());
+            await saveMessagesOffline(this.messages);
+          }
+        } else {
+          this.messages = serverMessages;
+          console.log(`✅ Loaded ${this.messages.length} messages`);
+          if (this.messages.length > 0) {
+            await saveMessagesOffline(this.messages);
+          }
+          this.$nextTick(() => this.scrollToBottom());
         }
 
-        this.$nextTick(() => this.scrollToBottom());
+        // Build seen IDs set for deduplication
+        this._seenMessageIds = new Set(this.messages.map(m => String(m.id)));
+
       } catch (err) {
         console.error('❌ Load messages error:', err);
-        const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
-        if (cachedMessages && cachedMessages.length > 0) this.messages = cachedMessages;
+        if (!silent) {
+          const cachedMessages = await getOfflineMessages(this.userId, otherUserId);
+          if (cachedMessages && cachedMessages.length > 0) this.messages = cachedMessages;
+        }
       } finally {
         this.loadingMessages = false;
       }
@@ -2007,9 +2027,37 @@ export default {
             const fromId = payload.from_user_id != null ? String(payload.from_user_id) : null;
             if (!toId || toId !== String(this.userId)) return;
 
-            // If currently chatting with sender, refresh messages immediately.
+            // If currently chatting with sender, inject message directly (no full reload)
             if (this.selectedChat && String(this.selectedChat.user_id) === fromId) {
-              await this.loadMessages(this.selectedChat.user_id);
+              const msgId = payload.message_id ? String(payload.message_id) : null;
+              // Dedup: don't inject if we already have this message
+              if (msgId && this._seenMessageIds.has(msgId)) return;
+              // Optimistic append via socket payload
+              if (payload.text || payload.image || payload.voice) {
+                const newMsg = {
+                  id: msgId || `socket-${Date.now()}`,
+                  text: payload.text || '',
+                  image: payload.image || '',
+                  voice: payload.voice ? true : '',
+                  mood: payload.mood || '',
+                  reply_to_id: payload.reply_to_id || null,
+                  reply_to_text: payload.reply_to_text || '',
+                  reply_to_preview: payload.reply_to_preview || '',
+                  reply_to_username: payload.reply_to_username || '',
+                  timestamp: new Date().toISOString(),
+                  read: false,
+                  sent_by_me: false,
+                  status: 'synced'
+                };
+                if (msgId) this._seenMessageIds.add(msgId);
+                this.messages.push(newMsg);
+                this.$nextTick(() => this.scrollToBottom());
+              } else {
+                // Fallback: reload messages silently
+                await this.loadMessages(this.selectedChat.user_id, true);
+              }
+              // Mark as read since we're in the chat
+              this.markAsRead(fromId);
             } else {
               // Otherwise refresh conversations/unread badge.
               await this.loadConversations();
@@ -2055,6 +2103,21 @@ export default {
     } catch (e) {
       console.error('Socket setup failed:', e);
     }
+
+    // ── Polling Fallback (works even if socket fails) ─────────────────────────
+    // Poll conversations list every 15s to catch missed messages
+    this._convPollInterval = setInterval(async () => {
+      if (!this.selectedChat && !isNetworkOffline()) {
+        try { await this.loadConversations(); } catch (_) {}
+      }
+    }, 15000);
+
+    // Poll active chat messages every 5s for real-time feel
+    this._msgPollInterval = setInterval(async () => {
+      if (this.selectedChat && !isNetworkOffline()) {
+        try { await this.loadMessages(this.selectedChat.user_id, true); } catch (_) {}
+      }
+    }, 5000);
 
     this.loadConversations().then(() => {
       this.autoOpenFromQuery();
@@ -2134,7 +2197,9 @@ export default {
       }
     } catch (_) {}
 
-    // Nothing call-related to clean up locally anymore
+    // Clear polling intervals
+    if (this._convPollInterval) { clearInterval(this._convPollInterval); this._convPollInterval = null; }
+    if (this._msgPollInterval) { clearInterval(this._msgPollInterval); this._msgPollInterval = null; }
   }
 };
 </script>

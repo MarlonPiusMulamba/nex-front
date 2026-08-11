@@ -1,7 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 
-// ── Production backend (Bugema University) ────────────────────────────────────
-const PRODUCTION_BACKEND = 'https://ssp.bugemauniv.ac.ug';
+// ── Production backends (Render Cloud & Bugema University) ───────────────────
+const PRODUCTION_BACKEND = 'https://nex-back-3-stoz.onrender.com';
+const BUGEMA_BACKEND = 'https://ssp.bugemauniv.ac.ug';
 
 // ── Local LAN backend (development only — never used in APK builds) ──────────
 const LOCAL_BACKEND = 'http://localhost:5000';
@@ -10,13 +11,12 @@ const config = {
   api: {
     localBaseURL: LOCAL_BACKEND,
     primaryBaseURL: PRODUCTION_BACKEND,
-    secondaryBaseURL: PRODUCTION_BACKEND, // single source of truth — no Render fallback
-    // candidateURLs drives the failover logic in api.js.
-    // In production builds VITE_API_URL = https://ssp.bugemauniv.ac.ug, so only
-    // that URL is in the list — no confusing fallback to old Render/DDNS hosts.
-    candidateURLs: [
-      import.meta.env.VITE_API_URL || PRODUCTION_BACKEND,
-    ].filter(Boolean),
+    secondaryBaseURL: BUGEMA_BACKEND,
+    candidateURLs: Array.from(new Set([
+      import.meta.env.VITE_API_URL,
+      PRODUCTION_BACKEND,
+      BUGEMA_BACKEND,
+    ].filter(Boolean))),
     baseURL: (() => {
       const isNative = Capacitor.isNativePlatform();
 
