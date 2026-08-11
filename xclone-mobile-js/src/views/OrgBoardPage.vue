@@ -53,15 +53,6 @@
               <ion-icon v-else :icon="personOutline" class="profile-thumb-icon"></ion-icon>
             </div>
           </button>
-          <!-- More options menu (Action Sheet for Bugema Notice Board PWA install, notifications, etc.) -->
-          <button 
-            class="header-settings-btn" 
-            @click="showHeaderActionSheet = true"
-            title="Notice Board Options"
-          >
-            <ion-icon :icon="ellipsisVertical" class="header-settings-icon"></ion-icon>
-            <span v-if="notificationPermission !== 'granted'" class="perm-badge">!</span>
-          </button>
           <!-- Admin settings gear -->
           <ion-button v-if="isAdmin" @click="showAdminPanel = true" class="settings-btn">
             <ion-icon slot="icon-only" :icon="settingsOutline"></ion-icon>
@@ -551,7 +542,7 @@
                       ✨ NEW
                     </button>
                     <span v-else class="read-done-badge" title="Notice read">
-                      ✓ Read
+                      ✓
                     </span>
                     <span class="cat-badge" :class="'cat-badge--' + (notice.category || 'general').toLowerCase()">
                       {{ notice.category || 'General' }}
@@ -6066,6 +6057,19 @@ body.dark .audio-reader-btn--active {
   letter-spacing: 0.4px;
   box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
   animation: badgePop 0.4s ease-out;
+}
+
+.read-done-badge {
+  color: #10b981;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 @keyframes badgePop {
