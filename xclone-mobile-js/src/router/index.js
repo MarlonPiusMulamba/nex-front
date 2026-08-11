@@ -194,40 +194,77 @@ router.afterEach((to) => {
   if (typeof document === 'undefined') return;
   const isBugemaNotice = to.path.startsWith('/notices/bugema') || standaloneOrg === 'bugema';
 
-  let link = document.querySelector("link[rel*='icon']");
-  if (!link) {
-    link = document.createElement('link');
-    link.rel = 'shortcut icon';
-    document.getElementsByTagName('head')[0].appendChild(link);
-  }
+  const setMeta = (id, nameOrProp, val) => {
+    let el = document.getElementById(id) || document.querySelector(`meta[property='${nameOrProp}']`) || document.querySelector(`meta[name='${nameOrProp}']`);
+    if (el) {
+      el.setAttribute('content', val);
+    } else {
+      const meta = document.createElement('meta');
+      if (nameOrProp.startsWith('og:')) meta.setAttribute('property', nameOrProp);
+      else meta.setAttribute('name', nameOrProp);
+      meta.setAttribute('content', val);
+      document.head.appendChild(meta);
+    }
+  };
 
-  const setMeta = (id, prop, val) => {
-    let el = document.getElementById(id) || document.querySelector(`meta[property='${prop}']`) || document.querySelector(`meta[name='${prop}']`);
-    if (el) el.setAttribute('content', val);
+  const updateHead = ({ iconUrl, manifestUrl, appName, title, desc }) => {
+    document.title = title;
+
+    // 1. Favicon links
+    let favicon = document.getElementById('app-favicon') || document.querySelector("link[rel*='icon']");
+    if (favicon) {
+      favicon.href = iconUrl;
+    }
+
+    let shortcutIcon = document.querySelector("link[rel='shortcut icon']");
+    if (shortcutIcon) {
+      shortcutIcon.href = iconUrl;
+    }
+
+    // 2. Apple Touch Icon (Critical for iOS Home Screen Icon!)
+    let appleIcon = document.getElementById('app-apple-touch-icon') || document.querySelector("link[rel='apple-touch-icon']");
+    if (appleIcon) {
+      appleIcon.href = iconUrl;
+    }
+
+    // 3. Manifest Link (Critical for Android & Desktop PWA Name & Icon!)
+    let manifest = document.getElementById('manifest-link') || document.querySelector("link[rel='manifest']");
+    if (manifest) {
+      manifest.setAttribute('href', manifestUrl);
+    }
+
+    // 4. App Name & OpenGraph Meta
+    setMeta('meta-title', 'title', title);
+    setMeta('og-title', 'og:title', title);
+    setMeta('twitter-title', 'twitter:title', title);
+
+    setMeta('meta-desc', 'description', desc);
+    setMeta('og-desc', 'og:description', desc);
+    setMeta('twitter-desc', 'twitter:description', desc);
+
+    setMeta('og-image', 'og:image', iconUrl);
+    setMeta('twitter-image', 'twitter:image', iconUrl);
+
+    setMeta('apple-title', 'apple-mobile-web-app-title', appName);
+    setMeta('app-name', 'application-name', appName);
   };
 
   if (isBugemaNotice) {
-    document.title = 'Bugema University - Digital Notice Board';
-    link.href = '/bugema-logo.png';
-    setMeta('meta-title', 'title', 'Bugema University - Digital Notice Board');
-    setMeta('og-title', 'og:title', 'Bugema University - Digital Notice Board');
-    setMeta('twitter-title', 'twitter:title', 'Bugema University - Digital Notice Board');
-    setMeta('meta-desc', 'description', 'Official Bugema University Digital Notice Board. View official announcements, academic notices, timetable updates, and campus news.');
-    setMeta('og-desc', 'og:description', 'Official Bugema University Digital Notice Board. View official announcements, academic notices, timetable updates, and campus news.');
-    setMeta('twitter-desc', 'twitter:description', 'Official Bugema University Digital Notice Board. View official announcements, academic notices, timetable updates, and campus news.');
-    setMeta('og-image', 'og:image', '/bugema-logo.png');
-    setMeta('twitter-image', 'twitter:image', '/bugema-logo.png');
+    updateHead({
+      iconUrl: '/bugema-logo.png',
+      manifestUrl: '/manifest-bugema.json',
+      appName: 'Bugema Notice',
+      title: 'Bugema University - Digital Notice Board',
+      desc: 'Official Bugema University Digital Notice Board. View official announcements, academic notices, timetable updates, and campus news.'
+    });
   } else {
-    document.title = 'NexFi - Connect, Share & Communicate';
-    link.href = '/logo.png';
-    setMeta('meta-title', 'title', 'NexFi - Connect, Share & Communicate');
-    setMeta('og-title', 'og:title', 'NexFi - Connect, Share & Communicate');
-    setMeta('twitter-title', 'twitter:title', 'NexFi - Connect, Share & Communicate');
-    setMeta('meta-desc', 'description', 'Connect, share updates, direct message, and communicate seamlessly on NexFi.');
-    setMeta('og-desc', 'og:description', 'Connect, share updates, direct message, and communicate seamlessly on NexFi.');
-    setMeta('twitter-desc', 'twitter:description', 'Connect, share updates, direct message, and communicate seamlessly on NexFi.');
-    setMeta('og-image', 'og:image', '/logo.png');
-    setMeta('twitter-image', 'twitter:image', '/logo.png');
+    updateHead({
+      iconUrl: '/logo.png',
+      manifestUrl: '/manifest.json',
+      appName: 'NexFi',
+      title: 'NexFi - Connect, Share & Communicate',
+      desc: 'Connect, share updates, direct message, and communicate seamlessly on NexFi.'
+    });
   }
 });
 

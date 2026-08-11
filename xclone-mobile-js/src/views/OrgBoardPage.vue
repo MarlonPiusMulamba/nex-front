@@ -2599,14 +2599,25 @@ export default {
       if (!org) return;
       const titleText = `${org.name} - Digital Notice Board`;
       const descText = `Official Digital Notice Board for ${org.name}. View official announcements, academic notices, and campus communications.`;
-      const logoUrl = org.logo_url || '/bugema-logo.png';
+      const isBugema = (org.slug === 'bugema') || (org.name && org.name.toLowerCase().includes('bugema'));
+      const logoUrl = org.logo_url || (isBugema ? '/bugema-logo.png' : '/logo.png');
+      const manifestUrl = isBugema ? '/manifest-bugema.json' : '/manifest.json';
+      const appName = isBugema ? 'Bugema Notice' : `${org.name} Notice`;
 
       this.originalTitle = document.title;
       document.title = titleText;
 
       const setMeta = (id, prop, val) => {
         let el = document.getElementById(id) || document.querySelector(`meta[property='${prop}']`) || document.querySelector(`meta[name='${prop}']`);
-        if (el) el.setAttribute('content', val);
+        if (el) {
+          el.setAttribute('content', val);
+        } else {
+          const meta = document.createElement('meta');
+          if (prop.startsWith('og:')) meta.setAttribute('property', prop);
+          else meta.setAttribute('name', prop);
+          meta.setAttribute('content', val);
+          document.head.appendChild(meta);
+        }
       };
 
       setMeta('meta-title', 'title', titleText);
@@ -2620,21 +2631,38 @@ export default {
       setMeta('og-image', 'og:image', logoUrl);
       setMeta('twitter-image', 'twitter:image', logoUrl);
 
-      let link = document.querySelector("link[rel*='icon']");
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'shortcut icon';
-        document.getElementsByTagName('head')[0].appendChild(link);
+      setMeta('apple-title', 'apple-mobile-web-app-title', appName);
+      setMeta('app-name', 'application-name', appName);
+
+      // Favicon
+      let link = document.getElementById('app-favicon') || document.querySelector("link[rel*='icon']");
+      if (link) {
+        this.originalFavicon = link.href;
+        link.href = logoUrl;
       }
-      this.originalFavicon = link.href;
-      link.href = logoUrl;
+
+      // Apple Touch Icon (Critical for iOS PWA Home Screen icon!)
+      let appleIcon = document.getElementById('app-apple-touch-icon') || document.querySelector("link[rel='apple-touch-icon']");
+      if (appleIcon) {
+        appleIcon.href = logoUrl;
+      }
+
+      // Manifest link
+      let manifest = document.getElementById('manifest-link') || document.querySelector("link[rel='manifest']");
+      if (manifest) {
+        manifest.setAttribute('href', manifestUrl);
+      }
     },
     restoreFaviconAndTitle() {
       if (this.originalTitle) document.title = this.originalTitle;
-      if (this.originalFavicon) {
-        const link = document.querySelector("link[rel*='icon']");
-        if (link) link.href = this.originalFavicon;
-      }
+      const link = document.getElementById('app-favicon') || document.querySelector("link[rel*='icon']");
+      if (link) link.href = this.originalFavicon || '/logo.png';
+
+      const appleIcon = document.getElementById('app-apple-touch-icon') || document.querySelector("link[rel='apple-touch-icon']");
+      if (appleIcon) appleIcon.href = '/logo.png';
+
+      const manifest = document.getElementById('manifest-link') || document.querySelector("link[rel='manifest']");
+      if (manifest) manifest.setAttribute('href', '/manifest.json');
     },
     formatRole(role) {
       if (!role) return '';

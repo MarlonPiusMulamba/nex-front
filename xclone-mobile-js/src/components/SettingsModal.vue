@@ -582,10 +582,18 @@ export default {
     },
     async installPWA() {
       try {
-        let manifestTag = document.getElementById('manifest-link') || document.querySelector('link[rel="manifest"]');
+        const manifestTag = document.getElementById('manifest-link') || document.querySelector('link[rel="manifest"]');
         if (manifestTag) {
           manifestTag.setAttribute('href', '/manifest-bugema.json');
         }
+        const favicon = document.getElementById('app-favicon') || document.querySelector("link[rel*='icon']");
+        if (favicon) favicon.href = '/bugema-logo.png';
+
+        const appleIcon = document.getElementById('app-apple-touch-icon') || document.querySelector("link[rel='apple-touch-icon']");
+        if (appleIcon) appleIcon.href = '/bugema-logo.png';
+
+        const appleTitle = document.querySelector("meta[name='apple-mobile-web-app-title']");
+        if (appleTitle) appleTitle.setAttribute('content', 'Bugema Notice');
       } catch (_) {}
 
       // Use the globally-captured install prompt if this modal didn't see the event
