@@ -1571,10 +1571,8 @@ export default {
       const cleanBody = (notice.body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
       const summary = cleanBody.length > 140 ? cleanBody.substring(0, 140) + '...' : cleanBody;
       
-      const baseUrl = window.location.origin + window.location.pathname;
-      const noticeUrl = `${baseUrl}#notice-${notice.id}`;
-
-      const shareText = `📢 *${orgName.toUpperCase()} DIGITAL NOTICE BOARD*\n📌 *Dept:* ${deptName}\n\n*Title:* ${title}\n\n${summary}\n\n🔗 *Read Full Notice:* ${noticeUrl}`;
+      const noticeShareUrl = `${this.API_URL || 'https://nex-back-3-stoz.onrender.com'}/share/notice/${notice.id}`;
+      const shareText = `📢 *${orgName.toUpperCase()} DIGITAL NOTICE BOARD*\n📌 *Dept:* ${deptName}\n\n*Title:* ${title}\n\n${summary}\n\n🔗 *Read Full Notice:* ${noticeShareUrl}`;
 
       const canWebShare = typeof navigator !== 'undefined' && Boolean(navigator.share);
 
@@ -1597,7 +1595,7 @@ export default {
           {
             text: '✈️ Share via Telegram',
             handler: () => {
-              const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(noticeUrl)}&text=${encodeURIComponent(`📢 *${orgName}* - ${title}`)}`;
+              const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(noticeShareUrl)}&text=${encodeURIComponent(`📢 *${orgName}* - ${title}`)}`;
               if (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform()) {
                 window.open(tgUrl, '_system');
               } else {
@@ -1609,7 +1607,7 @@ export default {
             text: '📋 Copy Direct Link',
             handler: async () => {
               try {
-                await navigator.clipboard.writeText(noticeUrl);
+                await navigator.clipboard.writeText(noticeShareUrl);
                 const toast = await toastController.create({
                   message: '📋 Direct notice link copied to clipboard!',
                   duration: 2500,
@@ -1629,7 +1627,7 @@ export default {
                 await navigator.share({
                   title: `${orgName} - ${title}`,
                   text: shareText,
-                  url: noticeUrl
+                  url: noticeShareUrl
                 });
               } catch (e) {
                 if (e.name !== 'AbortError') {
