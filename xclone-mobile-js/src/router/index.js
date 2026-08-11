@@ -193,14 +193,41 @@ router.beforeEach((to, from, next) => {
 router.afterEach((to) => {
   if (typeof document === 'undefined') return;
   const isBugemaNotice = to.path.startsWith('/notices/bugema') || standaloneOrg === 'bugema';
-  const isNoticeBoard = to.path.startsWith('/notices/') || !!standaloneOrg;
+
+  let link = document.querySelector("link[rel*='icon']");
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'shortcut icon';
+    document.getElementsByTagName('head')[0].appendChild(link);
+  }
+
+  const setMeta = (id, prop, val) => {
+    let el = document.getElementById(id) || document.querySelector(`meta[property='${prop}']`) || document.querySelector(`meta[name='${prop}']`);
+    if (el) el.setAttribute('content', val);
+  };
 
   if (isBugemaNotice) {
     document.title = 'Bugema University - Digital Notice Board';
-  } else if (isNoticeBoard) {
-    document.title = 'Digital Notice Board';
+    link.href = '/bugema-logo.png';
+    setMeta('meta-title', 'title', 'Bugema University - Digital Notice Board');
+    setMeta('og-title', 'og:title', 'Bugema University - Digital Notice Board');
+    setMeta('twitter-title', 'twitter:title', 'Bugema University - Digital Notice Board');
+    setMeta('meta-desc', 'description', 'Official Bugema University Digital Notice Board. View official announcements, academic notices, timetable updates, and campus news.');
+    setMeta('og-desc', 'og:description', 'Official Bugema University Digital Notice Board. View official announcements, academic notices, timetable updates, and campus news.');
+    setMeta('twitter-desc', 'twitter:description', 'Official Bugema University Digital Notice Board. View official announcements, academic notices, timetable updates, and campus news.');
+    setMeta('og-image', 'og:image', '/bugema-logo.png');
+    setMeta('twitter-image', 'twitter:image', '/bugema-logo.png');
   } else {
-    document.title = 'Bugema University - Digital Notice Board';
+    document.title = 'NexFi - Connect, Share & Communicate';
+    link.href = '/logo.png';
+    setMeta('meta-title', 'title', 'NexFi - Connect, Share & Communicate');
+    setMeta('og-title', 'og:title', 'NexFi - Connect, Share & Communicate');
+    setMeta('twitter-title', 'twitter:title', 'NexFi - Connect, Share & Communicate');
+    setMeta('meta-desc', 'description', 'Connect, share updates, direct message, and communicate seamlessly on NexFi.');
+    setMeta('og-desc', 'og:description', 'Connect, share updates, direct message, and communicate seamlessly on NexFi.');
+    setMeta('twitter-desc', 'twitter:description', 'Connect, share updates, direct message, and communicate seamlessly on NexFi.');
+    setMeta('og-image', 'og:image', '/logo.png');
+    setMeta('twitter-image', 'twitter:image', '/logo.png');
   }
 });
 

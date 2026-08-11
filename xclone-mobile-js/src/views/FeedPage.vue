@@ -2541,6 +2541,8 @@ export default {
       try {
         const res = await axios.post(`${this.API_URL}/api/test/notification`, {
           user_id: this.userId,
+          title: 'Bugema University',
+          message: 'Bugema University wishes you a good morning and a joyous Tuesday! ☀️✨',
           push: true
         }, { timeout: 10000 });
         
