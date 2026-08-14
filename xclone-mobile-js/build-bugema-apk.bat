@@ -10,17 +10,24 @@ echo.
 
 cd /d "%~dp0"
 
-echo [1/5] Setting app name and ID to "Bugema Notices" (org.bugema.noticeboard)...
-powershell -Command "(Get-Content 'android\app\src\main\res\values\strings.xml') -replace '<string name=\"app_name\">.*?</string>', '<string name=\"app_name\">Bugema Notices</string>' -replace '<string name=\"title_activity_main\">.*?</string>', '<string name=\"title_activity_main\">Bugema Notices</string>' | Set-Content 'android\app\src\main\res\values\strings.xml'"
-powershell -Command "(Get-Content 'capacitor.config.json') -replace '\"appId\": \".*?\"', '\"appId\": \"org.bugema.noticeboard\"' -replace '\"appName\": \".*?\"', '\"appName\": \"Bugema Notices\"' | Set-Content 'capacitor.config.json'"
+echo [1/6] Copying BU logo and generating Android App Icons...
+copy /Y "public\bugema-logo.png" "public\logo.png"
+python generate_app_icons.py
+if %ERRORLEVEL% neq 0 (
+    echo [WARNING] Icon generation failed, using existing icons.
+)
+
+echo [2/6] Setting app name and ID to "Bugema Notice Board" (org.bugema.noticeboard)...
+powershell -Command "(Get-Content 'android\app\src\main\res\values\strings.xml') -replace '<string name=\"app_name\">.*?</string>', '<string name=\"app_name\">Bugema Notice Board</string>' -replace '<string name=\"title_activity_main\">.*?</string>', '<string name=\"title_activity_main\">Bugema Notice Board</string>' | Set-Content 'android\app\src\main\res\values\strings.xml'"
+powershell -Command "(Get-Content 'capacitor.config.json') -replace '\"appId\": \".*?\"', '\"appId\": \"org.bugema.noticeboard\"' -replace '\"appName\": \".*?\"', '\"appName\": \"Bugema Notice Board\"' | Set-Content 'capacitor.config.json'"
 powershell -Command "(Get-Content 'android\app\build.gradle') -replace 'applicationId \".*?\"', 'applicationId \"org.bugema.noticeboard\"' | Set-Content 'android\app\build.gradle'"
 echo   Done.
 
-echo [2/5] Building Web Assets (Bugema Standalone mode)...
+echo [3/6] Building Web Assets (Bugema Standalone mode)...
 set VITE_STANDALONE_ORG=bugema
 set VITE_API_URL=https://ssp.bugemauniv.ac.ug
 set VITE_APP_TITLE=Bugema Notice Board
-set VITE_APP_NAME=Bugema Notices
+set VITE_APP_NAME=Bugema Notice Board
 set VITE_ENABLE_SOCKETIO=true
 set NODE_ENV=production
 call npx vite build
@@ -31,7 +38,7 @@ if %ERRORLEVEL% neq 0 (
 )
 echo   Build done.
 
-echo [3/5] Syncing to Android project...
+echo [4/6] Syncing to Android project...
 call npx cap sync android
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Capacitor sync failed!
@@ -40,7 +47,7 @@ if %ERRORLEVEL% neq 0 (
 )
 echo   Sync done.
 
-echo [4/5] Compiling APK...
+echo [5/6] Compiling APK...
 cd android
 call gradlew assembleDebug --stacktrace
 if %ERRORLEVEL% neq 0 (
@@ -52,13 +59,15 @@ if %ERRORLEVEL% neq 0 (
 cd ..
 echo   Compile done.
 
-echo [5/5] Copying APK to project root...
+echo [6/6] Copying APK to project root and public folder...
 copy /Y "android\app\build\outputs\apk\debug\app-debug.apk" "Bugema_Notice_Board.apk"
+copy /Y "android\app\build\outputs\apk\debug\app-debug.apk" "public\Bugema_Notice_Board.apk"
 
 echo.
 echo =======================================================
 echo  SUCCESS! Bugema APK is ready:
-echo  Bugema_Notice_Board.apk
+echo  1. Bugema_Notice_Board.apk
+echo  2. public\Bugema_Notice_Board.apk
 echo =======================================================
 echo.
-pause
+
