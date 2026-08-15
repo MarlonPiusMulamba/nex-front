@@ -15,11 +15,6 @@ on:
           - bugema
   push:
     branches: [main, master]
-    paths:
-      - 'src/**'
-      - 'public/**'
-      - 'capacitor.config.json'
-      - 'package.json'
 
 jobs:
   # ══════════════════════════════════════════════════════════════
