@@ -53,6 +53,7 @@ jobs:
             npx cap add ios
           fi
           sed -i '' "s/platform :ios, '13.0'/platform :ios, '14.0'/g" ios/App/Podfile || true
+          sed -i '' "s/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/IPHONEOS_DEPLOYMENT_TARGET = 14.0;/g" ios/App/App.xcodeproj/project.pbxproj || true
 
       - name: 🔄 Sync assets to iOS
         run: npx cap sync ios
@@ -161,6 +162,7 @@ jobs:
             npx cap add ios
           fi
           sed -i '' "s/platform :ios, '13.0'/platform :ios, '14.0'/g" ios/App/Podfile || true
+          sed -i '' "s/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/IPHONEOS_DEPLOYMENT_TARGET = 14.0;/g" ios/App/App.xcodeproj/project.pbxproj || true
 
       - name: 🔄 Sync assets to iOS
         run: npx cap sync ios
