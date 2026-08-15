@@ -178,10 +178,10 @@ jobs:
         run: |
           INFO_PLIST="ios/App/App/Info.plist"
           if [ -f "$INFO_PLIST" ]; then
-            /usr/libexec/PlistBuddy -c "Set :CFBundleName 'Bugema Notices'" "$INFO_PLIST" 2>/dev/null || \
-            /usr/libexec/PlistBuddy -c "Add :CFBundleName string 'Bugema Notices'" "$INFO_PLIST"
-            /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'Bugema Notices'" "$INFO_PLIST" 2>/dev/null || \
-            /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'Bugema Notices'" "$INFO_PLIST"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleName 'Bugema Notice Board'" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleName string 'Bugema Notice Board'" "$INFO_PLIST"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'Bugema Notice Board'" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'Bugema Notice Board'" "$INFO_PLIST"
           fi
 
       - name: 🔨 Build unsigned IPA (Bugema)
@@ -198,7 +198,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            PRODUCT_BUNDLE_IDENTIFIER=org.xclone.bugema \
+            PRODUCT_BUNDLE_IDENTIFIER=org.bugema.noticeboard \
             MARKETING_VERSION=1.0 \
             CURRENT_PROJECT_VERSION=1 \
             archive | xcpretty || true
