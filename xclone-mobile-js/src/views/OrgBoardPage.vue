@@ -2898,14 +2898,14 @@ export default {
   border-radius: 50%;
   object-fit: cover;
   display: block;
-  box-shadow: 0 3px 10px rgba(218, 165, 32, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .mini-logo-ring {
   position: absolute;
   inset: -2px;
   border-radius: 50%;
-  border: 2px solid rgba(218, 165, 32, 0.7);
+  border: 2px solid #ffffff;
   pointer-events: none;
 }
 
@@ -3250,7 +3250,7 @@ export default {
   position: absolute;
   inset: -3px;
   border-radius: 23px;
-  background: linear-gradient(135deg, #d4af37, #ffd700, #c0921c);
+  background: #ffffff;
   z-index: -1;
 }
 
