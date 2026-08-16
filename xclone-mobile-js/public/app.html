@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Download & Install - Bugema Notice Board</title>
+  <link rel="icon" href="/logo.png" type="image/png">
+  <style>
+    :root {
+      --primary-gold: #D4AF37;
+      --primary-hover: #F59E0B;
+      --bg-dark: #0B0F19;
+      --card-bg: rgba(22, 27, 46, 0.75);
+      --card-border: rgba(212, 175, 55, 0.25);
+      --text-main: #FFFFFF;
+      --text-muted: #94A3B8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at top center, #1E1B4B 0%, var(--bg-dark) 70%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    .container {
+      max-width: 440px;
+      width: 100%;
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--card-border);
+      border-radius: 32px;
+      padding: 36px 24px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 30px rgba(212, 175, 55, 0.15);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(212, 175, 55, 0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .app-icon-wrapper {
+      position: relative;
+      display: inline-block;
+      margin-bottom: 20px;
+    }
+
+    .app-icon {
+      width: 110px;
+      height: 110px;
+      border-radius: 26px;
+      object-fit: cover;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(212, 175, 55, 0.4);
+      border: 2px solid var(--primary-gold);
+    }
+
+    .verified-badge {
+      position: absolute;
+      bottom: -6px;
+      right: -6px;
+      background: #10B981;
+      color: white;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      border: 3px solid #1E1B4B;
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+      background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .org-tag {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--primary-gold);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 18px;
+      display: block;
+    }
+
+    .detected-device-banner {
+      background: rgba(212, 175, 55, 0.12);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      border-radius: 14px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #FEF08A;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 18px 24px;
+      border-radius: 20px;
+      font-size: 16px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.25s ease;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary-gold) 0%, var(--primary-hover) 100%);
+      color: #0B0F19;
+      box-shadow: 0 10px 25px rgba(212, 175, 55, 0.35);
+    }
+
+    .btn-primary:hover, .btn-primary:active {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px rgba(212, 175, 55, 0.5);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.07);
+      color: #F1F5F9;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .btn-icon {
+      font-size: 22px;
+    }
+
+    .qr-section {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 20px;
+      padding: 20px;
+      margin-top: 10px;
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+    }
+
+    .qr-img {
+      width: 160px;
+      height: 160px;
+      background: white;
+      padding: 8px;
+      border-radius: 16px;
+      margin: 12px auto;
+    }
+
+    .instructions {
+      text-align: left;
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-top: 20px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .instructions h3 {
+      font-size: 14px;
+      color: var(--primary-gold);
+      margin-bottom: 8px;
+    }
+
+    .instructions ol {
+      padding-left: 18px;
+    }
+
+    .instructions li {
+      margin-bottom: 6px;
+    }
+
+    footer {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: #64748B;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="card">
+      <div class="app-icon-wrapper">
+        <img src="/logo.png" alt="Bugema Notice Board" class="app-icon">
+        <div class="verified-badge">✓</div>
+      </div>
+
+      <h1>Bugema Notice Board</h1>
+      <span class="org-tag">Bugema University Official Mobile App</span>
+
+      <!-- Device Detection Banner -->
+      <div class="detected-device-banner" id="deviceBanner">
+        <span>🔍 Detecting your device...</span>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="btn-group">
+        <!-- iOS Direct Install Button -->
+        <a id="iosBtn" href="itms-services://?action=download-manifest&url=https://ssp.bugemauniv.ac.ug/manifest.plist" class="btn btn-primary" style="display: none;">
+          <span class="btn-icon"></span> Install on iPhone (iOS)
+        </a>
+
+        <!-- Android Direct APK Download Button -->
+        <a id="androidBtn" href="/Bugema_Notice_Board.apk" download class="btn btn-primary" style="display: none;">
+          <span class="btn-icon">🤖</span> Install on Android (APK)
+        </a>
+
+        <!-- General Download IPA File -->
+        <a id="ipaDirectBtn" href="/Bugema_Notice_Board.ipa" download class="btn btn-secondary" style="display: none;">
+          <span class="btn-icon">📦</span> Download .IPA File (iOS)
+        </a>
+
+        <!-- Web App Link -->
+        <a href="/" class="btn btn-secondary">
+          <span class="btn-icon">🌐</span> Open Web Version Directly
+        </a>
+      </div>
+
+      <!-- Desktop QR Code section -->
+      <div class="qr-section" id="desktopQrSection" style="display: none;">
+        <p style="font-size: 14px; color: var(--text-main); font-weight: 600;">Scan with Phone Camera to Install:</p>
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://ssp.bugemauniv.ac.ug/app.html" alt="Scan QR Code" class="qr-img">
+        <p style="font-size: 12px; color: var(--text-muted);">Points directly to this instant installer</p>
+      </div>
+
+      <!-- Instructions Section -->
+      <div class="instructions" id="instructionsBox">
+        <h3 id="instTitle">📱 How to Install:</h3>
+        <div id="iosInst" style="display: none;">
+          <ol>
+            <li>Tap <b>Install on iPhone</b> above in <b>Safari</b>.</li>
+            <li>Tap <b>Install</b> on the iOS system prompt.</li>
+            <li>Go to iPhone <b>Settings</b> &rarr; <b>General</b> &rarr; <b>VPN & Device Management</b>.</li>
+            <li>Tap your profile / developer name and tap <b>Trust</b>.</li>
+          </ol>
+        </div>
+        <div id="androidInst" style="display: none;">
+          <ol>
+            <li>Tap <b>Install on Android</b> above to download the APK.</li>
+            <li>Open the downloaded <code>Bugema_Notice_Board.apk</code>.</li>
+            <li>Allow <i>"Install from unknown sources"</i> if prompted.</li>
+          </ol>
+        </div>
+        <div id="generalInst" style="display: none;">
+          <p>Scan the QR code above with your phone camera, or select your platform below:</p>
+          <div style="margin-top: 10px; display: flex; gap: 10px;">
+            <a href="/Bugema_Notice_Board.apk" download style="color: #60A5FA; text-decoration: underline;">Android APK (21.8 MB)</a> | 
+            <a href="/Bugema_Notice_Board.ipa" download style="color: #60A5FA; text-decoration: underline;">iPhone IPA (28.7 MB)</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <footer>
+      Bugema University Notice Board Platform &bull; All Rights Reserved
+    </footer>
+  </div>
+
+  <script>
+    // Smart Device Detection Script
+    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+    const isAndroid = /android/i.test(userAgent);
+
+    const banner = document.getElementById('deviceBanner');
+    const iosBtn = document.getElementById('iosBtn');
+    const androidBtn = document.getElementById('androidBtn');
+    const ipaDirectBtn = document.getElementById('ipaDirectBtn');
+    const desktopQr = document.getElementById('desktopQrSection');
+    const iosInst = document.getElementById('iosInst');
+    const androidInst = document.getElementById('androidInst');
+    const generalInst = document.getElementById('generalInst');
+
+    if (isIOS) {
+      banner.innerHTML = '<span> iPhone Detected &bull; Instant OTA Installer Ready</span>';
+      iosBtn.style.display = 'flex';
+      ipaDirectBtn.style.display = 'flex';
+      iosInst.style.display = 'block';
+    } else if (isAndroid) {
+      banner.innerHTML = '<span>🤖 Android Device Detected &bull; Direct APK Ready</span>';
+      androidBtn.style.display = 'flex';
+      androidInst.style.display = 'block';
+    } else {
+      banner.innerHTML = '<span>💻 Desktop Detected &bull; Scan QR Code with Phone</span>';
+      androidBtn.style.display = 'flex';
+      iosBtn.style.display = 'flex';
+      ipaDirectBtn.style.display = 'flex';
+      desktopQr.style.display = 'block';
+      generalInst.style.display = 'block';
+    }
+  </script>
+
+</body>
+</html>
