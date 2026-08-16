@@ -59,15 +59,17 @@ if %ERRORLEVEL% neq 0 (
 cd ..
 echo   Compile done.
 
-echo [6/6] Copying APK to project root and public folder...
+echo [6/6] Copying APK to project root, public, and downloads folders...
 copy /Y "android\app\build\outputs\apk\debug\app-debug.apk" "Bugema_Notice_Board.apk"
 copy /Y "android\app\build\outputs\apk\debug\app-debug.apk" "public\Bugema_Notice_Board.apk"
+copy /Y "android\app\build\outputs\apk\debug\app-debug.apk" "public\downloads\Bugema_Notice_Board.apk"
 
 echo.
 echo =======================================================
 echo  SUCCESS! Bugema APK is ready:
 echo  1. Bugema_Notice_Board.apk
 echo  2. public\Bugema_Notice_Board.apk
+echo  3. public\downloads\Bugema_Notice_Board.apk
 echo =======================================================
 echo.
 

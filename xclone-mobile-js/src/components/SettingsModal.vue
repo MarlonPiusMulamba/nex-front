@@ -162,7 +162,7 @@
           <div v-if="activeInstallTab === 'android'" class="install-tab-content">
             <div class="install-info-box">
               <p class="install-instruction">
-                <strong>Official Bugema Notice Board Android App (v1.0.0):</strong> Download the native Android app package (7.6 MB) directly to your device.
+                <strong>Official Bugema Notice Board Android App (v1.0.0):</strong> Download the compiled Android package (.APK) directly to your device.
               </p>
             </div>
 
@@ -183,7 +183,7 @@
             <!-- Download Complete State: Manual Installation Instructions -->
             <div v-else-if="apkDownloaded" class="download-completed-box">
               <div class="completed-badge">
-                <span>✅ APK Saved to Downloads (7.6 MB)</span>
+                <span>✅ APK Saved to Downloads (Bugema_Notice_Board.apk)</span>
               </div>
               
               <div class="manual-install-card">
@@ -195,22 +195,26 @@
                 </ol>
               </div>
 
-              <ion-button expand="block" fill="outline" class="ios-action-btn" @click="startApkDownload">
-                <ion-icon :icon="arrowDownCircleOutline" slot="start"></ion-icon>
-                Download Again
-              </ion-button>
+              <a href="/Bugema_Notice_Board.apk" download="Bugema_Notice_Board.apk" class="install-action-btn-link" style="text-decoration: none;" @click="startApkDownload">
+                <ion-button expand="block" fill="outline" class="ios-action-btn">
+                  <ion-icon :icon="arrowDownCircleOutline" slot="start"></ion-icon>
+                  Download APK Again
+                </ion-button>
+              </a>
             </div>
 
             <!-- Initial State: Download Button -->
-            <ion-button 
-              v-else 
-              expand="block" 
-              class="install-action-btn" 
-              @click="startApkDownload"
-            >
-              <ion-icon :icon="arrowDownCircleOutline" slot="start"></ion-icon>
-              Download App
-            </ion-button>
+            <div v-else class="install-action-wrapper">
+              <a href="/Bugema_Notice_Board.apk" download="Bugema_Notice_Board.apk" class="install-action-btn-link" style="text-decoration: none;" @click="startApkDownload">
+                <ion-button 
+                  expand="block" 
+                  class="install-action-btn pulse-glow" 
+                >
+                  <ion-icon :icon="arrowDownCircleOutline" slot="start"></ion-icon>
+                  Download Android APK
+                </ion-button>
+              </a>
+            </div>
           </div>
 
           <!-- Tab 2: PWA Instant Standalone Web App Installation -->
@@ -275,20 +279,53 @@
             <p v-if="pwaMessage" class="pwa-status-msg" style="margin-top: 8px;">{{ pwaMessage }}</p>
           </div>
 
-          <!-- Tab 3: iOS Installation Instructions -->
+          <!-- Tab 3: iOS Installation Instructions & Direct IPA Download -->
           <div v-else-if="activeInstallTab === 'ios'" class="install-tab-content">
             <div class="install-info-box">
               <p class="install-instruction">
-                <strong>iOS Home Screen App:</strong>
+                <strong>Official Bugema Notice Board iOS App:</strong> Install Over-The-Air (OTA), download the <code>.IPA</code> file, or add the Safari Web App to your home screen.
               </p>
-              <ol class="ios-steps-list">
+            </div>
+
+            <!-- iOS Direct Install & IPA Download Buttons -->
+            <div class="ios-btn-stack" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px;">
+              <!-- Action 1: Over-The-Air (OTA) Direct iPhone Install -->
+              <a 
+                :href="iosManifestUrl" 
+                class="install-action-btn-link"
+                style="text-decoration: none;"
+              >
+                <ion-button expand="block" class="install-action-btn pulse-glow" style="--background: linear-gradient(135deg, #3b82f6, #1d4ed8); --color: #ffffff;">
+                  <span style="margin-right: 8px; font-size: 1.1rem;"></span>
+                  Install Directly on iPhone (OTA)
+                </ion-button>
+              </a>
+
+              <!-- Action 2: Direct .IPA File Download -->
+              <a 
+                href="/Bugema_Notice_Board.ipa" 
+                download="Bugema_Notice_Board.ipa" 
+                class="install-action-btn-link"
+                style="text-decoration: none;"
+              >
+                <ion-button expand="block" fill="outline" class="ios-action-btn">
+                  <ion-icon :icon="arrowDownCircleOutline" slot="start"></ion-icon>
+                  Download .IPA File (iOS)
+                </ion-button>
+              </a>
+            </div>
+
+            <!-- iOS Safari PWA Guide -->
+            <div class="manual-install-card ios-pwa-card">
+              <h4 class="install-guide-title">📲 How to Install via Safari (Web App):</h4>
+              <ol class="manual-steps-list">
                 <li>Open this site in <strong>Safari</strong> on your iPhone / iPad.</li>
                 <li>Tap the <strong>Share</strong> button (bottom toolbar).</li>
                 <li>Scroll down & tap <strong>Add to Home Screen ➕</strong>.</li>
               </ol>
             </div>
 
-            <ion-button expand="block" fill="outline" class="ios-action-btn" @click="copyIosShareLink">
+            <ion-button expand="block" fill="outline" class="ios-action-btn" @click="copyIosShareLink" style="margin-top: 10px;">
               <ion-icon :icon="copyOutline" slot="start"></ion-icon>
               Copy Link for Safari
             </ion-button>
@@ -392,6 +429,16 @@ export default {
         text: hasPrompt ? 'Native install prompt captured — "Install App" will trigger a REAL standalone install' : 'No install prompt captured — this browser will only add a home-screen shortcut'
       });
       return lines;
+    },
+    frontendOrigin() {
+      if (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null') {
+        return window.location.origin;
+      }
+      return 'https://bugema-notice.vercel.app';
+    },
+    iosManifestUrl() {
+      const plistUrl = `${this.frontendOrigin}/manifest.plist`;
+      return `itms-services://?action=download-manifest&url=${encodeURIComponent(plistUrl)}`;
     }
   },
   mounted() {
@@ -437,23 +484,42 @@ export default {
       this.apkInstalled = false;
       this.downloadedBytesStr = '0.0 MB';
 
-      const targetUrl = '/downloads/Bugema_Notice_Board.apk';
+      const primaryUrl = '/Bugema_Notice_Board.apk';
+      const fallbackUrl = '/downloads/Bugema_Notice_Board.apk';
 
       try {
-        const response = await axios.get(targetUrl, {
-          responseType: 'blob',
-          onDownloadProgress: (progressEvent) => {
-            const total = progressEvent.total || 7644757;
-            const loaded = progressEvent.loaded || 0;
-            const percent = Math.round((loaded * 100) / total);
-            this.apkProgress = Math.min(percent, 100);
+        let response;
+        try {
+          response = await axios.get(primaryUrl, {
+            responseType: 'blob',
+            onDownloadProgress: (progressEvent) => {
+              const total = progressEvent.total || 21828161;
+              const loaded = progressEvent.loaded || 0;
+              const percent = Math.round((loaded * 100) / total);
+              this.apkProgress = Math.min(percent, 100);
 
-            const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
-            const totalMB = (total / (1024 * 1024)).toFixed(1);
-            this.downloadedBytesStr = `${loadedMB} MB`;
-            this.totalBytesStr = `${totalMB} MB`;
-          }
-        });
+              const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
+              const totalMB = (total / (1024 * 1024)).toFixed(1);
+              this.downloadedBytesStr = `${loadedMB} MB`;
+              this.totalBytesStr = `${totalMB} MB`;
+            }
+          });
+        } catch (_) {
+          response = await axios.get(fallbackUrl, {
+            responseType: 'blob',
+            onDownloadProgress: (progressEvent) => {
+              const total = progressEvent.total || 7644757;
+              const loaded = progressEvent.loaded || 0;
+              const percent = Math.round((loaded * 100) / total);
+              this.apkProgress = Math.min(percent, 100);
+
+              const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
+              const totalMB = (total / (1024 * 1024)).toFixed(1);
+              this.downloadedBytesStr = `${loadedMB} MB`;
+              this.totalBytesStr = `${totalMB} MB`;
+            }
+          });
+        }
 
         this.apkProgress = 100;
         this.downloadedBytesStr = this.totalBytesStr;
@@ -479,23 +545,23 @@ export default {
     simulateApkDownload() {
       this.apkDownloading = true;
       let loaded = 0;
-      const total = 7.6;
+      const total = 21.8;
       const interval = setInterval(() => {
-        loaded += 0.8;
+        loaded += 1.2;
         if (loaded >= total) {
           loaded = total;
           this.apkProgress = 100;
-          this.downloadedBytesStr = '7.6 MB';
-          this.totalBytesStr = '7.6 MB';
+          this.downloadedBytesStr = '21.8 MB';
+          this.totalBytesStr = '21.8 MB';
           this.apkDownloaded = true;
           this.apkDownloading = false;
           clearInterval(interval);
         } else {
           this.apkProgress = Math.round((loaded / total) * 100);
           this.downloadedBytesStr = `${loaded.toFixed(1)} MB`;
-          this.totalBytesStr = '7.6 MB';
+          this.totalBytesStr = '21.8 MB';
         }
-      }, 150);
+      }, 120);
     },
     async startApkInstallation() {
       this.apkInstalling = true;
@@ -531,7 +597,7 @@ export default {
       await toast.present();
     },
     openDownloadedApk() {
-      const apkUrl = this.apkBlobUrl || '/downloads/Bugema_Notice_Board.apk';
+      const apkUrl = this.apkBlobUrl || '/Bugema_Notice_Board.apk';
       const link = document.createElement('a');
       link.href = apkUrl;
       link.setAttribute('download', 'Bugema_Notice_Board.apk');

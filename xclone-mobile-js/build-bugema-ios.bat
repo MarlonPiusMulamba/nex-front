@@ -45,9 +45,10 @@ if %ERRORLEVEL% neq 0 (
 )
 
 if exist "ios\App\build\Bugema_Notice_Board.ipa" (
-    echo Copying Bugema_Notice_Board.ipa to project root and public folder...
+    echo Copying Bugema_Notice_Board.ipa to project root, public, and downloads folders...
     copy /Y "ios\App\build\Bugema_Notice_Board.ipa" "Bugema_Notice_Board.ipa"
     copy /Y "ios\App\build\Bugema_Notice_Board.ipa" "public\Bugema_Notice_Board.ipa"
+    copy /Y "ios\App\build\Bugema_Notice_Board.ipa" "public\downloads\Bugema_Notice_Board.ipa"
 )
 
 echo.
