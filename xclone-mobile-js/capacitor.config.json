@@ -1,6 +1,6 @@
 {
-  "appId": "org.bugema.noticeboard",
-  "appName": "Bugema Notice Board",
+  "appId": "org.xclone.app",
+  "appName": "NexFi",
   "webDir": "dist",
   "server": {
     "androidScheme": "https",

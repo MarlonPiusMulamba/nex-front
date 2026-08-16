@@ -34,7 +34,6 @@ const routes = [
     path: '/',
     redirect: () => {
       if (standaloneOrg) return `/notices/${standaloneOrg}`;
-      if (isStandaloneMode()) return `/notices/${noticeSlug()}`;
       return '/tabs/feed';
     }
   },

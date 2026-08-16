@@ -9,7 +9,7 @@
     <transition name="slide-down">
       <div v-if="toast.visible" class="whatsapp-toast" @click="handleToastClick">
         <div class="toast-avatar">
-          <img :src="toast.icon || '/bugema-logo.png'" alt="Icon" @error="e => e.target.src = '/bugema-logo.png'" />
+          <img :src="toast.icon || '/logo.png'" alt="Icon" @error="e => e.target.src = '/logo.png'" />
         </div>
         <div class="toast-content">
           <div class="toast-header">
@@ -51,7 +51,7 @@ export default {
         visible: false,
         title: '',
         body: '',
-        icon: '/bugema-logo.png',
+        icon: '/logo.png',
         url: '',
         timer: null
       }
@@ -77,7 +77,7 @@ export default {
       if (this.toast.timer) clearTimeout(this.toast.timer);
       this.toast.title = detail.title || 'NexFi';
       this.toast.body = detail.body || '';
-      this.toast.icon = detail.icon || '/bugema-logo.png';
+      this.toast.icon = detail.icon || '/logo.png';
       this.toast.url = detail.url || '';
       this.toast.visible = true;
 

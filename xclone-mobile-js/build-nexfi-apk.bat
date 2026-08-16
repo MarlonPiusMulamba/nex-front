@@ -10,13 +10,24 @@ echo.
 
 cd /d "%~dp0"
 
-echo [1/5] Setting app name and ID to "NexFi" (org.xclone.app)...
+echo [1/6] Generating Android App Icons for NexFi...
+python generate_app_icons.py logo.png
+if %ERRORLEVEL% neq 0 (
+    echo [WARNING] Icon generation failed, using existing icons.
+)
+
+echo [2/6] Setting app name and ID to "NexFi" (org.xclone.app)...
 powershell -Command "(Get-Content 'android\app\src\main\res\values\strings.xml') -replace '<string name=\"app_name\">.*?</string>', '<string name=\"app_name\">NexFi</string>' -replace '<string name=\"title_activity_main\">.*?</string>', '<string name=\"title_activity_main\">NexFi</string>' | Set-Content 'android\app\src\main\res\values\strings.xml'"
 powershell -Command "(Get-Content 'capacitor.config.json') -replace '\"appId\": \".*?\"', '\"appId\": \"org.xclone.app\"' -replace '\"appName\": \".*?\"', '\"appName\": \"NexFi\"' | Set-Content 'capacitor.config.json'"
 powershell -Command "(Get-Content 'android\app\build.gradle') -replace 'applicationId \".*?\"', 'applicationId \"org.xclone.app\"' | Set-Content 'android\app\build.gradle'"
 echo   Done.
 
-echo [2/5] Building Web Assets (NexFi mode)...
+echo [2/5] Cleaning up old binaries and building Web Assets (NexFi mode)...
+if exist "public\*.apk" del /F /Q "public\*.apk"
+if exist "public\*.ipa" del /F /Q "public\*.ipa"
+if exist "public\downloads\*.apk" del /F /Q "public\downloads\*.apk"
+if exist "public\downloads\*.ipa" del /F /Q "public\downloads\*.ipa"
+if exist "dist" rmdir /S /Q "dist"
 set VITE_STANDALONE_ORG=
 set VITE_API_URL=https://ssp.bugemauniv.ac.ug
 set VITE_APP_TITLE=NexFi - Campus Platform

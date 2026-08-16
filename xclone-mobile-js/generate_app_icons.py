@@ -75,9 +75,9 @@ def generate_icons(source_path, res_dir):
         folder_path = os.path.join(res_dir, folder)
         os.makedirs(folder_path, exist_ok=True)
         
-        splash_bg = Image.new("RGBA", (w, h), (15, 23, 42, 255)) # Dark theme background matching app #0f172a
+        splash_bg = Image.new("RGBA", (w, h), (255, 255, 255, 255)) # Clean white background
         
-        target_logo_dim = min(w, h) * 0.4
+        target_logo_dim = min(w, h) * 0.55 # Prominent centered logo
         logo_ratio = min(target_logo_dim / img.width, target_logo_dim / img.height)
         s_w, s_h = int(img.width * logo_ratio), int(img.height * logo_ratio)
         s_resized = img.resize((s_w, s_h), Image.Resampling.LANCZOS)
@@ -91,6 +91,9 @@ def generate_icons(source_path, res_dir):
 
 if __name__ == "__main__":
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    source_logo = os.path.join(base_dir, "public", "bugema-logo.png")
+    logo_file = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else "logo.png"
+    source_logo = os.path.join(base_dir, "public", logo_file)
+    if not os.path.exists(source_logo):
+        source_logo = os.path.join(base_dir, "public", "nexfi-logo.png")
     res_directory = os.path.join(base_dir, "android", "app", "src", "main", "res")
     generate_icons(source_logo, res_directory)

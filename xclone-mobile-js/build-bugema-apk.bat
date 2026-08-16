@@ -10,9 +10,8 @@ echo.
 
 cd /d "%~dp0"
 
-echo [1/6] Copying BU logo and generating Android App Icons...
-copy /Y "public\bugema-logo.png" "public\logo.png"
-python generate_app_icons.py
+echo [1/6] Generating Android App Icons for Bugema Notice Board...
+python generate_app_icons.py bugema-logo.png
 if %ERRORLEVEL% neq 0 (
     echo [WARNING] Icon generation failed, using existing icons.
 )
@@ -23,7 +22,12 @@ powershell -Command "(Get-Content 'capacitor.config.json') -replace '\"appId\": 
 powershell -Command "(Get-Content 'android\app\build.gradle') -replace 'applicationId \".*?\"', 'applicationId \"org.bugema.noticeboard\"' | Set-Content 'android\app\build.gradle'"
 echo   Done.
 
-echo [3/6] Building Web Assets (Bugema Standalone mode)...
+echo [3/6] Cleaning up old binaries and building Web Assets (Bugema Standalone mode)...
+if exist "public\*.apk" del /F /Q "public\*.apk"
+if exist "public\*.ipa" del /F /Q "public\*.ipa"
+if exist "public\downloads\*.apk" del /F /Q "public\downloads\*.apk"
+if exist "public\downloads\*.ipa" del /F /Q "public\downloads\*.ipa"
+if exist "dist" rmdir /S /Q "dist"
 set VITE_STANDALONE_ORG=bugema
 set VITE_API_URL=https://ssp.bugemauniv.ac.ug
 set VITE_APP_TITLE=Bugema Notice Board

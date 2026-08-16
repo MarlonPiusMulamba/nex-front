@@ -648,18 +648,19 @@ export default {
     },
     async installPWA() {
       try {
+        const isBugema = (this.$route?.path || '').includes('/notices/bugema') || Boolean(import.meta.env.VITE_STANDALONE_ORG);
         const manifestTag = document.getElementById('manifest-link') || document.querySelector('link[rel="manifest"]');
         if (manifestTag) {
-          manifestTag.setAttribute('href', '/manifest-bugema.json');
+          manifestTag.setAttribute('href', isBugema ? '/manifest-bugema.json' : '/manifest.json');
         }
         const favicon = document.getElementById('app-favicon') || document.querySelector("link[rel*='icon']");
-        if (favicon) favicon.href = '/bugema-logo.png';
+        if (favicon) favicon.href = isBugema ? '/bugema-logo.png' : '/logo.png';
 
         const appleIcon = document.getElementById('app-apple-touch-icon') || document.querySelector("link[rel='apple-touch-icon']");
-        if (appleIcon) appleIcon.href = '/bugema-logo.png';
+        if (appleIcon) appleIcon.href = isBugema ? '/bugema-logo.png' : '/logo.png';
 
         const appleTitle = document.querySelector("meta[name='apple-mobile-web-app-title']");
-        if (appleTitle) appleTitle.setAttribute('content', 'Bugema Notice');
+        if (appleTitle) appleTitle.setAttribute('content', isBugema ? 'Bugema Notice' : 'NexFi');
       } catch (_) {}
 
       // Use the globally-captured install prompt if this modal didn't see the event

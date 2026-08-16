@@ -10,15 +10,17 @@ echo.
 
 cd /d "%~dp0"
 
-echo [1/4] Copying Bugema logo...
-if exist "public\bugema-logo.png" (
-    copy /Y "public\bugema-logo.png" "public\logo.png"
-)
+echo [1/4] Preparing Bugema branding...
 
 echo [2/4] Setting app name and ID to "Bugema Notice Board" (org.bugema.noticeboard)...
 powershell -Command "(Get-Content 'capacitor.config.json') -replace '\"appId\": \".*?\"', '\"appId\": \"org.bugema.noticeboard\"' -replace '\"appName\": \".*?\"', '\"appName\": \"Bugema Notice Board\"' | Set-Content 'capacitor.config.json'"
 
-echo [3/4] Building Web Assets (Bugema Standalone mode)...
+echo [3/4] Cleaning old binaries and building Web Assets (Bugema Standalone mode)...
+if exist "public\*.apk" del /F /Q "public\*.apk"
+if exist "public\*.ipa" del /F /Q "public\*.ipa"
+if exist "public\downloads\*.apk" del /F /Q "public\downloads\*.apk"
+if exist "public\downloads\*.ipa" del /F /Q "public\downloads\*.ipa"
+if exist "dist" rmdir /S /Q "dist"
 set VITE_STANDALONE_ORG=bugema
 set VITE_API_URL=https://ssp.bugemauniv.ac.ug
 set VITE_APP_TITLE=Bugema Notice Board
