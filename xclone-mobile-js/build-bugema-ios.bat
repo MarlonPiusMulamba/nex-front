@@ -44,6 +44,12 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
+if exist "ios\App\build\Bugema_Notice_Board.ipa" (
+    echo Copying Bugema_Notice_Board.ipa to project root and public folder...
+    copy /Y "ios\App\build\Bugema_Notice_Board.ipa" "Bugema_Notice_Board.ipa"
+    copy /Y "ios\App\build\Bugema_Notice_Board.ipa" "public\Bugema_Notice_Board.ipa"
+)
+
 echo.
 echo =======================================================
 echo  SUCCESS! iOS project is synced and ready!

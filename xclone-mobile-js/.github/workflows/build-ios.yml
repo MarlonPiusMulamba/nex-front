@@ -210,6 +210,9 @@ jobs:
           zip -r Bugema_Notice_Board.ipa Payload/
           echo "✅ Bugema IPA created!"
           ls -lh Bugema_Notice_Board.ipa
+          cd ../../..
+          cp ios/App/build/Bugema_Notice_Board.ipa Bugema_Notice_Board.ipa
+          cp ios/App/build/Bugema_Notice_Board.ipa public/Bugema_Notice_Board.ipa
 
       - name: 📤 Upload Bugema IPA artifact
         uses: actions/upload-artifact@v4
