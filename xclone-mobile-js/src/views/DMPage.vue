@@ -581,6 +581,7 @@ import {
   stop, trash, play, pause, arrowUndoOutline
 } from 'ionicons/icons';
 import api from '@/utils/api.js';
+import config from '@/config/index.js';
 import EmojiPicker from '@/components/EmojiPicker.vue';
 import VoiceDrop from '@/components/VoiceDrop.vue';
 import VerificationBadge from '@/components/VerificationBadge.vue';

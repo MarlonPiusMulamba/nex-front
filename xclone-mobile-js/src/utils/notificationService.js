@@ -810,7 +810,32 @@ class NotificationService {
 
     // Handle real-time incoming notification events (DMs, mentions, notices, calls)
     handleIncomingNotification(notification) {
-        console.log('📨 Incoming notification received:', notification);
+        if (!notification) return;
+
+        // Strict guard: DMs and user-specific notifications MUST NOT be shown to unauthenticated users or wrong recipients
+        const currentUserId = localStorage.getItem('userId');
+        const isUserLoggedIn = currentUserId && currentUserId !== '0' && currentUserId !== 'null' && currentUserId !== 'undefined';
+
+        const targetUserId = notification.to_user_id || notification.target_user_id || notification.user_id;
+
+        // If the notification is a message/DM or has a target user_id, enforce recipient check
+        if (notification.type === 'message' || notification.type === 'dm' || targetUserId) {
+            if (!isUserLoggedIn) {
+                console.log('🔇 Suppressing DM notification for unauthenticated user / guest');
+                return;
+            }
+            if (targetUserId && String(targetUserId) !== String(currentUserId)) {
+                console.log(`🔇 Suppressing DM notification for user ${targetUserId} (current user is ${currentUserId})`);
+                return;
+            }
+            // Do not notify sender of their own message
+            const senderUserId = notification.from_user_id || notification.sender_id;
+            if (senderUserId && String(senderUserId) === String(currentUserId)) {
+                return;
+            }
+        }
+
+        console.log('📨 Incoming notification accepted for user:', notification);
         const title = notification.title || (notification.from_username ? `💬 Message from ${notification.from_username}` : 'New Notification');
         const body = notification.message || notification.body || notification.text || '';
         const soundType = notification.type === 'call' ? 'call' : (notification.type === 'message' || notification.type === 'dm' ? 'message' : 'notice');

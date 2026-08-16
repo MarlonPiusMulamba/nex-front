@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router/index.js';
+import config from './config/index.js';
 import { IonicVue } from '@ionic/vue';
 import { io } from 'socket.io-client';
 import { Capacitor } from '@capacitor/core';
@@ -43,8 +44,6 @@ if (typeof window !== 'undefined' && 'onbeforeinstallprompt' in window) {
 }
 
 console.log('🚀 Step 1: Imports successful');
-
-import config from './config/index.js';
 
 console.log('🚀 Step 3: Creating Vue app...');
 

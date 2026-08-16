@@ -98,15 +98,15 @@
         <div class="lock-visual">
           <div class="lock-glow" style="background: rgba(239, 68, 68, 0.2);"></div>
           <div class="lock-circle" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4);">
-            <ion-icon :icon="alertCircleOutline" class="lock-icon" style="color: #ef4444;"></ion-icon>
+            <ion-icon :icon="cloudOfflineOutline" class="lock-icon" style="color: #ef4444;"></ion-icon>
           </div>
         </div>
-        <h2 class="locked-title" style="color: #ef4444;">Server Connection Issue</h2>
-        <p class="locked-desc">{{ errorMessage || 'Unable to connect to the Bugema Notice Board server. Please check your network connection.' }}</p>
+        <h2 class="locked-title" style="color: #ef4444;">Oops! Internet Connection Needed 📶</h2>
+        <p class="locked-desc">Oops! Please check your internet connection and try again.</p>
         <div class="action-box">
           <ion-button @click="loadAll" class="join-btn" style="--background: linear-gradient(135deg, #d4af37, #ffd700); --color: #000; font-weight: 800;">
             <ion-icon :icon="refresh" slot="start"></ion-icon>
-            Try Again
+            Retry Connection
           </ion-button>
         </div>
       </div>
@@ -2338,10 +2338,10 @@ export default {
         console.error('Load board error:', err);
         // Offline / network failure fallback: Load cached notices from offline storage
         const cached = await getOfflineBoard(slug);
-        if (cached && cached.org) {
+        if (cached && (cached.org || (cached.notices && cached.notices.length > 0))) {
           console.log(`📦 Loaded notice board '${slug}' from offline cache`);
-          this.org = cached.org;
-          this.membership = cached.membership;
+          this.org = cached.org || { name: 'Bugema Notice Board', slug: 'bugema' };
+          this.membership = cached.membership || null;
           this.locked = cached.locked || false;
           this.notices = cached.notices || [];
           this.allNotices = cached.notices || [];
@@ -2350,9 +2350,8 @@ export default {
           this.errorMessage = null;
           this.applyAutoTranslate();
         } else {
-          const detail = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Network error';
-          const activeUrl = api?.defaults?.baseURL || 'https://ssp.bugemauniv.ac.ug';
-          this.errorMessage = `${detail} (Backend: ${activeUrl})`;
+          this.isOfflineMode = true;
+          this.errorMessage = 'Oops! Please check your internet connection and try again.';
         }
       } finally {
         this.loading = false;
@@ -2808,6 +2807,19 @@ export default {
       svc.socket.on('connect', this._onSocketConnect);
     }
 
+    // Network status change listeners
+    this._handleOnline = () => {
+      console.log('🌐 Network online detected. Refreshing Bugema Notice Board...');
+      this.isOfflineMode = false;
+      this.loadAll();
+    };
+    this._handleOffline = () => {
+      console.log('📶 Network offline detected. Switching to cached notices mode...');
+      this.isOfflineMode = true;
+    };
+    window.addEventListener('online', this._handleOnline);
+    window.addEventListener('offline', this._handleOffline);
+
     // ── Polling fallback ─────────────────────────────────────────────────────
     // Polls every 15s so notices appear automatically even when socket fails
     // (LAN environment, backend restart, etc.)
@@ -2820,6 +2832,8 @@ export default {
       window.speechSynthesis.cancel();
     }
     window.removeEventListener('scroll', this.handleScroll);
+    if (this._handleOnline) window.removeEventListener('online', this._handleOnline);
+    if (this._handleOffline) window.removeEventListener('offline', this._handleOffline);
     if (this._windowNoticeNewHandler) {
       window.removeEventListener('notice:new', this._windowNoticeNewHandler);
     }

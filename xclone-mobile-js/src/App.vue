@@ -126,21 +126,29 @@ export default {
     if (socket) {
       socket.on('dm:new_message', (payload) => {
         const currentUserId = localStorage.getItem('userId');
-        if (payload && payload.to_user_id == currentUserId) {
+        if (!currentUserId || currentUserId === '0' || currentUserId === 'null' || currentUserId === 'undefined') return;
+        if (payload && String(payload.to_user_id) === String(currentUserId)) {
           notificationService.handleIncomingNotification({
             title: `💬 ${payload.from_username || 'New Message'}`,
             message: payload.text || 'Sent you a direct message',
             type: 'message',
+            to_user_id: payload.to_user_id,
+            from_user_id: payload.from_user_id,
             url: '/messages'
           });
         }
       });
 
       socket.on('notification:new', (payload) => {
+        const currentUserId = localStorage.getItem('userId');
+        if (!currentUserId || currentUserId === '0' || currentUserId === 'null' || currentUserId === 'undefined') return;
+        const targetId = payload?.user_id || payload?.to_user_id;
+        if (targetId && String(targetId) !== String(currentUserId)) return;
         notificationService.handleIncomingNotification({
           title: payload.title || 'New Notification',
           message: payload.message || 'You have a new update',
           type: payload.type || 'general',
+          to_user_id: targetId,
           url: payload.url || '/tabs/notifications'
         });
       });
@@ -201,11 +209,17 @@ export default {
       lanService.onMessage((msg) => {
         // If not on DM page, show notification
         if (this.$route.path !== '/tabs/dm') {
-          notificationService.handleIncomingNotification({
-            title: `LAN Message: ${msg.username || msg.from_user_id}`,
-            message: msg.text || '📸 Shared a media file',
-            type: 'message'
-          });
+          const currentUserId = localStorage.getItem('userId');
+          if (!currentUserId || currentUserId === '0' || currentUserId === 'null' || currentUserId === 'undefined') return;
+          if (msg && String(msg.to_user_id) === String(currentUserId)) {
+            notificationService.handleIncomingNotification({
+              title: `LAN Message: ${msg.username || msg.from_user_id}`,
+              message: msg.text || '📸 Shared a media file',
+              type: 'message',
+              to_user_id: msg.to_user_id,
+              from_user_id: msg.from_user_id
+            });
+          }
         }
       });
       

@@ -90,6 +90,10 @@ class SocketService {
         // Listen for notifications
         this.socket.on('notification:new', (data) => {
             console.log('🔔 New notification:', data);
+            const currentUserId = localStorage.getItem('userId');
+            if (!currentUserId || currentUserId === '0' || currentUserId === 'null' || currentUserId === 'undefined') return;
+            const targetId = data?.user_id || data?.to_user_id;
+            if (targetId && String(targetId) !== String(currentUserId)) return;
             // Trigger notification display
             if (window.notificationService) {
                 window.notificationService.handleIncomingNotification(data);
