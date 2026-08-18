@@ -3,6 +3,14 @@
   "outputDirectory": "xclone-mobile-js/dist",
   "rewrites": [
     {
+      "source": "/share/notice/:id",
+      "destination": "https://ssp.bugemauniv.ac.ug/share/notice/:id"
+    },
+    {
+      "source": "/share/board/:slug",
+      "destination": "https://ssp.bugemauniv.ac.ug/share/board/:slug"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

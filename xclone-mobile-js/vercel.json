@@ -2,7 +2,11 @@
     "rewrites": [
         {
             "source": "/share/notice/:id",
-            "destination": "https://nex-back-3-stoz.onrender.com/share/notice/:id"
+            "destination": "https://ssp.bugemauniv.ac.ug/share/notice/:id"
+        },
+        {
+            "source": "/share/board/:slug",
+            "destination": "https://ssp.bugemauniv.ac.ug/share/board/:slug"
         },
         {
             "source": "/(.*)",
