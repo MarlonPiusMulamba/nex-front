@@ -5294,6 +5294,7 @@ export default {
   --padding-bottom: 0px !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+  --border-radius: 20px !important;
 }
 </style>
 
