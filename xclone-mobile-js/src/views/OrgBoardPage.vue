@@ -3579,10 +3579,12 @@ export default {
 }
 
 /* ─── Notice List ──────────────────────────────────────────── */
+.notice-list-container,
 .notice-list {
-  padding: 14px;
+  padding: 14px 14px 28px 14px;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
   gap: 0;
 }
 
@@ -4555,19 +4557,15 @@ export default {
   box-shadow: 0 3px 10px rgba(18, 8, 161,0.3);
 }
 
-/* Desktop grid — 3 columns, X-style: centered canvas with white space at the
-   screen edges, and a feed column that never gets too wide on large displays. */
+/* Mobile-first base layout (Responsive on small phones) */
 .board-desktop-grid {
-  display: flex;
-  justify-content: center;
+  display: block;
   width: 100%;
-  max-width: 1265px;
-  margin: 0 auto;
-  padding: 0 16px;
-  min-height: calc(100vh - 120px);
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
   background: transparent;
   box-sizing: border-box;
-  gap: 0;
 }
 
 /* ── Left Sidebar (Desktop/Tablet only) ───────────── */
@@ -4749,14 +4747,12 @@ export default {
   height: 44px;
 }
 
-/* ── Middle Feed Column (X-style 600px width) ─────── */
+/* ── Middle Feed Column (Mobile first: full width, 0 min-width) ── */
 .feed-col {
-  width: 600px;
-  min-width: 600px;
-  max-width: 600px;
-  flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
-  border-right: 1px solid var(--ion-border-color, rgba(0,0,0,0.08));
   background: var(--ion-background-color, #f3f4f6);
   display: flex;
   flex-direction: column;
@@ -5052,26 +5048,40 @@ export default {
   }
 }
 
-/* ── RESPONSIVE: show columns only on desktop ─────── */
+/* ── RESPONSIVE: show columns only on desktop (X.com 3-column layout) ─────── */
 @media (min-width: 1024px) {
   .mobile-dept-pills {
     display: none !important;
   }
   .board-desktop-grid {
-    display: flex;
-    justify-content: center;
-    gap: 0;
-    padding: 0 16px;
-    width: 100%;
-    max-width: 1265px;
-    margin: 0 auto;
+    display: flex !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    padding: 0 16px !important;
+    width: 100% !important;
+    max-width: 1265px !important;
+    margin: 0 auto !important;
+    min-height: calc(100vh - 120px) !important;
   }
   .dept-sidebar {
     display: flex !important;
+    width: 275px !important;
+    min-width: 275px !important;
+    max-width: 275px !important;
+  }
+  .feed-col {
+    width: 600px !important;
+    min-width: 600px !important;
+    max-width: 600px !important;
+    flex-shrink: 0 !important;
+    border-right: 1px solid var(--ion-border-color, rgba(0,0,0,0.08)) !important;
   }
   .widgets-col,
   .board-widgets-col {
     display: flex !important;
+    width: 350px !important;
+    min-width: 350px !important;
+    max-width: 350px !important;
   }
   .active-dept-label {
     display: flex !important;
@@ -6440,6 +6450,7 @@ ion-content,
 
 @media (max-width: 767px) {
   .board-desktop-grid {
+    display: block !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
@@ -6448,9 +6459,21 @@ ion-content,
   
   .feed-col {
     width: 100% !important;
+    min-width: 0 !important;
     max-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
+  }
+
+  .notice-list-container {
+    padding: 10px 10px 24px 10px !important;
+  }
+
+  .urgent-ticker-banner {
+    margin: 6px 10px 4px 10px !important;
+    border-radius: 10px !important;
+    width: calc(100% - 20px) !important;
+    border: 1px solid rgba(239, 68, 68, 0.25) !important;
   }
 
   .notice-card {
