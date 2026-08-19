@@ -17,7 +17,6 @@
               </div>
               <span class="brand-word-right" v-if="orgNameRestWords">{{ orgNameRestWords }}</span>
             </div>
-            <span class="board-subtitle">Digital Notice Board <template v-if="org.official_domain">• @{{ org.official_domain }}</template></span>
           </div>
 
           <div class="org-header-title centered-header" v-else>
@@ -28,7 +27,6 @@
               </div>
               <span class="brand-word-right">UNIVERSITY</span>
             </div>
-            <span class="board-subtitle">Digital Notice Board • @bugemauniv.ac.ug</span>
           </div>
 
           <div class="header-card-end">
@@ -380,23 +378,6 @@
           ════════════════════════════════════════════════════ -->
           <main class="feed-col">
 
-            <!-- 🚨 Sticky Urgent Notice Ticker (NEXFi Feeds Style) -->
-            <div v-if="urgentNotices && urgentNotices.length > 0 && !dismissedTicker" class="urgent-ticker-banner" @click="scrollToNotice(urgentNotices[0].id)">
-              <div class="ticker-inner">
-                <ion-icon :icon="alertCircleOutline" class="ticker-icon"></ion-icon>
-                <div class="ticker-text-container">
-                  <span class="ticker-text">
-                    <strong>URGENT:</strong> {{ urgentNotices[0].title }}
-                  </span>
-                </div>
-              </div>
-              <div class="ticker-right-controls">
-                <ion-icon :icon="chevronForwardOutline" class="ticker-arrow"></ion-icon>
-                <button class="ticker-dismiss-btn" @click.stop="dismissedTicker = true" title="Dismiss">
-                  <ion-icon :icon="closeOutline"></ion-icon>
-                </button>
-              </div>
-            </div>
 
             <!-- 🔔 Floating Real-Time "New Notices" Notification Pill -->
             <transition name="pill-slide">
@@ -468,6 +449,24 @@
                 </button>
                 <button class="clear-dept-btn" @click="selectedDept = null" title="Clear department filter">
                   <ion-icon :icon="closeCircleOutline"></ion-icon>
+                </button>
+              </div>
+            </div>
+
+            <!-- 🚨 Urgent Notice Ticker Banner (appears right before notices) -->
+            <div v-if="urgentNotices && urgentNotices.length > 0 && !dismissedTicker" class="urgent-ticker-banner" @click="scrollToNotice(urgentNotices[0].id)">
+              <div class="ticker-inner">
+                <ion-icon :icon="alertCircleOutline" class="ticker-icon"></ion-icon>
+                <div class="ticker-text-container">
+                  <span class="ticker-text">
+                    <strong>URGENT:</strong> {{ urgentNotices[0].title }}
+                  </span>
+                </div>
+              </div>
+              <div class="ticker-right-controls">
+                <ion-icon :icon="chevronForwardOutline" class="ticker-arrow"></ion-icon>
+                <button class="ticker-dismiss-btn" @click.stop="dismissedTicker = true" title="Dismiss">
+                  <ion-icon :icon="closeOutline"></ion-icon>
                 </button>
               </div>
             </div>
@@ -2926,24 +2925,24 @@ export default {
 <style scoped>
 /* ─── Toolbar ─────────────────────────────────────────────── */
 .glass-toolbar {
-  --background: var(--ion-background-color, #f3f4f6);
+  --background: transparent;
   --border-width: 0;
-  --min-height: auto;
-  padding: 8px 10px 4px 10px;
+  --min-height: 30px;
+  padding: 3px 8px 2px 8px;
   contain: none;
 }
 
 .header-brand-card {
-  background: var(--ion-card-background, #ffffff);
-  border-radius: 16px;
-  border: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.06));
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
-  padding: 10px 14px 8px 14px;
+  background: transparent;
+  border-radius: 8px;
+  border: none;
+  box-shadow: none;
+  padding: 3px 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  max-width: 600px;
+  max-width: 480px;
   margin: 0 auto;
   position: relative;
   box-sizing: border-box;
@@ -2953,7 +2952,7 @@ export default {
 .header-card-end {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
 }
 
@@ -2961,8 +2960,8 @@ export default {
   background: transparent;
   border: none;
   color: #1208a1;
-  font-size: 1.3rem;
-  padding: 4px;
+  font-size: 0.9rem;
+  padding: 2px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2972,13 +2971,13 @@ export default {
 .org-header-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   flex: 1;
 }
 
 .org-header-title.centered-header {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   text-align: center;
@@ -2987,7 +2986,7 @@ export default {
   max-width: 100%;
   box-sizing: border-box;
   margin: 0 auto;
-  padding: 4px 4px;
+  padding: 0;
   overflow: hidden;
 }
 
@@ -2995,52 +2994,49 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(4px, 1.5vw, 10px);
+  gap: 5px;
   max-width: 100%;
 }
 
 .brand-word-left,
 .brand-word-right {
-  font-size: clamp(0.95rem, 3.8vw, 1.45rem);
-  font-weight: 900;
+  font-size: 1.05rem;
+  font-weight: 800;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   color: #1208a1;
-  line-height: 1.1;
+  line-height: 1;
   white-space: nowrap;
 }
 
 .mini-logo-wrap {
   position: relative;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 .mini-logo {
-  width: clamp(38px, 3.8vw, 52px);
-  height: clamp(38px, 3.8vw, 52px);
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   object-fit: cover;
   display: block;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .mini-logo-ring {
-  position: absolute;
-  inset: -2px;
-  border-radius: 50%;
-  border: 2px solid #ffffff;
-  pointer-events: none;
+  display: none;
 }
 
 .header-text {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  line-height: 1.1;
+  line-height: 1;
 }
 
 .board-title {
-  font-size: 1.15rem;
+  font-size: 0.75rem;
   font-weight: 800;
   padding: 0;
   white-space: nowrap;
@@ -3051,15 +3047,15 @@ export default {
 .title-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .board-subtitle {
-  font-size: clamp(0.65rem, 1vw, 0.78rem);
+  font-size: 0.6rem;
   color: #64748b;
   font-weight: 600;
   letter-spacing: 0.2px;
-  margin-top: 3px;
+  margin-top: 0;
 }
 
 .official-badge {
@@ -3524,8 +3520,8 @@ export default {
 
 .category-scroll {
   display: flex;
-  padding: 12px 14px 10px;
-  gap: 8px;
+  padding: 4px 12px 6px;
+  gap: 7px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -3823,9 +3819,27 @@ export default {
 .cat-badge--events   { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
 .cat-badge--urgent   { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
 
+/* Notice title & body font sizes */
+.notice-title {
+  font-size: 0.87rem;
+  font-weight: 700;
+  color: var(--ion-text-color, #1a1a1a);
+  margin: 0 0 4px 0;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.notice-text {
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--ion-text-color, #1a1a1a);
+  margin: 0;
+  word-break: break-word;
+}
+
 /* Body */
 .notice-body {
-  padding: 12px 16px 4px;
+  padding: 10px 14px 4px;
 }
 
 .show-more-toggle {
@@ -5243,16 +5257,16 @@ export default {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 1px 4px;
   display: flex;
   align-items: center;
 }
 .profile-icon-wrap {
-  width: 34px;
-  height: 34px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid rgba(18, 8, 161, 0.7);
+  border: 1.5px solid rgba(18, 8, 161, 0.7);
   background: rgba(18, 8, 161, 0.12);
   display: flex;
   align-items: center;
@@ -5261,7 +5275,7 @@ export default {
 }
 .profile-icon-btn:hover .profile-icon-wrap {
   border-color: #1208a1;
-  box-shadow: 0 0 10px rgba(18, 8, 161, 0.45);
+  box-shadow: 0 0 6px rgba(18, 8, 161, 0.45);
 }
 .profile-thumb {
   width: 100%;
@@ -5269,8 +5283,17 @@ export default {
   object-fit: cover;
 }
 .profile-thumb-icon {
-  font-size: 18px;
+  font-size: 13px;
   color: #1208a1;
+}
+/* Compact Ionic searchbar */
+.notice-searchbar {
+  --min-height: 36px !important;
+  height: 36px !important;
+  --padding-top: 0px !important;
+  --padding-bottom: 0px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 </style>
 
@@ -5949,7 +5972,7 @@ export default {
   gap: 8px;
   width: 100%;
   max-width: 100%;
-  padding: 10px 10px 4px 10px;
+  padding: 4px 10px 2px 10px;
   box-sizing: border-box;
 }
 
@@ -6008,22 +6031,11 @@ body.dark .notice-date {
 
 body.dark .dept-sidebar,
 body.dark .dept-nav,
-body.dark .dept-nav-item {
-  background: #0f1419 !important;
-  color: #f3f4f6 !important;
-  border-color: #2f3336 !important;
-}
+body.dark .dept-nav-item, html.dark .dept-nav-item, .dark .dept-nav-item { background: #0f1419 !important; color: #f3f4f6 !important; border-color: #2f3336 !important; }
 
-body.dark .cat-pill {
-  background: #21262d !important;
-  color: #c9d1d9 !important;
-  border-color: #30363d !important;
-}
+body.dark .cat-pill, html.dark .cat-pill, .dark .cat-pill { background: #21262d !important; color: #c9d1d9 !important; border-color: #30363d !important; }
 
-body.dark .cat-pill--active {
-  background: #1208a1 !important;
-  color: #000000 !important;
-}
+body.dark .cat-pill--active, html.dark .cat-pill--active, .dark .cat-pill--active { background: #ffd700 !important; color: #000000 !important; font-weight: 800 !important; box-shadow: 0 2px 10px rgba(255, 215, 0, 0.4) !important; }
 
 body.dark .members-table-container,
 body.dark .members-table,
@@ -6060,11 +6072,7 @@ body.dark .notice-detail-content {
   font-size: 0.95rem;
 }
 
-body.dark .export-flyer-btn {
-  background: rgba(18, 8, 161, 0.15);
-  color: #3b82f6;
-  border-color: rgba(18, 8, 161, 0.45);
-}
+body.dark .export-flyer-btn, html.dark .export-flyer-btn, .dark .export-flyer-btn { background: rgba(255, 215, 0, 0.12) !important; color: #ffd700 !important; border-color: rgba(255, 215, 0, 0.35) !important; }
 
 /* 🔗 One-Click Share Notice Button */
 .share-notice-btn {
@@ -6128,11 +6136,7 @@ body.dark .share-notice-btn {
   font-size: 0.95rem;
 }
 
-body.dark .add-calendar-btn {
-  background: rgba(18, 8, 161, 0.15);
-  color: #60a5fa;
-  border-color: rgba(96, 165, 250, 0.4);
-}
+body.dark .add-calendar-btn, html.dark .add-calendar-btn, .dark .add-calendar-btn { background: rgba(255, 215, 0, 0.12) !important; color: #ffd700 !important; border-color: rgba(255, 215, 0, 0.35) !important; }
 
 /* 🔊 Text-to-Speech Audio Reader Button */
 .footer-right-actions {
@@ -6195,11 +6199,7 @@ body.dark .add-calendar-btn {
   100% { transform: scale(1.3); opacity: 1; }
 }
 
-body.dark .audio-reader-btn {
-  background: rgba(18, 8, 161, 0.15);
-  color: #3b82f6;
-  border-color: rgba(18, 8, 161, 0.45);
-}
+body.dark .audio-reader-btn, html.dark .audio-reader-btn, .dark .audio-reader-btn { background: rgba(255, 215, 0, 0.12) !important; color: #ffd700 !important; border-color: rgba(255, 215, 0, 0.35) !important; }
 
 body.dark .audio-reader-btn--active {
   background: #1208a1 !important;
@@ -6383,6 +6383,30 @@ body.dark .ticker-text {
 
 
 
+<style>
+/* Force Ionic toolbar to respect our compact height */
+ion-toolbar.glass-toolbar {
+  --min-height: 30px !important;
+  --padding-top: 3px !important;
+  --padding-bottom: 2px !important;
+  --padding-start: 8px !important;
+  --padding-end: 8px !important;
+  --background: transparent !important;
+}
+
+/* Borderless / transparent header wrapper */
+ion-header.board-header-wrapper {
+  --background: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-bottom: none !important;
+}
+
+ion-header.board-header-wrapper::after {
+  display: none !important;
+  content: none !important;
+}
+
 /* 📱 Responsive Mobile Hardening: Prevent horizontal cutoff */
 ion-page,
 ion-content,
@@ -6453,129 +6477,89 @@ ion-content,
   }
 }
 
-/* 🌙 DARK THEME GOLD / YELLOW STYLING OVERRIDES */
+/* ==========================================================================
+   🌙 DARK THEME COMPLETE GOLD / YELLOW STYLING OVERRIDES
+   ========================================================================== */
+
+/* Header in dark mode */
+body.dark .header-brand-card,
+html.dark .header-brand-card,
+.dark .header-brand-card {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 body.dark .brand-word-left,
-body.dark .brand-word-right {
+body.dark .brand-word-right,
+html.dark .brand-word-left,
+html.dark .brand-word-right,
+.dark .brand-word-left,
+.dark .brand-word-right {
   color: #ffd700 !important;
 }
 
-body.dark .header-admin-gear-btn {
+body.dark .board-subtitle,
+html.dark .board-subtitle,
+.dark .board-subtitle {
+  color: #9ca3af !important;
+}
+
+body.dark .header-admin-gear-btn,
+html.dark .header-admin-gear-btn,
+.dark .header-admin-gear-btn,
+body.dark .header-settings-icon,
+html.dark .header-settings-icon,
+.dark .header-settings-icon {
   color: #ffd700 !important;
 }
 
-body.dark .cat-pill:hover {
+/* Category & Filter Pills in dark mode */
+body.dark .cat-pill,
+html.dark .cat-pill,
+.dark .cat-pill {
+  background: #16181c !important;
+  color: #9ca3af !important;
+  border-color: #2f3336 !important;
+}
+
+body.dark .cat-pill:hover,
+html.dark .cat-pill:hover,
+.dark .cat-pill:hover {
   border-color: rgba(255, 215, 0, 0.4) !important;
   color: #ffd700 !important;
   background: rgba(255, 215, 0, 0.08) !important;
 }
 
-body.dark .cat-pill--active {
+body.dark .cat-pill--active,
+html.dark .cat-pill--active,
+.dark .cat-pill--active,
+body.dark .dept-pill--active,
+html.dark .dept-pill--active,
+.dark .dept-pill--active {
   background: #ffd700 !important;
   color: #000000 !important;
-  box-shadow: 0 3px 12px rgba(255, 215, 0, 0.35) !important;
+  font-weight: 800 !important;
+  border-color: transparent !important;
+  box-shadow: 0 2px 10px rgba(255, 215, 0, 0.35) !important;
 }
 
-body.dark .dept-pill--active {
-  background: #ffd700 !important;
-  color: #000000 !important;
-  box-shadow: 0 3px 10px rgba(255, 215, 0, 0.35) !important;
-}
-
-body.dark .pinned-bar {
+/* Pinned Notice bar */
+body.dark .pinned-bar,
+html.dark .pinned-bar,
+.dark .pinned-bar {
   color: #ffd700 !important;
   background: rgba(255, 215, 0, 0.08) !important;
   border-bottom-color: rgba(255, 215, 0, 0.2) !important;
 }
 
-body.dark .pinned-bar ion-icon {
+body.dark .pinned-bar ion-icon,
+html.dark .pinned-bar ion-icon,
+.dark .pinned-bar ion-icon {
   color: #ffd700 !important;
 }
 
-body.dark .notice-text :deep(a),
-body.dark .notice-text :deep(.notice-link),
-body.dark .notice-text :deep(.post-link),
-body.dark :deep(a.notice-link),
-body.dark :deep(a.post-link) {
-  color: #ffd700 !important;
-  background: rgba(255, 215, 0, 0.12) !important;
-  border-bottom: 2px solid #ffd700 !important;
-}
-
-body.dark .mobile-dept-select-box {
-  background: rgba(255, 215, 0, 0.08) !important;
-  color: #ffd700 !important;
-  border-color: rgba(255, 215, 0, 0.35) !important;
-}
-
-body.dark .mobile-nav-btn--active {
-  color: #ffd700 !important;
-}
-
-body.dark .mobile-nav-btn--active ion-icon {
-  color: #ffd700 !important;
-}
-
-body.dark .mobile-post-nav-btn .post-icon-wrap {
-  background: #ffd700 !important;
-  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4) !important;
-}
-
-body.dark .mobile-post-nav-btn .post-icon-wrap ion-icon {
-  color: #000000 !important;
-}
-
-body.dark .notice-post-btn {
-  background: #ffd700 !important;
-  color: #000000 !important;
-  box-shadow: 0 4px 20px rgba(255, 215, 0, 0.4) !important;
-}
-
-body.dark .notice-post-btn ion-icon {
-  color: #000000 !important;
-}
-
-body.dark .sidebar-post-btn {
-  --background: #ffd700 !important;
-  --color: #000000 !important;
-}
-
-body.dark .dept-nav-item--active {
-  background: rgba(255, 215, 0, 0.12) !important;
-  color: #ffd700 !important;
-}
-
-body.dark .dept-nav-item--active .dept-nav-count {
-  background: rgba(255, 215, 0, 0.2) !important;
-  color: #ffd700 !important;
-}
-
-body.dark .notice-searchbar {
-  --icon-color: #ffd700 !important;
-}
-
-body.dark .avatar-ring {
-  border-color: rgba(255, 215, 0, 0.4) !important;
-}
-
-body.dark .status-ring {
-  border-color: #ffd700 !important;
-}
-
-/* 🌙 Extra Dark Mode Link & Attachment Overrides */
-body.dark .attach-filename {
-  color: #f3f4f6 !important;
-}
-
-body.dark .notice-attachment-card {
-  background: #1e2430 !important;
-  border-color: #2f3336 !important;
-}
-
-body.dark .notice-attachment-card:hover {
-  background: #252d3d !important;
-  border-color: rgba(255, 215, 0, 0.4) !important;
-}
-
+/* Notice Links, Hashtags, Mentions, Read-More */
 body.dark .show-more-toggle,
 body.dark .notice-text :deep(.read-more),
 body.dark :deep(.read-more),
@@ -6585,10 +6569,253 @@ body.dark .notice-text :deep(.post-link),
 body.dark :deep(a.notice-link),
 body.dark :deep(a.post-link),
 body.dark .hashtag,
-body.dark .mention {
+body.dark .mention,
+html.dark .show-more-toggle,
+html.dark .notice-text :deep(.read-more),
+html.dark :deep(.read-more),
+html.dark .notice-text :deep(a),
+html.dark .notice-text :deep(.notice-link),
+html.dark .notice-text :deep(.post-link),
+html.dark :deep(a.notice-link),
+html.dark :deep(a.post-link),
+html.dark .hashtag,
+html.dark .mention,
+.dark .show-more-toggle,
+.dark .notice-text :deep(.read-more),
+.dark :deep(.read-more),
+.dark .notice-text :deep(a),
+.dark .notice-text :deep(.notice-link),
+.dark .notice-text :deep(.post-link),
+.dark :deep(a.notice-link),
+.dark :deep(a.post-link),
+.dark .hashtag,
+.dark .mention {
   color: #ffd700 !important;
   background: none !important;
   border: none !important;
   box-shadow: none !important;
   text-decoration: underline !important;
 }
+
+/* Notice card Attachment in dark mode */
+body.dark .notice-attachment-card,
+html.dark .notice-attachment-card,
+.dark .notice-attachment-card {
+  background: #1e2430 !important;
+  border: 1px solid #2f3336 !important;
+}
+
+body.dark .notice-attachment-card:hover,
+html.dark .notice-attachment-card:hover,
+.dark .notice-attachment-card:hover {
+  background: #252d3d !important;
+  border-color: rgba(255, 215, 0, 0.4) !important;
+}
+
+body.dark .attach-filename,
+html.dark .attach-filename,
+.dark .attach-filename {
+  color: #f3f4f6 !important;
+}
+
+/* Notice Card Action Buttons */
+body.dark .export-flyer-btn,
+html.dark .export-flyer-btn,
+.dark .export-flyer-btn {
+  background: rgba(255, 215, 0, 0.1) !important;
+  color: #ffd700 !important;
+  border-color: rgba(255, 215, 0, 0.3) !important;
+}
+
+body.dark .add-calendar-btn,
+html.dark .add-calendar-btn,
+.dark .add-calendar-btn {
+  background: rgba(255, 215, 0, 0.1) !important;
+  color: #ffd700 !important;
+  border-color: rgba(255, 215, 0, 0.3) !important;
+}
+
+body.dark .audio-reader-btn,
+html.dark .audio-reader-btn,
+.dark .audio-reader-btn {
+  background: rgba(255, 215, 0, 0.1) !important;
+  color: #ffd700 !important;
+  border-color: rgba(255, 215, 0, 0.3) !important;
+}
+
+/* Mobile Department dropdown & Bottom Nav */
+body.dark .mobile-dept-select-box,
+html.dark .mobile-dept-select-box,
+.dark .mobile-dept-select-box {
+  background: rgba(255, 215, 0, 0.08) !important;
+  color: #ffd700 !important;
+  border-color: rgba(255, 215, 0, 0.35) !important;
+}
+
+body.dark .mobile-nav-btn--active,
+html.dark .mobile-nav-btn--active,
+.dark .mobile-nav-btn--active,
+body.dark .mobile-nav-btn--active ion-icon,
+html.dark .mobile-nav-btn--active ion-icon,
+.dark .mobile-nav-btn--active ion-icon {
+  color: #ffd700 !important;
+}
+
+body.dark .mobile-post-nav-btn .post-icon-wrap,
+html.dark .mobile-post-nav-btn .post-icon-wrap,
+.dark .mobile-post-nav-btn .post-icon-wrap {
+  background: #ffd700 !important;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4) !important;
+}
+
+body.dark .mobile-post-nav-btn .post-icon-wrap ion-icon,
+html.dark .mobile-post-nav-btn .post-icon-wrap ion-icon,
+.dark .mobile-post-nav-btn .post-icon-wrap ion-icon {
+  color: #000000 !important;
+}
+
+body.dark .notice-post-btn,
+html.dark .notice-post-btn,
+.dark .notice-post-btn {
+  background: #ffd700 !important;
+  color: #000000 !important;
+  box-shadow: 0 4px 20px rgba(255, 215, 0, 0.4) !important;
+}
+
+body.dark .notice-post-btn ion-icon,
+html.dark .notice-post-btn ion-icon,
+.dark .notice-post-btn ion-icon {
+  color: #000000 !important;
+}
+
+body.dark .sidebar-post-btn,
+html.dark .sidebar-post-btn,
+.dark .sidebar-post-btn {
+  --background: #ffd700 !important;
+  --color: #000000 !important;
+}
+
+/* Left Sidebar Department navigation items */
+body.dark .dept-nav-item,
+html.dark .dept-nav-item,
+.dark .dept-nav-item {
+  background: #16181c !important;
+  color: #f3f4f6 !important;
+  border-color: #2f3336 !important;
+}
+
+body.dark .dept-nav-item:hover,
+html.dark .dept-nav-item:hover,
+.dark .dept-nav-item:hover {
+  background: rgba(255, 215, 0, 0.08) !important;
+  color: #ffd700 !important;
+}
+
+body.dark .dept-nav-item--active,
+html.dark .dept-nav-item--active,
+.dark .dept-nav-item--active {
+  background: rgba(255, 215, 0, 0.12) !important;
+  color: #ffd700 !important;
+  border-color: rgba(255, 215, 0, 0.4) !important;
+}
+
+body.dark .dept-nav-item--active .dept-nav-icon-wrap,
+html.dark .dept-nav-item--active .dept-nav-icon-wrap,
+.dark .dept-nav-item--active .dept-nav-icon-wrap {
+  background: rgba(255, 215, 0, 0.2) !important;
+  color: #ffd700 !important;
+}
+
+body.dark .dept-nav-item--active .dept-nav-count,
+html.dark .dept-nav-item--active .dept-nav-count,
+.dark .dept-nav-item--active .dept-nav-count {
+  background: #ffd700 !important;
+  color: #000000 !important;
+}
+
+/* Right Sidebar Bulletins & Widgets */
+body.dark .widget-card,
+html.dark .widget-card,
+.dark .widget-card {
+  background: #16181c !important;
+  border-color: #2f3336 !important;
+}
+
+body.dark .widget-header,
+html.dark .widget-header,
+.dark .widget-header {
+  color: #ffd700 !important;
+}
+
+body.dark .widget-count,
+html.dark .widget-count,
+.dark .widget-count {
+  background: rgba(255, 215, 0, 0.18) !important;
+  color: #ffd700 !important;
+}
+
+body.dark .bullet-dot,
+html.dark .bullet-dot,
+.dark .bullet-dot {
+  background: #ffd700 !important;
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.6) !important;
+}
+
+body.dark .wni-cat,
+html.dark .wni-cat,
+.dark .wni-cat {
+  color: #ffd700 !important;
+}
+
+body.dark .bulletin-item:hover,
+html.dark .bulletin-item:hover,
+.dark .bulletin-item:hover {
+  border-color: rgba(255, 215, 0, 0.35) !important;
+}
+
+body.dark .notice-searchbar,
+html.dark .notice-searchbar,
+.dark .notice-searchbar {
+  --icon-color: #ffd700 !important;
+}
+
+body.dark .avatar-ring,
+html.dark .avatar-ring,
+.dark .avatar-ring {
+  border-color: rgba(255, 215, 0, 0.4) !important;
+}
+
+body.dark .status-ring,
+html.dark .status-ring,
+.dark .status-ring {
+  border-color: #ffd700 !important;
+}
+
+/* Dark mode – profile icon turns gold */
+body.dark .profile-icon-wrap,
+html.dark .profile-icon-wrap,
+.dark .profile-icon-wrap {
+  border-color: rgba(255, 215, 0, 0.8) !important;
+  background: rgba(255, 215, 0, 0.12) !important;
+}
+body.dark .profile-thumb-icon,
+html.dark .profile-thumb-icon,
+.dark .profile-thumb-icon {
+  color: #ffd700 !important;
+}
+body.dark .back-btn,
+html.dark .back-btn,
+.dark .back-btn {
+  --color: #ffd700 !important;
+}
+body.dark .notice-title,
+html.dark .notice-title,
+.dark .notice-title {
+  color: #f3f4f6 !important;
+}
+body.dark .notice-text,
+html.dark .notice-text,
+.dark .notice-text {
+  color: #d1d5db !important;
+}
+</style>
