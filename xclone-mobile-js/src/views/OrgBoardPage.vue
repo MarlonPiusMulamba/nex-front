@@ -4559,22 +4559,28 @@ export default {
    screen edges, and a feed column that never gets too wide on large displays. */
 .board-desktop-grid {
   display: flex;
-  max-width: 1280px;
+  justify-content: center;
+  width: 100%;
+  max-width: 1265px;
   margin: 0 auto;
+  padding: 0 16px;
   min-height: calc(100vh - 120px);
   background: transparent;
+  box-sizing: border-box;
+  gap: 0;
 }
 
 /* ── Left Sidebar (Desktop/Tablet only) ───────────── */
 .dept-sidebar {
   display: none !important; /* strictly hidden on mobile */
-  width: 300px;
-  min-width: 260px;
-  max-width: 320px;
+  width: 275px;
+  min-width: 275px;
+  max-width: 275px;
   flex-shrink: 0;
-  padding: 16px 14px;
-  border-right: 1px solid var(--ion-border-color, rgba(0,0,0,0.07));
+  padding: 16px 12px;
+  border-right: 1px solid var(--ion-border-color, rgba(0,0,0,0.08));
   background: var(--ion-background-color, #ffffff);
+  box-sizing: border-box;
   flex-direction: column;
   gap: 12px;
   position: sticky;
@@ -4743,15 +4749,18 @@ export default {
   height: 44px;
 }
 
-/* ── Middle Feed Column ───────────────────────────── */
+/* ── Middle Feed Column (X-style 600px width) ─────── */
 .feed-col {
-  flex: 1;
-  min-width: 0;
+  width: 600px;
+  min-width: 600px;
   max-width: 600px;
-  margin: 0 auto;
+  flex-shrink: 0;
+  margin: 0;
+  border-right: 1px solid var(--ion-border-color, rgba(0,0,0,0.08));
   background: var(--ion-background-color, #f3f4f6);
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .active-dept-label {
@@ -4782,24 +4791,25 @@ export default {
 }
 .clear-dept-btn:hover { color: #ef4444; }
 
-/* ── Right Widgets Column (Desktop only) ─────────── */
+/* ── Right Widgets Column (Desktop only, 350px width) ── */
 .widgets-col {
   display: none !important; /* strictly hidden on mobile and tablet */
-  width: 320px;
-  min-width: 280px;
-  max-width: 360px;
+  width: 350px;
+  min-width: 350px;
+  max-width: 350px;
   flex-shrink: 0;
-  padding: 16px 14px;
-  border-left: 1px solid rgba(0,0,0,0.07);
-  background: #ffffff;
+  padding: 12px 16px 24px 28px;
+  border-left: none;
+  background: transparent;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   position: sticky;
   top: 0;
   height: calc(100vh - 112px);
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(18, 8, 161,0.2) transparent;
+  box-sizing: border-box;
 }
 .widgets-col::-webkit-scrollbar { width: 4px; }
 .widgets-col::-webkit-scrollbar-thumb { background: rgba(18, 8, 161,0.25); border-radius: 4px; }
@@ -5049,7 +5059,12 @@ export default {
   }
   .board-desktop-grid {
     display: flex;
+    justify-content: center;
     gap: 0;
+    padding: 0 16px;
+    width: 100%;
+    max-width: 1265px;
+    margin: 0 auto;
   }
   .dept-sidebar {
     display: flex !important;
@@ -6408,14 +6423,19 @@ ion-header.board-header-wrapper::after {
   content: none !important;
 }
 
-/* 📱 Responsive Mobile Hardening: Prevent horizontal cutoff */
+/* 📱 Mobile Hardening: Prevent horizontal cutoff (mobile only) */
 ion-page,
 ion-content,
-.board-content,
-.board-desktop-grid,
-.feed-col {
+.board-content {
   max-width: 100vw !important;
   box-sizing: border-box !important;
+}
+
+/* Desktop: ensure grid stays centered with side padding */
+@media (min-width: 768px) {
+  .board-desktop-grid {
+    box-sizing: border-box !important;
+  }
 }
 
 @media (max-width: 767px) {
