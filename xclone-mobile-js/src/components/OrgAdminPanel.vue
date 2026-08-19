@@ -799,7 +799,7 @@ export default {
 .panel-sub {
   font-size: 0.68rem;
   font-weight: 600;
-  color: #daa520;
+  color: #1208a1;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -857,13 +857,13 @@ export default {
 .empty-icon-wrap {
   width: 64px;
   height: 64px;
-  background: rgba(218,165,32,0.06);
+  background: rgba(18, 8, 161,0.06);
   border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 28px;
-  color: #daa520;
+  color: #1208a1;
   opacity: 0.5;
   margin-bottom: 14px;
 }
@@ -895,7 +895,7 @@ export default {
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  border: 2px solid rgba(218,165,32,0.2);
+  border: 2px solid rgba(18, 8, 161,0.2);
 }
 
 .req-meta {
@@ -989,15 +989,15 @@ export default {
 
 .invite-toggle-btn {
   --border-radius: 10px;
-  --color: #daa520;
-  --border-color: rgba(218,165,32,0.4);
+  --color: #1208a1;
+  --border-color: rgba(18, 8, 161,0.4);
   flex-shrink: 0;
 }
 
 /* ─── Invite panel ──────────────────────────────────────────── */
 .invite-panel {
   background: #fff;
-  border: 1.5px dashed rgba(218,165,32,0.5);
+  border: 1.5px dashed rgba(18, 8, 161,0.5);
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 14px;
@@ -1007,7 +1007,7 @@ export default {
 .invite-title {
   font-size: 0.88rem;
   font-weight: 800;
-  color: #c0921c;
+  color: #1208a1;
   margin: 0 0 12px 0;
   display: flex;
   align-items: center;
@@ -1028,7 +1028,7 @@ export default {
 .at-prefix {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #daa520;
+  color: #1208a1;
   margin-right: 4px;
 }
 
@@ -1073,7 +1073,7 @@ export default {
 
 .send-invite-btn {
   --border-radius: 12px;
-  --background: linear-gradient(135deg, #d4af37, #ffd700);
+  --background: #1208a1;
   --color: #000;
   font-weight: 800;
   margin-top: 4px;
@@ -1089,8 +1089,8 @@ export default {
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  background: linear-gradient(90deg, rgba(218,165,32,0.07), transparent);
-  border-left: 3px solid #daa520;
+  background: linear-gradient(90deg, rgba(18, 8, 161,0.07), transparent);
+  border-left: 3px solid #1208a1;
   border-radius: 10px;
   margin-bottom: 8px;
 }
@@ -1098,12 +1098,12 @@ export default {
 .dept-group-icon {
   width: 30px;
   height: 30px;
-  background: rgba(218,165,32,0.1);
+  background: rgba(18, 8, 161,0.1);
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #c0921c;
+  color: #1208a1;
   font-size: 15px;
   flex-shrink: 0;
 }
@@ -1177,7 +1177,7 @@ export default {
   border-radius: 50%;
   border: 2px solid #fff;
 }
-.role-dot--org_admin    { background: #daa520; }
+.role-dot--org_admin    { background: #1208a1; }
 .role-dot--dept_manager { background: #6366f1; }
 .role-dot--dept_viewer  { background: #10b981; }
 
@@ -1216,7 +1216,7 @@ export default {
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
-.role-chip--org_admin    { background: rgba(218,165,32,0.12); color: #b8860b; }
+.role-chip--org_admin    { background: rgba(18, 8, 161,0.12); color: #1208a1; }
 .role-chip--dept_manager { background: rgba(99,102,241,0.1);  color: #6366f1; }
 .role-chip--dept_viewer  { background: rgba(16,185,129,0.1);  color: #10b981; }
 
@@ -1231,7 +1231,7 @@ export default {
   --padding-end: 6px;
   height: 30px;
 }
-.edit-btn:hover { --color: #daa520; }
+.edit-btn:hover { --color: #1208a1; }
 
 /* ─── Edit form ─────────────────────────────────────────────── */
 .edit-form {
@@ -1284,7 +1284,7 @@ export default {
 
 .save-btn {
   --border-radius: 10px;
-  --background: linear-gradient(135deg, #d4af37, #ffd700);
+  --background: #1208a1;
   --color: #000;
   font-weight: 800;
 }
@@ -1307,7 +1307,7 @@ export default {
 
 .new-dept-form {
   background: #fff;
-  border: 1.5px dashed rgba(218,165,32,0.5);
+  border: 1.5px dashed rgba(18, 8, 161,0.5);
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 14px;
@@ -1339,12 +1339,12 @@ export default {
 .dept-icon-wrap {
   width: 36px;
   height: 36px;
-  background: rgba(218,165,32,0.1);
+  background: rgba(18, 8, 161,0.1);
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #c0921c;
+  color: #1208a1;
   font-size: 18px;
   flex-shrink: 0;
 }
@@ -1381,7 +1381,7 @@ export default {
 }
 
 .edit-dept-btn {
-  --color: #daa520;
+  --color: #1208a1;
   --padding-start: 8px;
   --padding-end: 8px;
   opacity: 0.7;
@@ -1400,7 +1400,7 @@ export default {
 
 /* ─── Dept logo picker ───────────────────────────────────────── */
 .dept-logo-picker {
-  border: 1.5px dashed rgba(218,165,32,0.45);
+  border: 1.5px dashed rgba(18, 8, 161,0.45);
   border-radius: 12px;
   height: 68px;
   display: flex;
@@ -1413,8 +1413,8 @@ export default {
 }
 
 .dept-logo-picker:hover {
-  background: rgba(218,165,32,0.05);
-  border-color: #daa520;
+  background: rgba(18, 8, 161,0.05);
+  border-color: #1208a1;
 }
 
 .dept-logo-preview-img {
@@ -1439,7 +1439,7 @@ export default {
 /* ─── Dept inline edit form ──────────────────────────────────── */
 .dept-edit-form {
   background: #fff;
-  border: 1.5px solid rgba(218,165,32,0.3);
+  border: 1.5px solid rgba(18, 8, 161,0.3);
   border-radius: 16px;
   padding: 14px 16px;
   margin-bottom: 4px;

@@ -174,8 +174,8 @@ export default {
 }
 
 .notice-item:hover {
-  background: rgba(218, 165, 32, 0.05);
-  border-color: rgba(218, 165, 32, 0.2);
+  background: rgba(18, 8, 161, 0.05);
+  border-color: rgba(18, 8, 161, 0.2);
   transform: translateX(4px);
 }
 

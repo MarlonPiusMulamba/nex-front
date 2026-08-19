@@ -958,17 +958,17 @@ export default {
 }
 
 .btn-ama {
-  color: #ffd700;
+  color: #3b82f6;
 }
 .btn-ama:hover {
-  background-color: rgba(255, 215, 0, 0.1);
+  background-color: rgba(18, 8, 161, 0.1);
 }
 
 .btn-space {
-  color: #FFD700;
+  color: #3b82f6;
 }
 .btn-space:hover {
-  background-color: rgba(255, 215, 0, 0.1);
+  background-color: rgba(18, 8, 161, 0.1);
 }
 
 
@@ -978,7 +978,7 @@ export default {
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 20px;
-  border: 1px solid #FFD700;
+  border: 1px solid #3b82f6;
 }
 
 .space-creator-header {
@@ -995,7 +995,7 @@ export default {
 .space-creator-title {
   font-weight: 700;
   font-size: 16px;
-  color: #FFD700;
+  color: #3b82f6;
 }
 
 .space-input-item {
@@ -1030,7 +1030,7 @@ export default {
 /* Focused Mode Styles */
 .poll-creator, .ama-creator, .audio-space-creator {
   animation: slideUpFade 0.3s ease-out;
-  border: 1px solid rgba(218, 165, 32, 0.1);
+  border: 1px solid rgba(18, 8, 161, 0.1);
   background: rgba(255, 255, 255, 0.02);
   border-radius: 24px;
   overflow: hidden;
@@ -1039,7 +1039,7 @@ export default {
 
 .poll-creator-header, .ama-creator-header, .space-creator-header {
   padding: 16px;
-  background: rgba(218, 165, 32, 0.05);
+  background: rgba(18, 8, 161, 0.05);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1278,8 +1278,8 @@ body.dark .pc-dur-pill { border-color: #374151; color: #9ca3af; }
   margin: 12px 0;
   overflow: hidden;
   background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
-  border: 1px solid #ffd700;
-  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.15);
+  border: 1px solid #3b82f6;
+  box-shadow: 0 4px 15px rgba(18, 8, 161, 0.15);
 }
 
 .ama-creator-header {
@@ -1287,8 +1287,8 @@ body.dark .pc-dur-pill { border-color: #374151; color: #9ca3af; }
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  background: rgba(255, 215, 0, 0.1);
-  border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+  background: rgba(18, 8, 161, 0.1);
+  border-bottom: 1px solid rgba(18, 8, 161, 0.1);
 }
 
 .ama-creator-icon {
@@ -1296,7 +1296,7 @@ body.dark .pc-dur-pill { border-color: #374151; color: #9ca3af; }
 }
 
 .ama-creator-title {
-  color: #ffd700;
+  color: #3b82f6;
   font-weight: 700;
   font-size: 14px;
   text-transform: uppercase;
@@ -1337,12 +1337,12 @@ body.dark .pc-dur-pill { border-color: #374151; color: #9ca3af; }
 }
 
 .ama-chip.active {
-    background: #ffd700;
+    background: #3b82f6;
     color: #000;
     font-weight: 700;
 }
 .duration-chip.active {
-    background: #ffd700;
+    background: #3b82f6;
     color: #000;
     font-weight: 700;
 }
@@ -1353,8 +1353,8 @@ body.dark .pc-dur-pill { border-color: #374151; color: #9ca3af; }
   margin: 12px 0;
   overflow: hidden;
   background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
-  border: 1px solid #ffd700;
-  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
+  border: 1px solid #3b82f6;
+  box-shadow: 0 4px 15px rgba(18, 8, 161, 0.2);
   padding: 16px;
 }
 
@@ -1367,7 +1367,7 @@ body.dark .pc-dur-pill { border-color: #374151; color: #9ca3af; }
 
 .space-creator-icon { font-size: 24px; }
 .space-creator-title {
-  color: #ffd700;
+  color: #3b82f6;
   font-weight: 700;
   font-size: 18px;
 }

@@ -444,18 +444,18 @@ export default {
   gap: 6px;
   flex: 1;
   padding: 10px 14px;
-  border: 1.5px dashed rgba(218,165,32,0.4);
+  border: 1.5px dashed rgba(18, 8, 161,0.4);
   border-radius: 10px;
-  background: rgba(218,165,32,0.05);
-  color: #c0921c;
+  background: rgba(18, 8, 161,0.05);
+  color: #1208a1;
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 .attach-action-btn:hover:not(:disabled) {
-  background: rgba(218,165,32,0.12);
-  border-color: rgba(218,165,32,0.7);
+  background: rgba(18, 8, 161,0.12);
+  border-color: rgba(18, 8, 161,0.7);
 }
 .attach-action-btn:disabled {
   opacity: 0.4;
@@ -593,7 +593,7 @@ export default {
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(218, 165, 32, 0.3);
+  border: 1px solid rgba(18, 8, 161, 0.3);
   background: var(--ion-background-color, #ffffff);
   color: var(--ion-text-color, #1a1a1a);
   font-family: inherit;
@@ -602,7 +602,7 @@ export default {
   outline: none;
 }
 .custom-datetime-picker:focus {
-  border-color: #daa520;
+  border-color: #1208a1;
 }
 
 /* ── Formatting Toolbar ── */
@@ -621,10 +621,10 @@ export default {
   letter-spacing: 0.5px;
 }
 .format-btn {
-  background: rgba(218, 165, 32, 0.12);
-  border: 1px solid rgba(218, 165, 32, 0.3);
+  background: rgba(18, 8, 161, 0.12);
+  border: 1px solid rgba(18, 8, 161, 0.3);
   border-radius: 8px;
-  color: #daa520;
+  color: #1208a1;
   padding: 5px 12px;
   font-size: 0.95rem;
   cursor: pointer;
@@ -634,7 +634,7 @@ export default {
   transition: all 0.2s ease;
 }
 .format-btn:hover, .format-btn:active {
-  background: #daa520;
+  background: #1208a1;
   color: #000;
   transform: translateY(-1px);
 }

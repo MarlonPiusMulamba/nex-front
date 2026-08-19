@@ -2,62 +2,67 @@
   <ion-page>
     <ion-header class="board-header-wrapper">
       <ion-toolbar class="glass-toolbar">
-        <ion-buttons slot="start" v-if="!isStandaloneMode">
-          <ion-back-button default-href="/tabs/notices" class="back-btn"></ion-back-button>
-        </ion-buttons>
-        <div class="org-header-title centered-header" v-if="org">
-          <div class="brand-title-row">
-            <span class="brand-word-left">{{ orgNameFirstWord }}</span>
-            <div class="mini-logo-wrap">
-              <img :src="org.logo_url || defaultLogo" class="mini-logo" />
-              <div class="mini-logo-ring"></div>
-            </div>
-            <span class="brand-word-right" v-if="orgNameRestWords">{{ orgNameRestWords }}</span>
+        <div class="header-brand-card">
+          <div class="header-card-start" v-if="!isStandaloneMode">
+            <ion-buttons>
+              <ion-back-button default-href="/tabs/notices" class="back-btn"></ion-back-button>
+            </ion-buttons>
           </div>
-          <span class="board-subtitle">Digital Notice Board <template v-if="org.official_domain">• @{{ org.official_domain }}</template></span>
-        </div>
-        <div class="org-header-title centered-header" v-else>
-          <div class="brand-title-row">
-            <span class="brand-word-left">BUGEMA</span>
-            <div class="mini-logo-wrap">
-              <img src="/bugema-logo.png" class="mini-logo" />
-              <div class="mini-logo-ring"></div>
+          
+          <div class="org-header-title centered-header" v-if="org">
+            <div class="brand-title-row">
+              <span class="brand-word-left">{{ orgNameFirstWord }}</span>
+              <div class="mini-logo-wrap">
+                <img :src="org.logo_url || defaultLogo" class="mini-logo" />
+              </div>
+              <span class="brand-word-right" v-if="orgNameRestWords">{{ orgNameRestWords }}</span>
             </div>
-            <span class="brand-word-right">UNIVERSITY</span>
+            <span class="board-subtitle">Digital Notice Board <template v-if="org.official_domain">• @{{ org.official_domain }}</template></span>
           </div>
-          <span class="board-subtitle">Digital Notice Board • @bugemauniv.ac.ug</span>
-        </div>
-        <ion-buttons slot="end">
-          <!-- Language & Theme Settings (Desktop/Tablet only; mobile uses bottom-nav icon) -->
-          <button
-            class="header-settings-btn desktop-header-settings"
-            @click="showSettingsModal = true"
-            title="Language & Theme"
-          >
-            <ion-icon :icon="globeOutline" class="header-settings-icon"></ion-icon>
-          </button>
-          <!-- Profile Avatar Icon (shown whenever logged in) -->
-          <button 
-            v-if="userId" 
-            class="profile-icon-btn" 
-            @click="showProfilePanel = true"
-            title="My Profile"
-          >
-            <div class="profile-icon-wrap">
-              <img 
-                v-if="userProfile?.avatar_url" 
-                :src="userProfile.avatar_url" 
-                class="profile-thumb" 
-                @error="e => e.target.style.display='none'"
-              />
-              <ion-icon v-else :icon="personOutline" class="profile-thumb-icon"></ion-icon>
+
+          <div class="org-header-title centered-header" v-else>
+            <div class="brand-title-row">
+              <span class="brand-word-left">BUGEMA</span>
+              <div class="mini-logo-wrap">
+                <img src="/bugema-logo.png" class="mini-logo" />
+              </div>
+              <span class="brand-word-right">UNIVERSITY</span>
             </div>
-          </button>
-          <!-- Admin settings gear -->
-          <ion-button v-if="isAdmin" @click="showAdminPanel = true" class="settings-btn">
-            <ion-icon slot="icon-only" :icon="settingsOutline"></ion-icon>
-          </ion-button>
-        </ion-buttons>
+            <span class="board-subtitle">Digital Notice Board • @bugemauniv.ac.ug</span>
+          </div>
+
+          <div class="header-card-end">
+            <!-- Language & Theme Settings (Desktop/Tablet) -->
+            <button
+              class="header-settings-btn desktop-header-settings"
+              @click="showSettingsModal = true"
+              title="Language & Theme"
+            >
+              <ion-icon :icon="globeOutline" class="header-settings-icon"></ion-icon>
+            </button>
+            <!-- Profile Avatar Icon -->
+            <button 
+              v-if="userId" 
+              class="profile-icon-btn" 
+              @click="showProfilePanel = true"
+              title="My Profile"
+            >
+              <div class="profile-icon-wrap">
+                <img 
+                  v-if="userProfile?.avatar_url" 
+                  :src="userProfile.avatar_url" 
+                  class="profile-thumb" 
+                  @error="e => e.target.style.display='none'"
+                />
+                <ion-icon v-else :icon="personOutline" class="profile-thumb-icon"></ion-icon>
+              </div>
+            </button>
+            <!-- Admin settings gear -->
+            <button v-if="isAdmin" @click="showAdminPanel = true" class="header-admin-gear-btn" title="Admin Settings">
+              <ion-icon :icon="settingsOutline"></ion-icon>
+            </button>
+          </div>
+        </div>
       </ion-toolbar>
       <!-- Admin tab switcher -->
       <ion-toolbar v-if="isAdmin && org && !locked" class="tab-toolbar">
@@ -104,7 +109,7 @@
         <h2 class="locked-title" style="color: #ef4444;">Oops! Internet Connection Needed 📶</h2>
         <p class="locked-desc">Oops! Please check your internet connection and try again.</p>
         <div class="action-box">
-          <ion-button @click="loadAll" class="join-btn" style="--background: linear-gradient(135deg, #d4af37, #ffd700); --color: #000; font-weight: 800;">
+          <ion-button @click="loadAll" class="join-btn" style="--background: #1208a1; --color: #000; font-weight: 800;">
             <ion-icon :icon="refresh" slot="start"></ion-icon>
             Retry Connection
           </ion-button>
@@ -375,24 +380,22 @@
           ════════════════════════════════════════════════════ -->
           <main class="feed-col">
 
-            <!-- 🚨 Emergency Broadcast Marquee Ticker -->
-            <div v-if="urgentNotices && urgentNotices.length > 0 && !dismissedTicker" class="emergency-ticker-bar">
-              <div class="ticker-badge" @click="scrollToNotice(urgentNotices[0].id)">
-                <span class="ticker-pulse-dot"></span>
-                <ion-icon :icon="megaphoneOutline" class="ticker-badge-icon"></ion-icon>
-                <span class="ticker-badge-label">EMERGENCY BROADCAST</span>
-              </div>
-              <div class="ticker-content-wrap" @click="scrollToNotice(urgentNotices[0].id)">
-                <div class="ticker-marquee-text">
-                  <span v-for="(n, idx) in urgentNotices" :key="'tick-' + n.id" class="ticker-item">
-                    🚨 <strong>[{{ n.dept_name || 'Campus' }}]</strong> {{ n.title }} — {{ (n.body || '').replace(/<[^>]*>/g, '').substring(0, 90) }}...
-                    <span v-if="idx < urgentNotices.length - 1" class="ticker-sep">•</span>
+            <!-- 🚨 Sticky Urgent Notice Ticker (NEXFi Feeds Style) -->
+            <div v-if="urgentNotices && urgentNotices.length > 0 && !dismissedTicker" class="urgent-ticker-banner" @click="scrollToNotice(urgentNotices[0].id)">
+              <div class="ticker-inner">
+                <ion-icon :icon="alertCircleOutline" class="ticker-icon"></ion-icon>
+                <div class="ticker-text-container">
+                  <span class="ticker-text">
+                    <strong>URGENT:</strong> {{ urgentNotices[0].title }}
                   </span>
                 </div>
               </div>
-              <button class="ticker-dismiss-btn" @click.stop="dismissedTicker = true" title="Dismiss Ticker">
-                <ion-icon :icon="closeOutline"></ion-icon>
-              </button>
+              <div class="ticker-right-controls">
+                <ion-icon :icon="chevronForwardOutline" class="ticker-arrow"></ion-icon>
+                <button class="ticker-dismiss-btn" @click.stop="dismissedTicker = true" title="Dismiss">
+                  <ion-icon :icon="closeOutline"></ion-icon>
+                </button>
+              </div>
             </div>
 
             <!-- 🔔 Floating Real-Time "New Notices" Notification Pill -->
@@ -408,17 +411,6 @@
               </div>
             </transition>
 
-            <!-- 👁️ Unread Notices Summary & "Mark All as Read" Banner -->
-            <div v-if="unreadNoticesCount > 0" class="unread-summary-bar">
-              <div class="unread-badge-box">
-                <span class="unread-pulse-dot"></span>
-                <span class="unread-text"><strong>{{ unreadNoticesCount }}</strong> new notice{{ unreadNoticesCount !== 1 ? 's' : '' }} since your last visit</span>
-              </div>
-              <button class="mark-read-btn" @click="markAllNoticesAsRead">
-                <ion-icon :icon="checkmarkCircle" class="mark-read-icon"></ion-icon>
-                <span>Mark All as Read</span>
-              </button>
-            </div>
 
             <!-- Search & Category Filters -->
             <div class="filter-bar">
@@ -537,13 +529,6 @@
                     </div>
                   </div>
                   <div class="notice-badges">
-                    <!-- ✨ NEW Unread Badge (Clickable to mark as read) -->
-                    <button v-if="isNoticeUnread(notice)" class="new-unread-badge" @click.stop="markNoticeAsRead(notice)" title="Click to mark notice as read">
-                      ✨ NEW
-                    </button>
-                    <span v-else class="read-done-badge" title="Notice read">
-                      ✓
-                    </span>
                     <span class="cat-badge" :class="'cat-badge--' + (notice.category || 'general').toLowerCase()">
                       {{ notice.category || 'General' }}
                     </span>
@@ -555,32 +540,49 @@
                   <p class="notice-text" v-html="getNoticeBodyHtml(notice.body, notice.id)" @click="handleContentClick($event, notice)"></p>
                 </div>
 
-                <!-- ── X-style image grid ───────────────────── -->
+                <!-- ── Pictures / Photo Grid (Facebook / X style) ─────────────── -->
                 <div
-                  v-if="notice.media_urls && notice.media_urls.length > 0"
+                  v-if="getNoticeImages(notice) && getNoticeImages(notice).length > 0"
                   class="notice-media-grid"
-                  :class="`nm-count-${Math.min(notice.media_urls.length, 4)}`"
+                  :class="`nm-count-${Math.min(getNoticeImages(notice).length, 4)}`"
                 >
                   <div
-                    v-for="(url, mi) in notice.media_urls.slice(0, 4)"
+                    v-for="(url, mi) in getNoticeImages(notice).slice(0, 4)"
                     :key="mi"
                     class="nm-cell"
-                    @click="openLightbox(notice.media_urls, mi)"
+                    @click="openLightbox(getNoticeImages(notice), mi)"
                   >
                     <img :src="url" class="nm-img" loading="lazy" />
-                    <div v-if="mi === 3 && notice.media_urls.length > 4" class="nm-more-overlay">
-                      +{{ notice.media_urls.length - 4 }}
+                    <div v-if="mi === 3 && getNoticeImages(notice).length > 4" class="nm-more-overlay">
+                      +{{ getNoticeImages(notice).length - 4 }}
                     </div>
                   </div>
                 </div>
 
-                <!-- ── PDF / Doc attachment row ─────────────── -->
-                <div v-if="notice.attachment_url" class="notice-attachment" @click="openAttachment(notice.attachment_url)">
-                  <div class="attach-icon-wrap">
-                    <ion-icon :icon="documentOutline"></ion-icon>
+                <!-- ── Document Attachment Card (PDFs, Word Docs, PPT, Excel etc. - Entire Card Clickable) ──── -->
+                <div 
+                  v-if="notice.attachment_url && !getAttachmentInfo(notice.attachment_url).isImage" 
+                  class="notice-attachment-card"
+                  @click="openAttachment(notice.attachment_url, 'download')"
+                  title="Click anywhere on card to download attachment"
+                >
+                  <div class="attach-card-left">
+                    <div class="attach-card-icon" :class="'attach-icon--' + getAttachmentInfo(notice.attachment_url).ext">
+                      <ion-icon :icon="documentOutline"></ion-icon>
+                    </div>
+                    <div class="attach-card-info">
+                      <span class="attach-filename">{{ getAttachmentInfo(notice.attachment_url).name }}</span>
+                      <div class="attach-meta-row">
+                        <span class="attach-format-badge" :class="'fmt-' + getAttachmentInfo(notice.attachment_url).ext">{{ getAttachmentInfo(notice.attachment_url).ext.toUpperCase() }}</span>
+                      </div>
+                    </div>
                   </div>
-                  <span>View Official Document / Attachment</span>
-                  <ion-icon :icon="chevronForwardOutline" class="attach-arrow"></ion-icon>
+                  <div class="attach-card-actions">
+                    <button class="attach-action-btn attach-download-btn" @click.stop="openAttachment(notice.attachment_url, 'download')" title="Download file">
+                      <ion-icon :icon="cloudDownloadOutline"></ion-icon>
+                      <span>Download</span>
+                    </button>
+                  </div>
                 </div>
 
 
@@ -952,7 +954,8 @@ import {
   closeCircleOutline, documentOutline, closeCircle, expandOutline,
   arrowUpOutline, closeOutline, refresh, cloudOfflineOutline,
   volumeHigh, volumeMediumOutline, shareSocialOutline, downloadOutline,
-  ellipsisVertical, notificationsCircleOutline, refreshOutline, phonePortraitOutline, close
+  ellipsisVertical, notificationsCircleOutline, refreshOutline, phonePortraitOutline, close,
+  eyeOutline, cloudDownloadOutline, imageOutline
 } from 'ionicons/icons';
 import api from '@/utils/api.js';
 import config from '@/config';
@@ -988,6 +991,7 @@ export default {
       closeCircleOutline, documentOutline, closeCircle, expandOutline, arrowUpOutline, closeOutline, refresh, cloudOfflineOutline,
       volumeHigh, volumeMediumOutline, shareSocialOutline, downloadOutline,
       ellipsisVertical, notificationsCircleOutline, refreshOutline, phonePortraitOutline, close,
+      eyeOutline, cloudDownloadOutline, imageOutline,
       showHeaderActionSheet: false,
       notificationPermission: 'default',
       dismissedTicker: false,
@@ -998,6 +1002,7 @@ export default {
       showNewNoticesPill: false,
       isScrolledDown: false,
       lightbox: { show: false, images: [], index: 0 },
+      docViewer: { show: false, url: '', title: '', ext: '' },
       searchQuery: '',
       activeView: 'notices',
       allMembers: [],
@@ -1029,7 +1034,8 @@ export default {
       username: localStorage.getItem('username'),
       API_URL: config.api.baseURL,
       defaultLogo: 'https://images.unsplash.com/photo-1562564055-71e051d33c19?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80',
-      defaultAvatar: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIwIiBmaWxsPSIjZjNmNGY2Ii8+PHJlY3QgeD0iMiIgeT0iMiIgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiByeD0iMTgiIHN0cm9rZT0iI2RhYTUyMCIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2Utb3BhY2l0eT0iMC40IiBmaWxsPSJub25lIi8+PHBhdGggZD0iTTUwIDIyTDIwIDM4djhoNjB2LThMNTAgMjJ6bS0yMiAyNnYyNGg4VjQ4aC04em0xNSAwdjI0aDhWNDhoLTh6bTE1IDB2MjRoOFY0OGgtOHptMTUgMHYyNGg4VjQ4aC04ek0xNiA3NnY2aDY4di02SDE2eiIgZmlsbD0iI2RhYTUyMCIvPjwvc3ZnPg==',
+      defaultAvatarBlue: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIwIiBmaWxsPSIjZjFmNWY5Ii8+PHJlY3QgeD0iMiIgeT0iMiIgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiByeD0iMTgiIHN0cm9rZT0iIzEyMDhhMSIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1vcGFjaXR5PSIwLjMiIGZpbGw9Im5vbmUiLz48cGF0aCBkPSJNNTAgMjJMMjAgMzh2OGg2MHYtOEw1MCAyMnptLTIyIDI2djI0aDhWNDhoLTh6bTE1IDB2MjRoOFY0OGgtOHptMTUgMHYyNGg4VjQ4aC04em0xNSAwdjI0aDhWNDhoLTh6TTE2IDc2djZoNjh2LTZIMTZ6IiBmaWxsPSIjMTIwOGExIi8+PC9zdmc+',
+      defaultAvatarGold: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIwIiBmaWxsPSIjMWUyNDMwIi8+PHJlY3QgeD0iMiIgeT0iMiIgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiByeD0iMTgiIHN0cm9rZT0iI2ZmZDcwMCIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1vcGFjaXR5PSIwLjQiIGZpbGw9Im5vbmUiLz48cGF0aCBkPSJNNTAgMjJMMjAgMzh2OGg2MHYtOEw1MCAyMnptLTIyIDI2djI0aDhWNDhoLTh6bTE1IDB2MjRoOFY0OGgtOHptMTUgMHYyNGg4VjQ4aC04em0xNSAwdjI0aDhWNDhoLTh6TTE2IDc2djZoNjh2LTZIMTZ6IiBmaWxsPSIjZmZkNzAwIi8+PC9zdmc+',
       fetchingNotices: false,
       originalFavicon: null,
       originalTitle: '',
@@ -1224,6 +1230,16 @@ export default {
     }
   },
   methods: {
+    getNoticeImages(notice) {
+      if (!notice) return [];
+      const images = Array.isArray(notice.media_urls) ? [...notice.media_urls] : [];
+      if (notice.attachment_url && this.getAttachmentInfo(notice.attachment_url).isImage) {
+        if (!images.includes(notice.attachment_url)) {
+          images.push(notice.attachment_url);
+        }
+      }
+      return images;
+    },
     installPWA(target = 'bugema') {
       const isBugema = target === 'bugema' || this.$route.path.includes('/bugema');
       const appName = isBugema ? 'Bugema Notice Board' : 'NexFi App';
@@ -1422,7 +1438,7 @@ export default {
       let attachmentHtml = '';
       if (notice.attachment_url) {
         attachmentHtml = `
-          <div style="display:flex; align-items:center; gap:12px; padding:14px 20px; margin-top:20px; background:${isDark ? '#1d2127' : '#f0f4f8'}; border:1.5px solid ${isDark ? '#2f3336' : '#cbd5e1'}; border-radius:14px; color:${isDark ? '#60a5fa' : '#2563eb'}; font-weight:700; font-size:15px;">
+          <div style="display:flex; align-items:center; gap:12px; padding:14px 20px; margin-top:20px; background:${isDark ? '#1d2127' : '#f0f4f8'}; border:1.5px solid ${isDark ? '#2f3336' : '#cbd5e1'}; border-radius:14px; color:${isDark ? '#60a5fa' : '#1208a1'}; font-weight:700; font-size:15px;">
             <span style="font-size:22px;">📄</span>
             <span>View Official Document / Attachment</span>
           </div>
@@ -1433,15 +1449,15 @@ export default {
       const catColor = category === 'Urgent' ? '#ef4444' : 
                        category === 'Academic' ? '#3b82f6' : 
                        category === 'Finance' ? '#10b981' : 
-                       category === 'Events' ? '#8b5cf6' : '#daa520';
+                       category === 'Events' ? '#8b5cf6' : '#1208a1';
 
       // Complete Snapshot Card HTML
       wrapper.innerHTML = `
         <div style="background: ${isDark ? '#16181c' : '#ffffff'}; border: 2.5px solid ${isDark ? '#2f3336' : '#e5e7eb'}; border-radius: 26px; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.3);">
           
           <!-- Institutional Header Banner -->
-          <div style="background: linear-gradient(135deg, #0b0f14 0%, #1e2430 50%, #0b0f14 100%); padding: 26px 36px; border-bottom: 4px solid #daa520; text-align: center; color: #ffffff;">
-            <div style="font-size: 28px; font-weight: 900; letter-spacing: 1.5px; color: #ffd700; text-transform: uppercase;">
+          <div style="background: linear-gradient(135deg, #0b0f14 0%, #1e2430 50%, #0b0f14 100%); padding: 26px 36px; border-bottom: 4px solid #1208a1; text-align: center; color: #ffffff;">
+            <div style="font-size: 28px; font-weight: 900; letter-spacing: 1.5px; color: #3b82f6; text-transform: uppercase;">
               🏛️ ${orgName.toUpperCase()}
             </div>
             <div style="font-size: 13px; font-weight: 800; letter-spacing: 2px; color: #cbd5e1; margin-top: 6px; text-transform: uppercase;">
@@ -1453,7 +1469,7 @@ export default {
           <div style="padding: 32px 36px;">
             
             ${notice.is_pinned ? `
-              <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(218,165,32,0.15); color:#daa520; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:800; margin-bottom:20px; border:1px solid rgba(218,165,32,0.35);">
+              <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(18, 8, 161,0.15); color:#1208a1; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:800; margin-bottom:20px; border:1px solid rgba(18, 8, 161,0.35);">
                 📌 Pinned Notice
               </div>
             ` : ''}
@@ -1461,7 +1477,7 @@ export default {
             <!-- Author Header -->
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px;">
               <div style="display: flex; align-items: center; gap: 16px;">
-                <div style="position: relative; width: 56px; height: 56px; border-radius: 50%; padding: 2px; background: linear-gradient(135deg, #daa520, #ffd700); flex-shrink: 0;">
+                <div style="position: relative; width: 56px; height: 56px; border-radius: 50%; padding: 2px; background: #1208a1; flex-shrink: 0;">
                   <img src="${base64Avatar}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #222;" />
                 </div>
                 <div>
@@ -1505,7 +1521,7 @@ export default {
 
           <!-- Bottom Verification Footer -->
           <div style="background: ${isDark ? '#111317' : '#f8fafc'}; padding: 20px 36px; border-top: 2px solid ${isDark ? '#2f3336' : '#e2e8f0'}; display: flex; flex-direction: column; gap: 6px;">
-            <div style="font-size: 15px; font-weight: 800; color: #daa520; display: flex; align-items: center; gap: 8px;">
+            <div style="font-size: 15px; font-weight: 800; color: #1208a1; display: flex; align-items: center; gap: 8px;">
               <span>🏛️ ${orgName} • Digital Notice Board</span>
             </div>
             <div style="font-size: 12px; color: ${isDark ? '#9ca3af' : '#64748b'}; word-break: break-all; font-family: monospace;">
@@ -2101,8 +2117,8 @@ export default {
       });
 
       // Step 3: Auto-format hashtags (#tag) and mentions (@user)
-      escaped = escaped.replace(/(^|\s)(#[a-zA-Z0-9_]+)/g, '$1<span class="hashtag" data-hashtag="$2" style="color:#daa520;font-weight:600;cursor:pointer">$2</span>');
-      escaped = escaped.replace(/(^|\s)(@[a-zA-Z0-9_]+)/g, '$1<span class="mention" data-mention="$2" style="color:#daa520;font-weight:600;cursor:pointer">$2</span>');
+      escaped = escaped.replace(/(^|\s)(#[a-zA-Z0-9_]+)/g, '$1<span class="hashtag" data-hashtag="$2" class="hashtag" style="font-weight:700;cursor:pointer">$2</span>');
+      escaped = escaped.replace(/(^|\s)(@[a-zA-Z0-9_]+)/g, '$1<span class="mention" data-mention="$2" class="hashtag" style="font-weight:700;cursor:pointer">$2</span>');
 
       // Step 4: Convert newlines to <br>
       return escaped.replace(/\n/g, '<br>');
@@ -2571,8 +2587,61 @@ export default {
       if (days < 7) return `${days}d ago`;
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     },
-    openAttachment(url) {
-      window.open(url, '_blank');
+    openAttachment(url, mode = 'view') {
+      if (!url) return;
+      const info = this.getAttachmentInfo(url);
+      const isNative = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform();
+
+      if (mode === 'download') {
+        // Always trigger a download via anchor tag
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = url.split('/').pop().split('?')[0] || 'attachment';
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+      }
+
+      if (mode === 'view-external') {
+        // Explicit fallback: open in browser
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      // Images: use existing lightbox (works perfectly on all platforms)
+      if (info.isImage) {
+        this.lightbox = { show: true, images: [url], index: 0 };
+        return;
+      }
+
+      // PDFs and documents: open in-app viewer using Google Docs Viewer
+      // Google Docs Viewer renders PDFs/DOC/XLS/PPT inside an iframe — works in Android WebView
+      const googleDocsUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`;
+      this.docViewer = {
+        show: true,
+        url,
+        iframeSrc: googleDocsUrl,
+        title: info.name + '.' + info.ext,
+        ext: info.ext,
+        loading: true
+      };
+    },
+    closeDocViewer() {
+      this.docViewer = { show: false, url: '', iframeSrc: '', title: '', ext: '', loading: false };
+    },
+    getAttachmentInfo(url) {
+      if (!url) return { name: 'Attachment', ext: 'file', isImage: false };
+      const raw = url.split('/').pop().split('?')[0] || 'attachment';
+      const parts = raw.split('.');
+      const ext = parts.length > 1 ? parts.pop().toLowerCase() : 'file';
+      // Decode URI and truncate for display
+      let name = decodeURIComponent(parts.join('.') || raw);
+      if (name.length > 32) name = name.substring(0, 29) + '...';
+      const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'tiff', 'heic'];
+      const isImage = imageExts.includes(ext);
+      return { name: name || 'Attachment', ext, isImage };
     },
     openLightbox(images, index = 0) {
       this.lightbox = { show: true, images: images || [], index };
@@ -2691,20 +2760,22 @@ export default {
       this.loadAll();
     },
     getNoticeAvatar(notice) {
-      // Prefer department logo when the notice belongs to a dept
+      const isDark = i18nState.theme === 'dark' || (typeof document !== 'undefined' && document.body.classList.contains('dark'));
+      const fallback = isDark ? this.defaultAvatarGold : this.defaultAvatarBlue;
       if (notice && notice.dept_logo) {
         let url = notice.dept_logo;
         if (url.startsWith('/')) url = `${this.API_URL}${url}`;
         return url;
       }
-      if (!notice || !notice.author_avatar) return this.defaultAvatar;
+      if (!notice || !notice.author_avatar) return fallback;
       let url = notice.author_avatar;
       if (url.startsWith('/')) url = `${this.API_URL}${url}`;
       return url;
     },
     onAvatarError(event) {
       if (event && event.target) {
-        event.target.src = this.defaultAvatar;
+        const isDark = i18nState.theme === 'dark' || (typeof document !== 'undefined' && document.body.classList.contains('dark'));
+        event.target.src = isDark ? this.defaultAvatarGold : this.defaultAvatarBlue;
       }
     },
     goHomeNotices() {
@@ -2855,14 +2926,47 @@ export default {
 <style scoped>
 /* ─── Toolbar ─────────────────────────────────────────────── */
 .glass-toolbar {
-  --background: var(--ion-toolbar-background, rgba(255, 255, 255, 0.94));
-  --color: var(--ion-text-color, #111827);
-  --border-color: var(--ion-border-color, rgba(218, 165, 32, 0.2));
-  --min-height: 56px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 2px 12px rgba(218, 165, 32, 0.12);
-  padding: 4px 0;
+  --background: var(--ion-background-color, #f3f4f6);
+  --border-width: 0;
+  --min-height: auto;
+  padding: 8px 10px 4px 10px;
+  contain: none;
+}
+
+.header-brand-card {
+  background: var(--ion-card-background, #ffffff);
+  border-radius: 16px;
+  border: 1px solid var(--ion-border-color, rgba(0, 0, 0, 0.06));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+  padding: 10px 14px 8px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.header-card-start,
+.header-card-end {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.header-admin-gear-btn {
+  background: transparent;
+  border: none;
+  color: #1208a1;
+  font-size: 1.3rem;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .org-header-title {
@@ -2880,25 +2984,30 @@ export default {
   text-align: center;
   flex: 1;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   margin: 0 auto;
-  padding: 4px 8px;
+  padding: 4px 4px;
+  overflow: hidden;
 }
 
 .brand-title-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: clamp(4px, 1.5vw, 10px);
+  max-width: 100%;
 }
 
 .brand-word-left,
 .brand-word-right {
-  font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+  font-size: clamp(0.95rem, 3.8vw, 1.45rem);
   font-weight: 900;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: var(--ion-text-color, #000000);
+  color: #1208a1;
   line-height: 1.1;
+  white-space: nowrap;
 }
 
 .mini-logo-wrap {
@@ -2946,25 +3055,24 @@ export default {
 }
 
 .board-subtitle {
-  font-size: clamp(0.68rem, 1.1vw, 0.88rem);
-  color: #b38209;
-  font-weight: 700;
-  opacity: 0.95;
-  letter-spacing: 0.3px;
-  margin-top: 2px;
+  font-size: clamp(0.65rem, 1vw, 0.78rem);
+  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  margin-top: 3px;
 }
 
 .official-badge {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  background: rgba(218, 165, 32, 0.12);
-  color: #c0921c;
+  background: rgba(18, 8, 161, 0.12);
+  color: #1208a1;
   font-size: 0.65rem;
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 10px;
-  border: 1px solid rgba(218, 165, 32, 0.3);
+  border: 1px solid rgba(18, 8, 161, 0.3);
   text-transform: uppercase;
 }
 
@@ -2972,8 +3080,8 @@ export default {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: rgba(218, 165, 32, 0.12);
-  color: #b38209;
+  background: rgba(18, 8, 161, 0.12);
+  color: #1208a1;
   font-size: 0.72rem;
   font-weight: 800;
   padding: 4px 10px;
@@ -2984,7 +3092,7 @@ export default {
 }
 
 .login-btn-sm {
-  --color: #daa520;
+  --color: #1208a1;
   --border-radius: 10px;
   font-weight: 700;
   font-size: 0.8rem;
@@ -2992,13 +3100,13 @@ export default {
 
 .board-domain {
   font-size: 0.7rem;
-  color: #daa520;
+  color: #1208a1;
   font-weight: 500;
   opacity: 0.8;
 }
 
 .back-btn {
-  --color: #daa520;
+  --color: #1208a1;
 }
 
 .settings-btn {
@@ -3021,8 +3129,8 @@ export default {
 }
 
 .header-settings-btn:hover {
-  background: rgba(218, 165, 32, 0.12);
-  color: #daa520;
+  background: rgba(18, 8, 161, 0.12);
+  color: #1208a1;
 }
 
 .header-settings-icon {
@@ -3067,7 +3175,7 @@ export default {
   height: 62px;
   border-radius: 50%;
   object-fit: cover;
-  box-shadow: 0 4px 16px rgba(218, 165, 32, 0.3);
+  box-shadow: 0 4px 16px rgba(18, 8, 161, 0.3);
   z-index: 2;
   border: 2px solid #ffffff;
 }
@@ -3077,8 +3185,8 @@ export default {
   inset: -8px;
   width: 116px;
   height: 116px;
-  color: #d4af37;
-  --color: #d4af37;
+  color: #1208a1;
+  --color: #1208a1;
   z-index: 3;
 }
 
@@ -3114,19 +3222,19 @@ export default {
 .lock-glow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle, rgba(218, 165, 32, 0.2) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(18, 8, 161, 0.2) 0%, transparent 70%);
   border-radius: 50%;
 }
 
 .lock-circle {
   width: 84px;
   height: 84px;
-  background: linear-gradient(135deg, #d4af37, #ffd700);
+  background: #1208a1;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 32px rgba(218, 165, 32, 0.4);
+  box-shadow: 0 8px 32px rgba(18, 8, 161, 0.4);
   z-index: 2;
 }
 
@@ -3138,7 +3246,7 @@ export default {
 .pulse-ring {
   position: absolute;
   border-radius: 50%;
-  border: 2px solid rgba(218, 165, 32, 0.4);
+  border: 2px solid rgba(18, 8, 161, 0.4);
 }
 
 .ring-1 {
@@ -3174,8 +3282,8 @@ export default {
 }
 
 .join-btn {
-  --background: linear-gradient(135deg, #d4af37, #ffd700);
-  --background-activated: #c0921c;
+  --background: #1208a1;
+  --background-activated: #1208a1;
   --color: #000;
   --border-radius: 14px;
   --padding-start: 28px;
@@ -3183,16 +3291,16 @@ export default {
   font-weight: 800;
   font-size: 1rem;
   height: 52px;
-  box-shadow: 0 8px 24px rgba(218, 165, 32, 0.35);
+  box-shadow: 0 8px 24px rgba(18, 8, 161, 0.35);
 }
 
 .pending-badge {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(218, 165, 32, 0.08);
-  border: 1.5px dashed rgba(218, 165, 32, 0.5);
-  color: #c0921c;
+  background: rgba(18, 8, 161, 0.08);
+  border: 1.5px dashed rgba(18, 8, 161, 0.5);
+  color: #1208a1;
   padding: 14px 24px;
   border-radius: 16px;
   font-weight: 600;
@@ -3232,8 +3340,8 @@ export default {
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg,
-    rgba(218, 165, 32, 0.06) 0%,
-    rgba(255, 215, 0, 0.03) 50%,
+    rgba(18, 8, 161, 0.06) 0%,
+    rgba(18, 8, 161, 0.03) 50%,
     rgba(192, 146, 28, 0.06) 100%
   );
 }
@@ -3286,7 +3394,7 @@ export default {
 
 .org-domain {
   font-size: 0.78rem;
-  color: #daa520;
+  color: #1208a1;
   font-family: 'SF Mono', monospace;
   margin: 0 0 12px 0;
   display: flex;
@@ -3333,7 +3441,7 @@ export default {
 }
 
 .member-pill {
-  background: rgba(218, 165, 32, 0.08);
+  background: rgba(18, 8, 161, 0.08);
   padding: 4px 10px;
   border-radius: 20px;
   flex-direction: row;
@@ -3342,7 +3450,7 @@ export default {
 }
 
 .member-icon {
-  color: #daa520;
+  color: #1208a1;
   font-size: 14px;
 }
 
@@ -3447,17 +3555,17 @@ export default {
 }
 
 .cat-pill:hover {
-  border-color: rgba(218, 165, 32, 0.4);
-  color: #daa520;
-  background: rgba(218, 165, 32, 0.05);
+  border-color: rgba(18, 8, 161, 0.4);
+  color: #1208a1;
+  background: rgba(18, 8, 161, 0.05);
 }
 
 .cat-pill--active {
-  background: linear-gradient(135deg, #d4af37, #ffd700);
-  color: #000;
+  background: #1208a1;
+  color: #ffffff;
   border-color: transparent;
   font-weight: 800;
-  box-shadow: 0 3px 12px rgba(218, 165, 32, 0.3);
+  box-shadow: 0 3px 12px rgba(18, 8, 161, 0.3);
   transform: translateY(-1px);
 }
 
@@ -3548,7 +3656,7 @@ export default {
 .empty-visual {
   width: 90px;
   height: 90px;
-  background: rgba(218, 165, 32, 0.06);
+  background: rgba(18, 8, 161, 0.06);
   border-radius: 28px;
   display: flex;
   align-items: center;
@@ -3558,7 +3666,7 @@ export default {
 
 .empty-icon {
   font-size: 40px;
-  color: #daa520;
+  color: #1208a1;
   opacity: 0.5;
 }
 
@@ -3591,13 +3699,13 @@ export default {
 
 .notice-card {
   font-family: Tahoma, 'Segoe UI', Geneva, Verdana, sans-serif !important;
-  background: var(--ion-card-background, #fff);
+  background: #ffffff !important;
   color: var(--ion-text-color, #1a1a1a);
-  border-radius: 18px;
+  border-radius: 16px;
   padding: 0;
   margin-bottom: 12px;
-  border: 1px solid var(--ion-border-color, rgba(0,0,0,0.06));
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
   overflow: hidden;
   transition: transform 0.2s, box-shadow 0.2s;
   animation: cardIn 0.35s ease both;
@@ -3621,12 +3729,12 @@ export default {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: linear-gradient(90deg, rgba(218, 165, 32, 0.08), transparent);
+  background: linear-gradient(90deg, rgba(18, 8, 161, 0.08), transparent);
   padding: 7px 18px;
   font-size: 0.72rem;
   font-weight: 700;
-  color: #c0921c;
-  border-bottom: 1px solid rgba(218, 165, 32, 0.1);
+  color: #1208a1;
+  border-bottom: 1px solid rgba(18, 8, 161, 0.1);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -3670,7 +3778,7 @@ export default {
   position: absolute;
   inset: -2px;
   border-radius: 14px;
-  border: 1.5px solid rgba(218, 165, 32, 0.3);
+  border: 1.5px solid rgba(18, 8, 161, 0.3);
   pointer-events: none;
 }
 
@@ -3721,7 +3829,7 @@ export default {
 }
 
 .show-more-toggle {
-  color: #daa520;
+  color: #1208a1;
   font-size: 0.92rem;
   cursor: pointer;
   margin-top: 6px;
@@ -3732,113 +3840,54 @@ export default {
 
 .show-more-toggle:hover {
   text-decoration: underline;
-  color: #b8860b;
+  color: #1208a1;
 }
 
-/* X-style inline "Read more ▾" / "Show less ▴" link in Bugema Gold */
+/* ── Link and Read-More styles (Clean text, no bg/borders) ──── */
+.show-more-toggle,
 .notice-text :deep(.read-more),
 :deep(.read-more) {
-  color: #b38209 !important;
-  background: rgba(218, 165, 32, 0.14) !important;
-  border: 1.5px solid rgba(218, 165, 32, 0.45) !important;
-  font-weight: 800 !important;
-  font-size: 0.84rem !important;
-  padding: 3px 10px !important;
-  border-radius: 8px !important;
+  color: #1208a1 !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  font-weight: 750 !important;
+  font-size: 0.88rem !important;
+  padding: 0 !important;
+  margin-left: 4px !important;
   cursor: pointer !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 4px !important;
-  margin-left: 6px !important;
+  display: inline !important;
   user-select: none !important;
-  transition: all 0.2s ease-in-out !important;
-  vertical-align: middle !important;
-  box-shadow: 0 2px 6px rgba(218, 165, 32, 0.18) !important;
+  text-decoration: underline !important;
+  transition: opacity 0.15s ease !important;
 }
 
 .notice-text :deep(.read-more:hover),
-:deep(.read-more:hover) {
-  color: #000000 !important;
-  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
-  border-color: #daa520 !important;
-  text-decoration: none !important;
-  cursor: pointer !important;
-  transform: translateY(-1px) scale(1.04) !important;
-  box-shadow: 0 4px 14px rgba(218, 165, 32, 0.4) !important;
-}
-
-.notice-text :deep(.read-more:active),
-:deep(.read-more:active) {
-  transform: translateY(0) scale(0.98) !important;
-  background: #c0921c !important;
-  color: #000000 !important;
-}
-
-.notice-highlight {
-  outline: 2px solid #daa520;
-  box-shadow: 0 0 16px rgba(218, 165, 32, 0.4);
-  transition: all 0.3s ease;
-}
-
-.notice-text {
-  font-family: 'Tahoma', 'Segoe UI', Geneva, Verdana, sans-serif;
-  margin: 0;
-  padding: 0;
-  line-height: 1.6;
-  white-space: normal;
-  word-break: break-word;
-  font-size: 0.96rem;
-  color: #1a1a1a;
-}
-
-.notice-title {
-  font-family: 'Tahoma', 'Segoe UI', Geneva, Verdana, sans-serif;
-  margin: 0 0 8px 0;
-  font-size: 1.05rem;
-  font-weight: 800;
-  color: #1a1a1a;
-  letter-spacing: -0.2px;
-  line-height: 1.3;
-}
-
-.search-wrap {
-  padding: 10px 14px 4px 14px;
-}
-
-.notice-searchbar {
-  --background: #f4f4f6;
-  --border-radius: 12px;
-  --box-shadow: none;
-  --placeholder-color: #888;
-  --icon-color: #daa520;
-  padding: 0;
-}
-
-.notice-list-container {
-  padding: 16px;
-  max-width: 920px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+:deep(.read-more:hover),
+.show-more-toggle:hover {
+  color: #1208a1 !important;
+  text-decoration: underline !important;
+  background: none !important;
+  box-shadow: none !important;
+  opacity: 0.85 !important;
 }
 
 .notice-text :deep(a),
 .notice-text :deep(.notice-link),
 .notice-text :deep(.post-link),
 :deep(a.notice-link),
-:deep(a.post-link) {
-  color: #b38209 !important;
-  background: rgba(218, 165, 32, 0.12) !important;
-  border-bottom: 2px solid #daa520 !important;
-  padding: 2px 7px !important;
-  border-radius: 5px !important;
+:deep(a.post-link),
+.hashtag,
+.mention {
+  color: #1208a1 !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
   font-weight: 700 !important;
   word-break: break-all !important;
-  overflow-wrap: anywhere !important;
   cursor: pointer !important;
-  text-decoration: none !important;
-  transition: all 0.2s ease-in-out !important;
+  text-decoration: underline !important;
   display: inline !important;
 }
 
@@ -3847,24 +3896,43 @@ export default {
 .notice-text :deep(.post-link:hover),
 :deep(a.notice-link:hover),
 :deep(a.post-link:hover) {
-  color: #855f00 !important;
-  background: rgba(218, 165, 32, 0.25) !important;
-  border-bottom-color: #b38209 !important;
+  color: #1208a1 !important;
   text-decoration: underline !important;
-  cursor: pointer !important;
-  box-shadow: 0 2px 8px rgba(218, 165, 32, 0.25) !important;
+  background: none !important;
+  box-shadow: none !important;
+  opacity: 0.85 !important;
 }
 
-.notice-text :deep(a:focus),
-.notice-text :deep(.notice-link:focus),
-.notice-text :deep(.post-link:focus),
-:deep(a.notice-link:focus),
-:deep(a.post-link:focus) {
-  outline: 2px auto #daa520;
-  outline-offset: 2px;
+.notice-attachment-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin: 10px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-/* Official Noticeboard Footer */
+.notice-attachment-card:hover {
+  background: #f1f5f9;
+  border-color: rgba(18, 8, 161, 0.3);
+  transform: translateY(-1px);
+}
+
+.attach-filename {
+  font-size: 0.88rem;
+  font-weight: 750;
+  color: #111827 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
 .noticeboard-footer {
   margin-top: 40px;
   margin-bottom: 30px;
@@ -3881,8 +3949,8 @@ export default {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(218, 165, 32, 0.08);
-  color: #b38209;
+  background: rgba(18, 8, 161, 0.08);
+  color: #1208a1;
   font-size: 0.8rem;
   font-weight: 700;
   padding: 6px 14px;
@@ -3901,7 +3969,7 @@ export default {
   margin: 10px 16px;
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid rgba(218, 165, 32, 0.18);
+  border: 1px solid rgba(18, 8, 161, 0.18);
   background: #080c10;
   display: grid;
   gap: 2px;
@@ -3979,41 +4047,150 @@ export default {
   backdrop-filter: blur(2px);
 }
 
-.notice-attachment {
+/* ── Attachment Card ───────────────────────────────── */
+.notice-attachment-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: rgba(218, 165, 32, 0.04);
-  border: 1px solid rgba(218, 165, 32, 0.15);
+  justify-content: space-between;
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 12px;
-  padding: 10px 14px;
-  margin: 10px 16px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #c0921c;
+  padding: 10px 12px;
+  margin: 10px 14px;
   transition: background 0.2s;
 }
 
-.notice-attachment:hover {
-  background: rgba(218, 165, 32, 0.1);
+.notice-attachment-card:hover {
+  background: #f1f5f9;
 }
 
-.attach-icon-wrap {
-  width: 32px;
-  height: 32px;
-  background: rgba(218, 165, 32, 0.1);
-  border-radius: 8px;
+.attach-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.attach-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  font-size: 20px;
+  background: rgba(18, 8, 161, 0.12);
+  color: #1208a1;
 }
 
-.attach-arrow {
-  margin-left: auto;
+/* Format-specific icon colours */
+.attach-icon--pdf  { background: rgba(239,68,68,0.12);  color: #ef4444; }
+.attach-icon--doc,
+.attach-icon--docx { background: rgba(18, 8, 161,0.12); color: #3b82f6; }
+.attach-icon--xls,
+.attach-icon--xlsx { background: rgba(16,185,129,0.12); color: #10b981; }
+.attach-icon--ppt,
+.attach-icon--pptx { background: rgba(249,115,22,0.12); color: #f97316; }
+.attach-icon--png,
+.attach-icon--jpg,
+.attach-icon--jpeg,
+.attach-icon--gif,
+.attach-icon--webp { background: rgba(139,92,246,0.12); color: #8b5cf6; }
+
+.attach-card-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.attach-filename {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary, #e2e8f0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.attach-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.attach-format-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  text-transform: uppercase;
+  background: rgba(18, 8, 161,0.15);
+  color: #1208a1;
+}
+
+/* Format-specific badge colours */
+.fmt-pdf  { background: rgba(239,68,68,0.15);  color: #ef4444; }
+.fmt-doc, .fmt-docx { background: rgba(18, 8, 161,0.15); color: #3b82f6; }
+.fmt-xls, .fmt-xlsx { background: rgba(16,185,129,0.15); color: #10b981; }
+.fmt-ppt, .fmt-pptx { background: rgba(249,115,22,0.15); color: #f97316; }
+.fmt-png, .fmt-jpg, .fmt-jpeg, .fmt-gif, .fmt-webp { background: rgba(139,92,246,0.15); color: #8b5cf6; }
+
+.attach-label-text {
+  font-size: 0.72rem;
+  color: var(--text-muted, #64748b);
+  font-weight: 500;
+}
+
+.attach-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.attach-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 9px;
+  border: none;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.attach-view-btn {
+  background: rgba(18, 8, 161,0.12);
+  color: #1208a1;
+  border: 1px solid rgba(18, 8, 161,0.25);
+}
+
+.attach-view-btn:hover {
+  background: rgba(18, 8, 161,0.22);
+  transform: translateY(-1px);
+}
+
+.attach-download-btn {
+  background: rgba(16,185,129,0.12);
+  color: #10b981;
+  border: 1px solid rgba(16,185,129,0.25);
+}
+
+.attach-download-btn:hover {
+  background: rgba(16,185,129,0.22);
+  transform: translateY(-1px);
+}
+
+.attach-action-btn ion-icon {
   font-size: 14px;
-  opacity: 0.5;
 }
 
 /* Footer */
@@ -4100,7 +4277,7 @@ export default {
 
 .ms-icon {
   font-size: 18px;
-  color: #daa520;
+  color: #1208a1;
   margin-bottom: 2px;
 }
 
@@ -4130,21 +4307,21 @@ export default {
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  background: linear-gradient(90deg, rgba(218,165,32,0.08), transparent);
+  background: linear-gradient(90deg, rgba(18, 8, 161,0.08), transparent);
   border-radius: 12px;
   margin-bottom: 8px;
-  border-left: 3px solid #daa520;
+  border-left: 3px solid #1208a1;
 }
 
 .dept-group-icon {
   width: 32px;
   height: 32px;
-  background: rgba(218,165,32,0.12);
+  background: rgba(18, 8, 161,0.12);
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #c0921c;
+  color: #1208a1;
   font-size: 16px;
   flex-shrink: 0;
 }
@@ -4222,7 +4399,7 @@ export default {
   border-radius: 50%;
   border: 2px solid #fff;
 }
-.role-dot--org_admin    { background: #daa520; }
+.role-dot--org_admin    { background: #1208a1; }
 .role-dot--dept_manager { background: #6366f1; }
 .role-dot--dept_viewer  { background: #10b981; }
 
@@ -4257,7 +4434,7 @@ export default {
   white-space: nowrap;
   flex-shrink: 0;
 }
-.role-badge--org_admin    { background: rgba(218,165,32,0.12); color: #c0921c; }
+.role-badge--org_admin    { background: rgba(18, 8, 161,0.12); color: #1208a1; }
 .role-badge--dept_manager { background: rgba(99,102,241,0.1);  color: #6366f1; }
 .role-badge--dept_viewer  { background: rgba(16,185,129,0.1);  color: #10b981; }
 
@@ -4271,7 +4448,7 @@ export default {
 }
 
 .edit-trigger:hover {
-  --color: #daa520;
+  --color: #1208a1;
 }
 
 /* Edit controls */
@@ -4317,7 +4494,7 @@ export default {
 
 .members-empty .empty-icon {
   font-size: 3rem;
-  color: #daa520;
+  color: #1208a1;
   opacity: 0.3;
   margin-bottom: 14px;
 }
@@ -4357,11 +4534,11 @@ export default {
 }
 .dept-pill ion-icon { font-size: 12px; }
 .dept-pill--active {
-  background: linear-gradient(135deg, #d4af37, #ffd700);
-  color: #000;
+  background: #1208a1;
+  color: #ffffff;
   border-color: transparent;
   font-weight: 800;
-  box-shadow: 0 3px 10px rgba(218,165,32,0.3);
+  box-shadow: 0 3px 10px rgba(18, 8, 161,0.3);
 }
 
 /* Desktop grid — 3 columns, X-style: centered canvas with white space at the
@@ -4391,18 +4568,18 @@ export default {
   height: calc(100vh - 112px);
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(218,165,32,0.2) transparent;
+  scrollbar-color: rgba(18, 8, 161,0.2) transparent;
 }
 .dept-sidebar::-webkit-scrollbar { width: 4px; }
-.dept-sidebar::-webkit-scrollbar-thumb { background: rgba(218,165,32,0.25); border-radius: 4px; }
+.dept-sidebar::-webkit-scrollbar-thumb { background: rgba(18, 8, 161,0.25); border-radius: 4px; }
 
 .sidebar-org-card {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px;
-  background: linear-gradient(135deg, rgba(218,165,32,0.06), rgba(255,215,0,0.03));
-  border: 1px solid rgba(218,165,32,0.15);
+  background: linear-gradient(135deg, rgba(18, 8, 161,0.06), rgba(18, 8, 161,0.03));
+  border: 1px solid rgba(18, 8, 161,0.15);
   border-radius: 14px;
   margin-bottom: 4px;
 }
@@ -4429,7 +4606,7 @@ export default {
 }
 .sidebar-org-domain {
   font-size: 0.7rem;
-  color: #daa520;
+  color: #1208a1;
   display: flex;
   align-items: center;
   gap: 3px;
@@ -4472,29 +4649,29 @@ export default {
   color: var(--ion-text-color, #444);
 }
 .dept-nav-item:hover {
-  background: rgba(218,165,32,0.07);
-  color: #c0921c;
+  background: rgba(18, 8, 161,0.07);
+  color: #1208a1;
 }
 .dept-nav-item--active {
-  background: linear-gradient(135deg, rgba(218,165,32,0.12), rgba(255,215,0,0.06));
-  color: #b38209;
+  background: linear-gradient(135deg, rgba(18, 8, 161,0.12), rgba(18, 8, 161,0.06));
+  color: #1208a1;
   font-weight: 700;
 }
 .dept-nav-icon-wrap {
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: rgba(218,165,32,0.08);
+  background: rgba(18, 8, 161,0.08);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 15px;
   flex-shrink: 0;
-  color: #c0921c;
+  color: #1208a1;
   transition: background 0.18s;
 }
 .dept-nav-item--active .dept-nav-icon-wrap {
-  background: rgba(218,165,32,0.18);
+  background: rgba(18, 8, 161,0.18);
 }
 .dept-nav-logo {
   width: 100%;
@@ -4526,8 +4703,8 @@ export default {
   flex-shrink: 0;
 }
 .dept-nav-item--active .dept-nav-count {
-  background: rgba(218,165,32,0.15);
-  color: #b38209;
+  background: rgba(18, 8, 161,0.15);
+  color: #1208a1;
 }
 
 .sidebar-auth-box {
@@ -4536,17 +4713,17 @@ export default {
   border-top: 1px solid rgba(0,0,0,0.05);
 }
 .sidebar-post-btn {
-  --background: linear-gradient(135deg, #d4af37, #ffd700);
-  --color: #000;
+  --background: #1208a1;
+  --color: #ffffff;
   --border-radius: 12px;
   font-weight: 800;
   font-size: 0.9rem;
   height: 44px;
 }
 .sidebar-login-btn {
-  --color: #daa520;
+  --color: #1208a1;
   --border-radius: 12px;
-  --border-color: rgba(218,165,32,0.4);
+  --border-color: rgba(18, 8, 161,0.4);
   font-weight: 700;
   font-size: 0.85rem;
   height: 44px;
@@ -4568,13 +4745,13 @@ export default {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: rgba(218,165,32,0.1);
-  border: 1.5px solid rgba(218,165,32,0.35);
+  background: rgba(18, 8, 161,0.1);
+  border: 1.5px solid rgba(18, 8, 161,0.35);
   border-radius: 12px;
   margin: 10px 14px 14px 14px;
   font-size: 0.88rem;
   font-weight: 700;
-  color: #b38209;
+  color: #1208a1;
 }
 .active-dept-label ion-icon { font-size: 14px; }
 .clear-dept-btn {
@@ -4608,10 +4785,10 @@ export default {
   height: calc(100vh - 112px);
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(218,165,32,0.2) transparent;
+  scrollbar-color: rgba(18, 8, 161,0.2) transparent;
 }
 .widgets-col::-webkit-scrollbar { width: 4px; }
-.widgets-col::-webkit-scrollbar-thumb { background: rgba(218,165,32,0.25); border-radius: 4px; }
+.widgets-col::-webkit-scrollbar-thumb { background: rgba(18, 8, 161,0.25); border-radius: 4px; }
 
 /* Widget card */
 .widget {
@@ -4633,15 +4810,15 @@ export default {
   letter-spacing: 0.4px;
   border-bottom: 1px solid rgba(0,0,0,0.05);
 }
-.widget-header ion-icon { font-size: 15px; color: #daa520; }
+.widget-header ion-icon { font-size: 15px; color: #1208a1; }
 .widget-header--urgent { color: #c0392b; }
 .widget-header--urgent ion-icon { color: #ef4444; }
 .widget-count {
   margin-left: auto;
   font-size: 0.7rem;
   font-weight: 800;
-  background: rgba(218,165,32,0.12);
-  color: #c0921c;
+  background: rgba(18, 8, 161,0.12);
+  color: #1208a1;
   padding: 2px 7px;
   border-radius: 10px;
 }
@@ -4680,12 +4857,12 @@ export default {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: rgba(218,165,32,0.4);
+  background: rgba(18, 8, 161,0.4);
   flex-shrink: 0;
   margin-top: 5px;
 }
 .wni-dot--urgent  { background: #ef4444; }
-.wni-dot--pinned  { background: #daa520; }
+.wni-dot--pinned  { background: #1208a1; }
 .wni-dot--academic { background: #6366f1; }
 .wni-info {
   display: flex;
@@ -4710,7 +4887,7 @@ export default {
 }
 .wni-dept {
   font-size: 0.68rem;
-  color: #daa520;
+  color: #1208a1;
   font-weight: 600;
 }
 
@@ -4762,8 +4939,8 @@ export default {
 }
 
 .widget-notice-item:hover {
-  background: rgba(218, 165, 32, 0.08);
-  border-color: rgba(218, 165, 32, 0.2);
+  background: rgba(18, 8, 161, 0.08);
+  border-color: rgba(18, 8, 161, 0.2);
   transform: translateX(2px);
 }
 
@@ -4797,7 +4974,7 @@ export default {
 
 /* WhatsApp Status Style Pinned Notices (24h Expiry) */
 .widget--pinned {
-  border: 1px solid rgba(218, 165, 32, 0.25);
+  border: 1px solid rgba(18, 8, 161, 0.25);
   background: var(--ion-card-background, #ffffff);
 }
 
@@ -4822,7 +4999,7 @@ export default {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 2px dashed #daa520;
+  border: 2px dashed #1208a1;
   animation: statusRotate 12s linear infinite;
 }
 
@@ -4838,11 +5015,11 @@ export default {
 
 @keyframes highlightPulse {
   0% {
-    box-shadow: 0 0 0 4px rgba(218, 165, 32, 0.6), 0 8px 30px rgba(218, 165, 32, 0.3);
+    box-shadow: 0 0 0 4px rgba(18, 8, 161, 0.6), 0 8px 30px rgba(18, 8, 161, 0.3);
     transform: scale(1.01);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(218, 165, 32, 0.6), 0 8px 30px rgba(218, 165, 32, 0.3);
+    box-shadow: 0 0 0 4px rgba(18, 8, 161, 0.6), 0 8px 30px rgba(18, 8, 161, 0.3);
     transform: scale(1.01);
   }
   100% {
@@ -4912,6 +5089,9 @@ export default {
     bottom: 0;
     left: 0;
     right: 0;
+    width: 100vw;
+    max-width: 100vw;
+    box-sizing: border-box;
     height: 60px;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(16px);
@@ -4921,7 +5101,8 @@ export default {
     z-index: 9999;
     align-items: center;
     justify-content: space-around;
-    padding: 4px 8px;
+    padding: 4px 4px;
+    overflow: hidden;
   }
 
   .mobile-nav-btn {
@@ -4931,16 +5112,25 @@ export default {
     justify-content: center;
     background: transparent;
     border: none;
-    padding: 6px 12px;
-    border-radius: 12px;
+    padding: 4px 4px;
+    border-radius: 10px;
     cursor: pointer;
-    color: #666;
-    font-size: 0.68rem;
+    color: #64748b;
+    font-size: 0.65rem;
     font-weight: 600;
     gap: 2px;
     flex: 1;
+    min-width: 0;
     position: relative;
     transition: all 0.2s ease;
+    overflow: hidden;
+  }
+
+  .mobile-nav-btn span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .mobile-nav-btn ion-icon {
@@ -4950,12 +5140,12 @@ export default {
   }
 
   .mobile-nav-btn--active {
-    color: #b38209;
+    color: #1208a1;
     font-weight: 800;
   }
 
   .mobile-nav-btn--active ion-icon {
-    color: #daa520;
+    color: #1208a1;
   }
 
   .nav-badge-wrap {
@@ -4995,16 +5185,16 @@ export default {
   .mobile-post-nav-btn .post-icon-wrap {
     width: 26px;
     height: 26px;
-    background: linear-gradient(135deg, #d4af37, #ffd700);
+    background: #1208a1;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 8px rgba(218, 165, 32, 0.4);
+    box-shadow: 0 2px 8px rgba(18, 8, 161, 0.4);
   }
 
   .mobile-post-nav-btn .post-icon-wrap ion-icon {
-    color: #000;
+    color: #ffffff;
     font-size: 18px;
   }
 }
@@ -5019,27 +5209,33 @@ export default {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #d4af37, #f5e06e);
+  background: #1208a1;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.5);
+  box-shadow: 0 4px 20px rgba(18, 8, 161, 0.4);
   z-index: 99999;
   transition: transform 0.2s, box-shadow 0.2s;
-  color: #000;
+  color: #ffffff;
   font-size: 28px;
 }
 
 .notice-post-btn:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 28px rgba(212, 175, 55, 0.7);
+  box-shadow: 0 6px 28px rgba(18, 8, 161, 0.6);
 }
 
 .notice-post-btn ion-icon {
   font-size: 28px;
-  color: #000;
+  color: #ffffff;
+}
+
+@media (max-width: 767px) {
+  .notice-post-btn {
+    display: none !important;
+  }
 }
 
 /* ── Profile Icon Button in Top Bar ─────────── */
@@ -5056,16 +5252,16 @@ export default {
   height: 34px;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid rgba(218, 165, 32, 0.7);
-  background: rgba(218, 165, 32, 0.12);
+  border: 2px solid rgba(18, 8, 161, 0.7);
+  background: rgba(18, 8, 161, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 .profile-icon-btn:hover .profile-icon-wrap {
-  border-color: #daa520;
-  box-shadow: 0 0 10px rgba(218, 165, 32, 0.45);
+  border-color: #1208a1;
+  box-shadow: 0 0 10px rgba(18, 8, 161, 0.45);
 }
 .profile-thumb {
   width: 100%;
@@ -5074,7 +5270,7 @@ export default {
 }
 .profile-thumb-icon {
   font-size: 18px;
-  color: #daa520;
+  color: #1208a1;
 }
 </style>
 
@@ -5101,7 +5297,7 @@ export default {
   max-width: 90vw;
   height: 100%;
   background: linear-gradient(165deg, #1a1a2e 0%, #16213e 50%, #0d1117 100%);
-  border-left: 1px solid rgba(218,165,32,0.25);
+  border-left: 1px solid rgba(18, 8, 161,0.25);
   display: flex;
   flex-direction: column;
   animation: slideInPanel 0.28s cubic-bezier(0.32, 0.72, 0, 1);
@@ -5134,8 +5330,8 @@ export default {
   transition: background 0.2s, color 0.2s;
 }
 .profile-panel-close:hover {
-  background: rgba(218,165,32,0.18);
-  color: #daa520;
+  background: rgba(18, 8, 161,0.18);
+  color: #1208a1;
 }
 
 .profile-panel-body {
@@ -5157,9 +5353,9 @@ export default {
   height: 96px;
   border-radius: 50%;
   overflow: hidden;
-  background: rgba(218,165,32,0.1);
-  border: 3px solid #daa520;
-  box-shadow: 0 0 24px rgba(218,165,32,0.35);
+  background: rgba(18, 8, 161,0.1);
+  border: 3px solid #1208a1;
+  box-shadow: 0 0 24px rgba(18, 8, 161,0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5171,7 +5367,7 @@ export default {
 }
 .profile-big-icon {
   font-size: 44px;
-  color: #daa520;
+  color: #1208a1;
 }
 
 /* Info */
@@ -5191,7 +5387,7 @@ export default {
 }
 .profile-username {
   font-size: 0.85rem;
-  color: #daa520;
+  color: #1208a1;
   font-weight: 500;
 }
 .profile-email {
@@ -5205,18 +5401,18 @@ export default {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(218,165,32,0.1);
-  border: 1px solid rgba(218,165,32,0.3);
+  background: rgba(18, 8, 161,0.1);
+  border: 1px solid rgba(18, 8, 161,0.3);
   border-radius: 24px;
   padding: 6px 14px;
   font-size: 0.8rem;
-  color: #d4af37;
+  color: #1208a1;
   font-weight: 500;
   flex-wrap: wrap;
   justify-content: center;
 }
 .membership-role {
-  background: rgba(218,165,32,0.2);
+  background: rgba(18, 8, 161,0.2);
   border-radius: 10px;
   padding: 1px 8px;
   font-size: 0.72rem;
@@ -5398,11 +5594,11 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  background: #1208a1;
   color: #ffffff;
   padding: 4px 8px 4px 14px;
   border-radius: 30px;
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 24px rgba(18, 8, 161, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15);
   border: 1.5px solid rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -5437,7 +5633,7 @@ export default {
 
 .pill-icon {
   font-size: 1.1rem;
-  color: #ffd700;
+  color: #3b82f6;
   animation: bounceUp 1.2s infinite ease-in-out;
 }
 
@@ -5473,11 +5669,11 @@ export default {
 
 @keyframes noticeHighlight {
   0% {
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.6), 0 8px 24px rgba(37, 99, 235, 0.25);
+    box-shadow: 0 0 0 3px rgba(18, 8, 161, 0.6), 0 8px 24px rgba(18, 8, 161, 0.25);
     transform: translateY(-2px);
   }
   70% {
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 0 0 3px rgba(18, 8, 161, 0.3);
   }
   100% {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
@@ -5486,7 +5682,7 @@ export default {
 }
 
 .offline-notice-banner {
-  background: linear-gradient(135deg, #d4af37, #b8860b);
+  background: #1208a1;
   color: #000;
   padding: 10px 16px;
   font-size: 0.85rem;
@@ -5505,8 +5701,8 @@ export default {
 }
 
 .profile-details-card {
-  background: rgba(218, 165, 32, 0.08);
-  border: 1px solid rgba(218, 165, 32, 0.2);
+  background: rgba(18, 8, 161, 0.08);
+  border: 1px solid rgba(18, 8, 161, 0.2);
   border-radius: 12px;
   padding: 12px 16px;
   margin: 16px 0;
@@ -5533,8 +5729,8 @@ export default {
 }
 
 .role-value {
-  color: #b8860b;
-  background: rgba(218, 165, 32, 0.15);
+  color: #1208a1;
+  background: rgba(18, 8, 161, 0.15);
   padding: 3px 10px;
   border-radius: 8px;
   font-size: 0.78rem;
@@ -5559,21 +5755,21 @@ export default {
 }
 
 .pref-pin-badge:hover {
-  background: rgba(218, 165, 32, 0.18);
-  color: #b38209;
+  background: rgba(18, 8, 161, 0.18);
+  color: #1208a1;
 }
 
 .pref-pin-badge--active {
-  background: rgba(218, 165, 32, 0.22) !important;
-  color: #b38209 !important;
-  border: 1px solid rgba(218, 165, 32, 0.4) !important;
+  background: rgba(18, 8, 161, 0.22) !important;
+  color: #1208a1 !important;
+  border: 1px solid rgba(18, 8, 161, 0.4) !important;
   font-weight: 800 !important;
 }
 
 .pin-my-dept-btn {
-  background: rgba(218, 165, 32, 0.12);
-  border: 1px solid rgba(218, 165, 32, 0.35);
-  color: #b38209;
+  background: rgba(18, 8, 161, 0.12);
+  border: 1px solid rgba(18, 8, 161, 0.35);
+  color: #1208a1;
   font-size: 0.75rem;
   font-weight: 700;
   padding: 3px 10px;
@@ -5584,15 +5780,15 @@ export default {
 }
 
 .pin-my-dept-btn:hover {
-  background: rgba(218, 165, 32, 0.22);
+  background: rgba(18, 8, 161, 0.22);
   transform: translateY(-1px);
 }
 
 .pin-my-dept-btn--active {
-  background: linear-gradient(135deg, #d4af37, #ffd700);
+  background: #1208a1;
   color: #000;
   font-weight: 800;
-  border-color: #daa520;
+  border-color: #1208a1;
 }
 
 /* 📱 Mobile Department Selector Pills & Pin Controls */
@@ -5627,19 +5823,19 @@ export default {
 }
 
 .mobile-dept-pill:hover {
-  background: rgba(218, 165, 32, 0.1);
-  border-color: rgba(218, 165, 32, 0.4);
+  background: rgba(18, 8, 161, 0.1);
+  border-color: rgba(18, 8, 161, 0.4);
 }
 
 .mobile-dept-pill--active {
-  background: rgba(218, 165, 32, 0.15) !important;
-  border-color: #daa520 !important;
-  color: #b38209 !important;
+  background: rgba(18, 8, 161, 0.15) !important;
+  border-color: #1208a1 !important;
+  color: #1208a1 !important;
   font-weight: 800 !important;
 }
 
 .mobile-dept-pill--saved {
-  border-color: rgba(218, 165, 32, 0.6) !important;
+  border-color: rgba(18, 8, 161, 0.6) !important;
 }
 
 .mobile-pin-btn {
@@ -5654,7 +5850,7 @@ export default {
 }
 
 .mobile-pin-btn--saved {
-  background: #daa520 !important;
+  background: #1208a1 !important;
   color: #000 !important;
   font-weight: 800 !important;
 }
@@ -5667,13 +5863,13 @@ export default {
   justify-content: space-between;
   gap: 8px 12px;
   padding: 10px 14px;
-  background: rgba(218, 165, 32, 0.1);
-  border: 1.5px solid rgba(218, 165, 32, 0.35);
+  background: rgba(18, 8, 161, 0.1);
+  border: 1.5px solid rgba(18, 8, 161, 0.35);
   border-radius: 12px;
   margin: 10px 0 16px 0;
   font-size: 0.88rem;
   font-weight: 700;
-  color: #b38209;
+  color: #1208a1;
 }
 
 .active-dept-title-box {
@@ -5686,7 +5882,7 @@ export default {
 
 .active-dept-title-box ion-icon {
   font-size: 1.2rem;
-  color: #daa520;
+  color: #1208a1;
   flex-shrink: 0;
 }
 
@@ -5710,9 +5906,9 @@ export default {
   gap: 6px;
   padding: 6px 12px;
   border-radius: 20px;
-  border: 1.5px solid rgba(218, 165, 32, 0.5);
-  background: rgba(218, 165, 32, 0.12);
-  color: #b38209;
+  border: 1.5px solid rgba(18, 8, 161, 0.5);
+  background: rgba(18, 8, 161, 0.12);
+  color: #1208a1;
   font-size: 0.8rem;
   font-weight: 750;
   cursor: pointer;
@@ -5721,15 +5917,15 @@ export default {
 }
 
 .pin-my-dept-btn:hover {
-  background: rgba(218, 165, 32, 0.25);
+  background: rgba(18, 8, 161, 0.25);
 }
 
 .pin-my-dept-btn--active {
-  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  background: #1208a1 !important;
   color: #000000 !important;
   border-color: transparent !important;
   font-weight: 800 !important;
-  box-shadow: 0 2px 8px rgba(218, 165, 32, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(18, 8, 161, 0.3) !important;
 }
 
 .clear-dept-btn {
@@ -5750,12 +5946,16 @@ export default {
 .search-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
+  max-width: 100%;
+  padding: 10px 10px 4px 10px;
+  box-sizing: border-box;
 }
 
 .search-wrap {
   flex: 1;
+  min-width: 0;
 }
 
 .mobile-dept-dropdown-wrap {
@@ -5765,17 +5965,17 @@ export default {
 }
 
 .mobile-dept-select-box {
-  --background: rgba(218, 165, 32, 0.08);
+  --background: rgba(18, 8, 161, 0.08);
   --border-radius: 12px;
-  --padding-start: 10px;
-  --padding-end: 10px;
-  font-size: 0.82rem;
+  --padding-start: 8px;
+  --padding-end: 8px;
+  font-size: 0.78rem;
   font-weight: 700;
-  color: #b38209;
-  border: 1px solid rgba(218, 165, 32, 0.35);
+  color: #1208a1;
+  border: 1px solid rgba(18, 8, 161, 0.3);
   border-radius: 12px;
-  max-width: 155px;
-  height: 42px;
+  max-width: 110px;
+  height: 40px;
 }
 
 /* 🌙 DARK MODE OVERRIDES FOR NOTICE BOARD & APP */
@@ -5821,7 +6021,7 @@ body.dark .cat-pill {
 }
 
 body.dark .cat-pill--active {
-  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  background: #1208a1 !important;
   color: #000000 !important;
 }
 
@@ -5839,9 +6039,9 @@ body.dark .notice-detail-content {
   gap: 5px;
   padding: 5px 11px;
   border-radius: 18px;
-  border: 1.5px solid rgba(218, 165, 32, 0.4);
-  background: rgba(218, 165, 32, 0.08);
-  color: #b38209;
+  border: 1.5px solid rgba(18, 8, 161, 0.4);
+  background: rgba(18, 8, 161, 0.08);
+  color: #1208a1;
   font-size: 0.8rem;
   font-weight: 750;
   cursor: pointer;
@@ -5851,8 +6051,8 @@ body.dark .notice-detail-content {
 }
 
 .export-flyer-btn:hover {
-  background: rgba(218, 165, 32, 0.2);
-  border-color: #daa520;
+  background: rgba(18, 8, 161, 0.2);
+  border-color: #1208a1;
   transform: translateY(-1px);
 }
 
@@ -5861,9 +6061,9 @@ body.dark .notice-detail-content {
 }
 
 body.dark .export-flyer-btn {
-  background: rgba(218, 165, 32, 0.15);
-  color: #ffd700;
-  border-color: rgba(218, 165, 32, 0.45);
+  background: rgba(18, 8, 161, 0.15);
+  color: #3b82f6;
+  border-color: rgba(18, 8, 161, 0.45);
 }
 
 /* 🔗 One-Click Share Notice Button */
@@ -5907,9 +6107,9 @@ body.dark .share-notice-btn {
   gap: 5px;
   padding: 5px 11px;
   border-radius: 18px;
-  border: 1.5px solid rgba(59, 130, 246, 0.4);
-  background: rgba(59, 130, 246, 0.08);
-  color: #2563eb;
+  border: 1.5px solid rgba(18, 8, 161, 0.4);
+  background: rgba(18, 8, 161, 0.08);
+  color: #1208a1;
   font-size: 0.8rem;
   font-weight: 750;
   cursor: pointer;
@@ -5919,8 +6119,8 @@ body.dark .share-notice-btn {
 }
 
 .add-calendar-btn:hover {
-  background: rgba(59, 130, 246, 0.18);
-  border-color: #2563eb;
+  background: rgba(18, 8, 161, 0.18);
+  border-color: #1208a1;
   transform: translateY(-1px);
 }
 
@@ -5929,7 +6129,7 @@ body.dark .share-notice-btn {
 }
 
 body.dark .add-calendar-btn {
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(18, 8, 161, 0.15);
   color: #60a5fa;
   border-color: rgba(96, 165, 250, 0.4);
 }
@@ -5948,9 +6148,9 @@ body.dark .add-calendar-btn {
   gap: 6px;
   padding: 5px 12px;
   border-radius: 18px;
-  border: 1.5px solid rgba(218, 165, 32, 0.4);
-  background: rgba(218, 165, 32, 0.08);
-  color: #b38209;
+  border: 1.5px solid rgba(18, 8, 161, 0.4);
+  background: rgba(18, 8, 161, 0.08);
+  color: #1208a1;
   font-size: 0.8rem;
   font-weight: 750;
   cursor: pointer;
@@ -5959,23 +6159,23 @@ body.dark .add-calendar-btn {
 }
 
 .audio-reader-btn:hover {
-  background: rgba(218, 165, 32, 0.2);
-  border-color: #daa520;
+  background: rgba(18, 8, 161, 0.2);
+  border-color: #1208a1;
   transform: translateY(-1px);
 }
 
 .audio-reader-btn--active {
-  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  background: #1208a1 !important;
   color: #000000 !important;
   border-color: transparent !important;
-  box-shadow: 0 3px 12px rgba(218, 165, 32, 0.4) !important;
+  box-shadow: 0 3px 12px rgba(18, 8, 161, 0.4) !important;
   animation: audioPulse 1.5s infinite ease-in-out;
 }
 
 @keyframes audioPulse {
-  0% { box-shadow: 0 0 0 0 rgba(218, 165, 32, 0.6); }
-  70% { box-shadow: 0 0 0 8px rgba(218, 165, 32, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(218, 165, 32, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(18, 8, 161, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(18, 8, 161, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(18, 8, 161, 0); }
 }
 
 .audio-btn-icon {
@@ -5996,160 +6196,121 @@ body.dark .add-calendar-btn {
 }
 
 body.dark .audio-reader-btn {
-  background: rgba(218, 165, 32, 0.15);
-  color: #ffd700;
-  border-color: rgba(218, 165, 32, 0.45);
+  background: rgba(18, 8, 161, 0.15);
+  color: #3b82f6;
+  border-color: rgba(18, 8, 161, 0.45);
 }
 
 body.dark .audio-reader-btn--active {
-  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  background: #1208a1 !important;
   color: #000000 !important;
 }
 
-/* 🚨 Emergency Broadcast Marquee Ticker */
-.emergency-ticker-bar {
+/* 🚨 Sticky Urgent Notice Banner (NEXFi Feeds Style) */
+.urgent-ticker-banner {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
-  color: #ffffff;
-  padding: 8px 14px;
-  border-radius: 12px;
-  margin: 10px 14px 4px 14px;
-  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.3);
-  overflow: hidden;
-  position: relative;
-  z-index: 5;
-}
-
-.ticker-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(0, 0, 0, 0.25);
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 0.72rem;
-  font-weight: 850;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.ticker-pulse-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ffd700;
-  animation: tickerPulse 1.2s infinite alternate;
-}
-
-@keyframes tickerPulse {
-  0% { transform: scale(0.7); opacity: 0.6; }
-  100% { transform: scale(1.3); opacity: 1; }
-}
-
-.ticker-content-wrap {
-  flex: 1;
-  overflow: hidden;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.ticker-marquee-text {
-  display: inline-block;
-  font-size: 0.82rem;
-  font-weight: 600;
-  animation: marqueeAnim 18s linear infinite;
-}
-
-.ticker-marquee-text:hover {
-  animation-play-state: paused;
-}
-
-@keyframes marqueeAnim {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
-}
-
-.ticker-sep {
-  margin: 0 10px;
-  color: #ffd700;
-}
-
-.ticker-dismiss-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: #ffffff;
-  border-radius: 50%;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s;
-}
-
-.ticker-dismiss-btn:hover {
-  background: rgba(255, 255, 255, 0.4);
-}
-
-/* 👁️ Unread Notices Summary Bar */
-.unread-summary-bar {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  background: rgba(218, 165, 32, 0.1);
-  border: 1.5px solid rgba(218, 165, 32, 0.35);
-  border-radius: 12px;
+  align-items: center;
+  background: rgba(239, 68, 68, 0.08);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.15);
   padding: 8px 14px;
-  margin: 8px 14px 12px 14px;
-  font-size: 0.82rem;
-  color: #b38209;
+  cursor: pointer;
+  animation: urgentPulse 3s infinite ease-in-out;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  border-radius: 0;
+  transition: background-color 0.2s ease;
 }
 
-.unread-badge-box {
+.urgent-ticker-banner:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+@keyframes urgentPulse {
+  0% { background-color: rgba(239, 68, 68, 0.08); }
+  50% { background-color: rgba(239, 68, 68, 0.14); }
+  100% { background-color: rgba(239, 68, 68, 0.08); }
+}
+
+.ticker-inner {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  flex: 1;
 }
 
-.unread-pulse-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #daa520;
-  animation: unreadPulse 1.4s infinite ease-in-out;
-}
-
-@keyframes unreadPulse {
-  0% { box-shadow: 0 0 0 0 rgba(218, 165, 32, 0.6); }
-  70% { box-shadow: 0 0 0 6px rgba(218, 165, 32, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(218, 165, 32, 0); }
-}
-
-.mark-read-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: linear-gradient(135deg, #d4af37, #ffd700);
-  color: #000000;
-  border: none;
-  padding: 5px 11px;
-  border-radius: 16px;
-  font-size: 0.75rem;
-  font-weight: 800;
-  cursor: pointer;
-  transition: transform 0.15s;
+.ticker-icon {
+  font-size: 1.2rem;
+  color: #ef4444;
+  animation: flashIcon 1.2s infinite alternate ease-in-out;
   flex-shrink: 0;
 }
 
-.mark-read-btn:hover {
-  transform: scale(1.03);
+@keyframes flashIcon {
+  from { opacity: 0.7; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1.04); }
 }
+
+.ticker-text-container {
+  min-width: 0;
+  flex: 1;
+}
+
+.ticker-text {
+  font-size: 0.8rem;
+  font-weight: 750;
+  color: #b91c1c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+
+.ticker-right-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.ticker-arrow {
+  font-size: 1.1rem;
+  color: #ef4444;
+  opacity: 0.85;
+}
+
+.ticker-dismiss-btn {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  opacity: 0.6;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  font-size: 1.05rem;
+  transition: opacity 0.2s;
+}
+
+.ticker-dismiss-btn:hover {
+  opacity: 1;
+}
+
+body.dark .urgent-ticker-banner {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+body.dark .ticker-text {
+  color: #fca5a5 !important;
+}
+
 
 .new-unread-badge {
   background: linear-gradient(135deg, #10b981, #059669);
@@ -6181,11 +6342,7 @@ body.dark .audio-reader-btn--active {
   100% { transform: scale(1); opacity: 1; }
 }
 
-body.dark .unread-summary-bar {
-  background: rgba(218, 165, 32, 0.15) !important;
-  border-color: rgba(218, 165, 32, 0.4) !important;
-  color: #ffd700 !important;
-}
+
 
 /* 📱 Responsive Mobile Action Buttons: Hide text labels on small screens, show icons only */
 @media (max-width: 767px) {
@@ -6224,3 +6381,214 @@ body.dark .unread-summary-bar {
 
 
 
+
+
+/* 📱 Responsive Mobile Hardening: Prevent horizontal cutoff */
+ion-page,
+ion-content,
+.board-content,
+.board-desktop-grid,
+.feed-col {
+  max-width: 100vw !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 767px) {
+  .board-desktop-grid {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  .feed-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .notice-card {
+  font-family: Tahoma, 'Segoe UI', Geneva, Verdana, sans-serif !important;
+  background: #ffffff !important;
+  color: var(--ion-text-color, #1a1a1a);
+  border-radius: 16px;
+  padding: 0;
+  margin-bottom: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+  animation: cardIn 0.35s ease both;
+  animation-delay: var(--delay, 0ms);
+}
+
+  .notice-header {
+    padding: 12px 12px 0 12px !important;
+  }
+
+  .notice-body {
+    padding: 10px 12px 4px !important;
+  }
+
+  .notice-attachment-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 10px 14px;
+  transition: background 0.2s;
+}
+
+  .attach-filename {
+    max-width: 120px !important;
+  }
+
+  .notice-footer {
+    padding: 8px 10px 10px !important;
+  }
+}
+
+/* 🌙 DARK THEME GOLD / YELLOW STYLING OVERRIDES */
+body.dark .brand-word-left,
+body.dark .brand-word-right {
+  color: #ffd700 !important;
+}
+
+body.dark .header-admin-gear-btn {
+  color: #ffd700 !important;
+}
+
+body.dark .cat-pill:hover {
+  border-color: rgba(255, 215, 0, 0.4) !important;
+  color: #ffd700 !important;
+  background: rgba(255, 215, 0, 0.08) !important;
+}
+
+body.dark .cat-pill--active {
+  background: #ffd700 !important;
+  color: #000000 !important;
+  box-shadow: 0 3px 12px rgba(255, 215, 0, 0.35) !important;
+}
+
+body.dark .dept-pill--active {
+  background: #ffd700 !important;
+  color: #000000 !important;
+  box-shadow: 0 3px 10px rgba(255, 215, 0, 0.35) !important;
+}
+
+body.dark .pinned-bar {
+  color: #ffd700 !important;
+  background: rgba(255, 215, 0, 0.08) !important;
+  border-bottom-color: rgba(255, 215, 0, 0.2) !important;
+}
+
+body.dark .pinned-bar ion-icon {
+  color: #ffd700 !important;
+}
+
+body.dark .notice-text :deep(a),
+body.dark .notice-text :deep(.notice-link),
+body.dark .notice-text :deep(.post-link),
+body.dark :deep(a.notice-link),
+body.dark :deep(a.post-link) {
+  color: #ffd700 !important;
+  background: rgba(255, 215, 0, 0.12) !important;
+  border-bottom: 2px solid #ffd700 !important;
+}
+
+body.dark .mobile-dept-select-box {
+  background: rgba(255, 215, 0, 0.08) !important;
+  color: #ffd700 !important;
+  border-color: rgba(255, 215, 0, 0.35) !important;
+}
+
+body.dark .mobile-nav-btn--active {
+  color: #ffd700 !important;
+}
+
+body.dark .mobile-nav-btn--active ion-icon {
+  color: #ffd700 !important;
+}
+
+body.dark .mobile-post-nav-btn .post-icon-wrap {
+  background: #ffd700 !important;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4) !important;
+}
+
+body.dark .mobile-post-nav-btn .post-icon-wrap ion-icon {
+  color: #000000 !important;
+}
+
+body.dark .notice-post-btn {
+  background: #ffd700 !important;
+  color: #000000 !important;
+  box-shadow: 0 4px 20px rgba(255, 215, 0, 0.4) !important;
+}
+
+body.dark .notice-post-btn ion-icon {
+  color: #000000 !important;
+}
+
+body.dark .sidebar-post-btn {
+  --background: #ffd700 !important;
+  --color: #000000 !important;
+}
+
+body.dark .dept-nav-item--active {
+  background: rgba(255, 215, 0, 0.12) !important;
+  color: #ffd700 !important;
+}
+
+body.dark .dept-nav-item--active .dept-nav-count {
+  background: rgba(255, 215, 0, 0.2) !important;
+  color: #ffd700 !important;
+}
+
+body.dark .notice-searchbar {
+  --icon-color: #ffd700 !important;
+}
+
+body.dark .avatar-ring {
+  border-color: rgba(255, 215, 0, 0.4) !important;
+}
+
+body.dark .status-ring {
+  border-color: #ffd700 !important;
+}
+
+/* 🌙 Extra Dark Mode Link & Attachment Overrides */
+body.dark .attach-filename {
+  color: #f3f4f6 !important;
+}
+
+body.dark .notice-attachment-card {
+  background: #1e2430 !important;
+  border-color: #2f3336 !important;
+}
+
+body.dark .notice-attachment-card:hover {
+  background: #252d3d !important;
+  border-color: rgba(255, 215, 0, 0.4) !important;
+}
+
+body.dark .show-more-toggle,
+body.dark .notice-text :deep(.read-more),
+body.dark :deep(.read-more),
+body.dark .notice-text :deep(a),
+body.dark .notice-text :deep(.notice-link),
+body.dark .notice-text :deep(.post-link),
+body.dark :deep(a.notice-link),
+body.dark :deep(a.post-link),
+body.dark .hashtag,
+body.dark .mention {
+  color: #ffd700 !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-decoration: underline !important;
+}

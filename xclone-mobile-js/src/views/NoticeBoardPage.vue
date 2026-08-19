@@ -403,8 +403,8 @@ export default {
 
 .board-card:hover {
   transform: translateY(-4px);
-  border-color: #daa520;
-  box-shadow: 0 10px 24px rgba(218, 165, 32, 0.12);
+  border-color: #1208a1;
+  box-shadow: 0 10px 24px rgba(18, 8, 161, 0.12);
 }
 
 .board-header {
@@ -465,7 +465,7 @@ export default {
 
 .member-tag {
   font-size: 0.75rem;
-  background: rgba(255, 215, 0, 0.1);
+  background: rgba(18, 8, 161, 0.1);
   color: gold;
   padding: 4px 10px;
   border-radius: 10px;

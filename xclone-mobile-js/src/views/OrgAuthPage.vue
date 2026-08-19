@@ -386,7 +386,7 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 20px 16px;
-  background: radial-gradient(circle at top, rgba(218, 165, 32, 0.08) 0%, rgba(244, 245, 247, 1) 70%);
+  background: radial-gradient(circle at top, rgba(18, 8, 161, 0.08) 0%, rgba(244, 245, 247, 1) 70%);
 }
 
 .top-nav-bar {
@@ -406,14 +406,14 @@ export default {
   padding: 8px 14px;
   font-size: 0.82rem;
   font-weight: 700;
-  color: #c0921c;
+  color: #1208a1;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,0.03);
   transition: all 0.2s;
 }
 
 .back-link-btn:hover {
-  background: rgba(218,165,32,0.08);
+  background: rgba(18, 8, 161,0.08);
 }
 
 .org-auth-card {
@@ -423,7 +423,7 @@ export default {
   border-radius: 24px;
   padding: 32px 28px;
   box-shadow: 0 10px 36px rgba(0, 0, 0, 0.06);
-  border: 1.5px solid rgba(218, 165, 32, 0.15);
+  border: 1.5px solid rgba(18, 8, 161, 0.15);
 }
 
 .org-loader {
@@ -458,7 +458,7 @@ export default {
   border-radius: 20px;
   object-fit: cover;
   box-shadow: 0 6px 20px rgba(0,0,0,0.12);
-  border: 2px solid rgba(218,165,32,0.3);
+  border: 2px solid rgba(18, 8, 161,0.3);
   background: #fff;
 }
 
@@ -472,7 +472,7 @@ export default {
 
 .org-subtitle {
   font-size: 0.78rem;
-  color: #daa520;
+  color: #1208a1;
   font-weight: 700;
   margin: 0 0 10px 0;
   display: flex;
@@ -484,8 +484,8 @@ export default {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: rgba(218, 165, 32, 0.08);
-  color: #b38209;
+  background: rgba(18, 8, 161, 0.08);
+  color: #1208a1;
   font-size: 0.7rem;
   font-weight: 800;
   padding: 4px 12px;
@@ -518,7 +518,7 @@ export default {
 
 .mode-tab--active {
   background: #ffffff;
-  color: #b38209;
+  color: #1208a1;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
@@ -579,7 +579,7 @@ export default {
   position: absolute;
   left: 14px;
   font-size: 18px;
-  color: #daa520;
+  color: #1208a1;
   pointer-events: none;
 }
 
@@ -598,9 +598,9 @@ export default {
 }
 
 .custom-input:focus {
-  border-color: #daa520;
+  border-color: #1208a1;
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(218, 165, 32, 0.15);
+  box-shadow: 0 0 0 3px rgba(18, 8, 161, 0.15);
 }
 
 .eye-btn {
@@ -620,12 +620,12 @@ export default {
   height: 48px;
   border-radius: 14px;
   border: none;
-  background: linear-gradient(135deg, #d4af37, #ffd700);
+  background: #1208a1;
   color: #000;
   font-weight: 800;
   font-size: 0.95rem;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(218, 165, 32, 0.35);
+  box-shadow: 0 4px 16px rgba(18, 8, 161, 0.35);
   margin-top: 6px;
   display: flex;
   align-items: center;

@@ -19,18 +19,18 @@
   --ion-input-text: #111111;
 
   --ion-tab-bar-background: #ffffff;
-  --ion-tab-bar-hover: #daa520;
+  --ion-tab-bar-hover: #1208a1;
   --ion-border-color: #e5e7eb;
 
-  --ion-color-primary: #daa520;
-  --ion-color-primary-rgb: 218, 165, 32;
+  --ion-color-primary: #1208a1;
+  --ion-color-primary-rgb: 18, 8, 161;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade: #c0921c;
-  --ion-color-primary-tint: #deae36;
+  --ion-color-primary-shade: #0d0674;
+  --ion-color-primary-tint: #2a20b5;
 
-  --ion-color-secondary: #b8860b;
-  --ion-color-tertiary: #ffd700;
+  --ion-color-secondary: #1208a1;
+  --ion-color-tertiary: #1208a1;
   --ion-color-light: #f7f9f9;
 }
 
@@ -41,6 +41,15 @@ body.dark,
 body.dark-theme,
 .dark {
   color-scheme: dark;
+
+  --ion-color-primary: #ffd700;
+  --ion-color-primary-rgb: 255, 215, 0;
+  --ion-color-primary-contrast: #000000;
+  --ion-color-primary-contrast-rgb: 0, 0, 0;
+  --ion-color-primary-shade: #d4af37;
+  --ion-color-primary-tint: #ffea75;
+
+  --ion-tab-bar-hover: #ffd700;
 
   --ion-background-color: #0b0f14;
   --ion-background-color-rgb: 11, 15, 20;
@@ -219,12 +228,12 @@ body.dark .cat-pill {
 }
 
 body.dark .cat-pill:hover {
-  background: rgba(218, 165, 32, 0.2) !important;
-  color: #ffd700 !important;
+  background: rgba(18, 8, 161, 0.2) !important;
+  color: #3b82f6 !important;
 }
 
 body.dark .cat-pill--active {
-  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  background: #1208a1 !important;
   color: #000000 !important;
 }
 

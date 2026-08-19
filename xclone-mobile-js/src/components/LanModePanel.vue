@@ -831,8 +831,8 @@ export default {
   margin: 16px;
   border-radius: 18px;
   background: var(--ion-card-background, var(--ion-background-color, #ffffff));
-  border: 1.5px solid rgba(218, 165, 32, 0.4);
-  box-shadow: 0 4px 18px rgba(218, 165, 32, 0.12);
+  border: 1.5px solid rgba(18, 8, 161, 0.4);
+  box-shadow: 0 4px 18px rgba(18, 8, 161, 0.12);
   overflow: hidden;
   transition: all 0.3s ease;
 }
@@ -845,7 +845,7 @@ export default {
   padding: 14px 18px;
   cursor: pointer;
   user-select: none;
-  background: rgba(218, 165, 32, 0.06);
+  background: rgba(18, 8, 161, 0.06);
 }
 
 .lan-title-row {
@@ -859,13 +859,13 @@ export default {
 .lan-title {
   font-size: 15px;
   font-weight: 800;
-  color: #b8860b;
+  color: #1208a1;
   letter-spacing: 0.05em;
 }
 
 :global(body.dark) .lan-title,
 :global(.ion-palette-dark) .lan-title {
-  color: #ffd700;
+  color: #3b82f6;
 }
 
 .lan-live-badge {
@@ -898,8 +898,8 @@ export default {
 }
 
 .lan-toggle-track.active {
-  background: linear-gradient(135deg, #daa520, #b8860b);
-  border-color: #daa520;
+  background: #1208a1;
+  border-color: #1208a1;
 }
 
 .lan-toggle-thumb {
@@ -952,7 +952,7 @@ export default {
 .chip-value {
   font-size: 13px;
   font-weight: 700;
-  color: #b8860b;
+  color: #1208a1;
   font-variant-numeric: tabular-nums;
 }
 
@@ -963,7 +963,7 @@ export default {
 }
 
 .dot-live { background: #00c96b; box-shadow: 0 0 8px #00c96b; animation: livePulse 1.5s ease-in-out infinite; }
-.dot-ready { background: #daa520; box-shadow: 0 0 6px rgba(218,165,32,0.5); }
+.dot-ready { background: #1208a1; box-shadow: 0 0 6px rgba(18, 8, 161,0.5); }
 .dot-off { background: rgba(148, 163, 184, 0.4); }
 
 /* ── Peers List ───────────────────────────────── */
@@ -987,8 +987,8 @@ export default {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: rgba(218,165,32,0.2);
-  color: #b8860b;
+  background: rgba(18, 8, 161,0.2);
+  color: #1208a1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1025,12 +1025,12 @@ export default {
 }
 
 .lan-btn.primary {
-  background: linear-gradient(135deg, #daa520, #b8860b);
+  background: #1208a1;
   color: #000;
-  box-shadow: 0 4px 15px rgba(218,165,32,0.3);
+  box-shadow: 0 4px 15px rgba(18, 8, 161,0.3);
 }
 
-.lan-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(218,165,32,0.4); }
+.lan-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(18, 8, 161,0.4); }
 
 .lan-btn.secondary {
   background: var(--ion-color-light, rgba(0, 0, 0, 0.05));
@@ -1072,13 +1072,13 @@ export default {
   cursor: pointer;
   padding: 8px 12px;
   border-radius: 12px;
-  background: var(--ion-color-light, rgba(218, 165, 32, 0.08));
-  border: 1px dashed rgba(218, 165, 32, 0.4);
+  background: var(--ion-color-light, rgba(18, 8, 161, 0.08));
+  border: 1px dashed rgba(18, 8, 161, 0.4);
   transition: all 0.2s ease;
 }
 
 .lan-ip-chip.clickable:hover {
-  background: rgba(218, 165, 32, 0.15);
+  background: rgba(18, 8, 161, 0.15);
   border-style: solid;
 }
 
@@ -1092,15 +1092,15 @@ export default {
 .chip-edit-badge {
   font-size: 10px;
   font-weight: 700;
-  color: #b8860b;
-  background: rgba(218, 165, 32, 0.2);
+  color: #1208a1;
+  background: rgba(18, 8, 161, 0.2);
   padding: 2px 6px;
   border-radius: 6px;
 }
 
 .ip-editor-card {
   background: var(--ion-color-light, #f8fafc);
-  border: 1.5px solid rgba(218, 165, 32, 0.4);
+  border: 1.5px solid rgba(18, 8, 161, 0.4);
   border-radius: 14px;
   padding: 14px;
   display: flex;
@@ -1115,7 +1115,7 @@ export default {
   align-items: center;
   font-size: 13px;
   font-weight: 800;
-  color: #b8860b;
+  color: #1208a1;
 }
 
 .close-editor-btn {
@@ -1134,8 +1134,8 @@ export default {
 }
 
 .editor-hint code {
-  background: rgba(218, 165, 32, 0.15);
-  color: #b8860b;
+  background: rgba(18, 8, 161, 0.15);
+  color: #1208a1;
   padding: 2px 4px;
   border-radius: 4px;
 }
@@ -1159,8 +1159,8 @@ export default {
 }
 
 .ip-input-field:focus {
-  border-color: #daa520;
-  box-shadow: 0 0 0 2px rgba(218, 165, 32, 0.2);
+  border-color: #1208a1;
+  box-shadow: 0 0 0 2px rgba(18, 8, 161, 0.2);
 }
 
 .save-ip-btn {
@@ -1193,8 +1193,8 @@ export default {
 }
 
 .preset-chip:hover {
-  background: rgba(218, 165, 32, 0.2);
-  color: #b8860b;
+  background: rgba(18, 8, 161, 0.2);
+  color: #1208a1;
 }
 
 .preset-chip.auto-btn {
@@ -1239,7 +1239,7 @@ export default {
   background: rgba(0,0,0,0.3);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 8px;
-  color: #daa520;
+  color: #1208a1;
   font-family: monospace;
   font-size: 11px;
   padding: 8px;
@@ -1274,7 +1274,7 @@ export default {
 .scan-corners {
   width: 160px;
   height: 160px;
-  border: 2px solid #daa520;
+  border: 2px solid #1208a1;
   border-radius: 4px;
   box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
 }
@@ -1285,9 +1285,9 @@ export default {
   justify-content: center;
   padding: 16px 24px;
   border-radius: 14px;
-  background: rgba(218,165,32,0.1);
-  border: 2px dashed rgba(218,165,32,0.4);
-  color: #daa520;
+  background: rgba(18, 8, 161,0.1);
+  border: 2px dashed rgba(18, 8, 161,0.4);
+  color: #1208a1;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -1327,8 +1327,8 @@ export default {
 .lan-spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid rgba(218,165,32,0.2);
-  border-top-color: #daa520;
+  border: 3px solid rgba(18, 8, 161,0.2);
+  border-top-color: #1208a1;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -1341,7 +1341,7 @@ export default {
 .code-display {
   width: 100%;
   background: rgba(0,0,0,0.35);
-  border: 1px solid rgba(218,165,32,0.25);
+  border: 1px solid rgba(18, 8, 161,0.25);
   border-radius: 14px;
   padding: 14px;
   display: flex;
@@ -1353,7 +1353,7 @@ export default {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: rgba(218,165,32,0.7);
+  color: rgba(18, 8, 161,0.7);
   font-weight: 700;
 }
 
@@ -1369,15 +1369,15 @@ export default {
   line-height: 1.4;
 }
 
-.code-value:active { background: rgba(218,165,32,0.1); }
+.code-value:active { background: rgba(18, 8, 161,0.1); }
 
 .copy-btn {
   width: 100%;
   padding: 10px;
   border-radius: 10px;
-  background: linear-gradient(135deg, rgba(218,165,32,0.2), rgba(218,165,32,0.1));
-  border: 1px solid rgba(218,165,32,0.35);
-  color: #daa520;
+  background: linear-gradient(135deg, rgba(18, 8, 161,0.2), rgba(18, 8, 161,0.1));
+  border: 1px solid rgba(18, 8, 161,0.35);
+  color: #1208a1;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -1438,9 +1438,9 @@ export default {
   border-radius: 8px;
   font-size: 11px;
   font-weight: 700;
-  border: 1px solid rgba(218,165,32,0.4);
+  border: 1px solid rgba(18, 8, 161,0.4);
   background: transparent;
-  color: #daa520;
+  color: #1208a1;
   transition: all 0.2s;
 }
 
@@ -1493,8 +1493,8 @@ export default {
 }
 
 .scan-chip.scanning {
-  background: rgba(218,165,32,0.1);
-  color: #daa520;
+  background: rgba(18, 8, 161,0.1);
+  color: #1208a1;
   animation: livePulse 1.5s ease-in-out infinite;
 }
 

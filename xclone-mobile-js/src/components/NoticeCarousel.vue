@@ -150,12 +150,12 @@ export default {
     getBadgeStyle(cat) {
       const colors = {
         'Urgent': { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444' },
-        'Academic': { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6' },
+        'Academic': { bg: 'rgba(18, 8, 161, 0.15)', text: '#3b82f6' },
         'Finance': { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981' },
         'Events': { bg: 'rgba(139, 92, 246, 0.15)', text: '#8b5cf6' },
         'General': { bg: 'rgba(107, 114, 128, 0.15)', text: '#6b7280' }
       };
-      const match = colors[cat] || { bg: 'rgba(218, 165, 32, 0.15)', text: '#daa520' };
+      const match = colors[cat] || { bg: 'rgba(18, 8, 161, 0.15)', text: '#1208a1' };
       return {
         backgroundColor: match.bg,
         color: match.text
@@ -182,7 +182,7 @@ export default {
 }
 
 .banner-card {
-  background: linear-gradient(135deg, #ffffff 0%, rgba(218, 165, 32, 0.04) 100%);
+  background: linear-gradient(135deg, #ffffff 0%, rgba(18, 8, 161, 0.04) 100%);
   border-radius: 16px;
   padding: 16px;
   border: none !important; /* No border colors */
@@ -239,7 +239,7 @@ export default {
 .dept-pipe-name {
   font-size: 0.72rem;
   font-weight: 600;
-  color: #daa520;
+  color: #1208a1;
   opacity: 0.9;
 }
 
@@ -265,7 +265,7 @@ export default {
 
 .announcement-icon {
   font-size: 1.1rem;
-  color: #daa520;
+  color: #1208a1;
   flex-shrink: 0;
 }
 
@@ -306,7 +306,7 @@ export default {
   border: none;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #daa520;
+  color: #1208a1;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -317,7 +317,7 @@ export default {
 }
 
 .action-btn:hover {
-  background-color: rgba(218, 165, 32, 0.08);
+  background-color: rgba(18, 8, 161, 0.08);
 }
 
 /* Modal Styling */
@@ -448,8 +448,8 @@ export default {
 
 .attachment-box {
   margin-top: 24px;
-  background: rgba(218, 165, 32, 0.04);
-  border: 1px dashed rgba(218, 165, 32, 0.3);
+  background: rgba(18, 8, 161, 0.04);
+  border: 1px dashed rgba(18, 8, 161, 0.3);
   border-radius: 12px;
   padding: 14px 16px;
   display: flex;
@@ -460,8 +460,8 @@ export default {
 }
 
 .attachment-box:hover {
-  background-color: rgba(218, 165, 32, 0.08);
-  border-color: #daa520;
+  background-color: rgba(18, 8, 161, 0.08);
+  border-color: #1208a1;
 }
 
 .attachment-info {
@@ -472,7 +472,7 @@ export default {
 
 .attachment-icon {
   font-size: 1.5rem;
-  color: #daa520;
+  color: #1208a1;
 }
 
 .attachment-text {
@@ -493,6 +493,6 @@ export default {
 
 .attachment-arrow {
   font-size: 1.2rem;
-  color: #daa520;
+  color: #1208a1;
 }
 </style>

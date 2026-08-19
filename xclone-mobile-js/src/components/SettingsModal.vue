@@ -295,7 +295,7 @@
                 class="install-action-btn-link"
                 style="text-decoration: none;"
               >
-                <ion-button expand="block" class="install-action-btn pulse-glow" style="--background: linear-gradient(135deg, #3b82f6, #1d4ed8); --color: #ffffff;">
+                <ion-button expand="block" class="install-action-btn pulse-glow" style="--background: #1208a1; --color: #ffffff;">
                   <span style="margin-right: 8px; font-size: 1.1rem;"></span>
                   Install Directly on iPhone (OTA)
                 </ion-button>
@@ -805,11 +805,11 @@ export default {
   gap: 8px;
   font-size: 1.05rem;
   font-weight: 800;
-  color: #daa520;
+  color: #1208a1;
 }
 .header-icon {
   font-size: 1.2rem;
-  color: #daa520;
+  color: #1208a1;
 }
 
 .close-btn {
@@ -832,7 +832,7 @@ export default {
 
 .settings-card {
   background: var(--ion-card-background, #ffffff);
-  border: 1px solid rgba(218, 165, 32, 0.2);
+  border: 1px solid rgba(18, 8, 161, 0.2);
   border-radius: 16px;
   padding: 16px 18px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
@@ -847,7 +847,7 @@ export default {
 
 .section-icon {
   font-size: 1.4rem;
-  color: #daa520;
+  color: #1208a1;
   margin-top: 2px;
   flex-shrink: 0;
 }
@@ -878,8 +878,8 @@ export default {
   justify-content: center;
   gap: 8px;
   padding: 12px 14px;
-  background: rgba(218, 165, 32, 0.05);
-  border: 1.5px solid rgba(218, 165, 32, 0.2);
+  background: rgba(18, 8, 161, 0.05);
+  border: 1.5px solid rgba(18, 8, 161, 0.2);
   border-radius: 12px;
   cursor: pointer;
   font-size: 0.9rem;
@@ -889,10 +889,10 @@ export default {
 }
 
 .theme-chip--active {
-  background: rgba(218, 165, 32, 0.18);
-  border-color: #daa520;
-  color: #b38209;
-  box-shadow: 0 2px 8px rgba(218, 165, 32, 0.2);
+  background: rgba(18, 8, 161, 0.18);
+  border-color: #1208a1;
+  color: #1208a1;
+  box-shadow: 0 2px 8px rgba(18, 8, 161, 0.2);
 }
 
 /* Language List */
@@ -908,15 +908,15 @@ export default {
   gap: 12px;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1.5px solid rgba(218, 165, 32, 0.15);
-  background: rgba(218, 165, 32, 0.03);
+  border: 1.5px solid rgba(18, 8, 161, 0.15);
+  background: rgba(18, 8, 161, 0.03);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .lang-option--selected {
-  border-color: #daa520;
-  background: rgba(218, 165, 32, 0.12);
+  border-color: #1208a1;
+  background: rgba(18, 8, 161, 0.12);
 }
 
 .lang-flag-box {
@@ -942,7 +942,7 @@ export default {
 
 .check-icon {
   font-size: 1.3rem;
-  color: #daa520;
+  color: #1208a1;
 }
 
 .toggle-flex {
@@ -953,7 +953,7 @@ export default {
 }
 
 .done-btn {
-  --background: #daa520;
+  --background: #1208a1;
   --color: #000000;
   font-weight: 800;
   border-radius: 12px;
@@ -962,8 +962,8 @@ export default {
 
 /* 📱 Install App Section Styles */
 .install-card {
-  border-color: rgba(218, 165, 32, 0.35);
-  background: linear-gradient(180deg, rgba(218, 165, 32, 0.05) 0%, var(--ion-card-background, #ffffff) 100%);
+  border-color: rgba(18, 8, 161, 0.35);
+  background: linear-gradient(180deg, rgba(18, 8, 161, 0.05) 0%, var(--ion-card-background, #ffffff) 100%);
 }
 
 .install-tabs-grid {
@@ -980,8 +980,8 @@ export default {
   gap: 4px;
   padding: 10px 6px;
   border-radius: 12px;
-  border: 1.5px solid rgba(218, 165, 32, 0.2);
-  background: rgba(218, 165, 32, 0.05);
+  border: 1.5px solid rgba(18, 8, 161, 0.2);
+  background: rgba(18, 8, 161, 0.05);
   color: var(--ion-text-color, #374151);
   font-size: 0.78rem;
   font-weight: 700;
@@ -991,11 +991,11 @@ export default {
 }
 
 .install-tab--active {
-  background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+  background: #1208a1 !important;
   color: #000000 !important;
   border-color: transparent !important;
   font-weight: 800 !important;
-  box-shadow: 0 3px 10px rgba(218, 165, 32, 0.3);
+  box-shadow: 0 3px 10px rgba(18, 8, 161, 0.3);
 }
 
 .tab-emoji {
@@ -1034,10 +1034,10 @@ export default {
   flex-direction: column;
   gap: 6px;
   padding: 12px 16px;
-  background: rgba(218, 165, 32, 0.1);
+  background: rgba(18, 8, 161, 0.1);
   border-radius: 14px;
-  border: 1.5px solid rgba(218, 165, 32, 0.35);
-  box-shadow: 0 4px 12px rgba(218, 165, 32, 0.12);
+  border: 1.5px solid rgba(18, 8, 161, 0.35);
+  box-shadow: 0 4px 12px rgba(18, 8, 161, 0.12);
 }
 
 .install-progress-wrap {
@@ -1055,7 +1055,7 @@ export default {
 }
 
 .progress-pct {
-  color: #daa520;
+  color: #1208a1;
   font-size: 0.95rem;
 }
 
@@ -1097,7 +1097,7 @@ export default {
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #d4af37, #ffd700, #f59e0b);
+  background: #1208a1;
   background-size: 200% 100%;
   animation: gradientMove 2s infinite linear;
   border-radius: 10px;
@@ -1121,8 +1121,8 @@ export default {
 }
 
 .manual-install-card {
-  background: rgba(218, 165, 32, 0.06);
-  border: 1px dashed rgba(218, 165, 32, 0.4);
+  background: rgba(18, 8, 161, 0.06);
+  border: 1px dashed rgba(18, 8, 161, 0.4);
   border-radius: 12px;
   padding: 12px 14px;
 }
@@ -1162,9 +1162,9 @@ export default {
 }
 
 .success-badge {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.3);
-  color: #2563eb;
+  background: rgba(18, 8, 161, 0.12);
+  border-color: rgba(18, 8, 161, 0.3);
+  color: #1208a1;
 }
 
 .pulse-glow {
@@ -1172,9 +1172,9 @@ export default {
 }
 
 @keyframes pulseGlow {
-  0% { box-shadow: 0 0 0 0 rgba(218, 165, 32, 0.5); }
-  70% { box-shadow: 0 0 0 10px rgba(218, 165, 32, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(218, 165, 32, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(18, 8, 161, 0.5); }
+  70% { box-shadow: 0 0 0 10px rgba(18, 8, 161, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(18, 8, 161, 0); }
 }
 
 .btn-group-flex {
@@ -1191,7 +1191,7 @@ export default {
 }
 
 .install-action-btn {
-  --background: linear-gradient(135deg, #d4af37, #ffd700);
+  --background: #1208a1;
   --color: #000000;
   font-weight: 800;
   border-radius: 12px;
@@ -1210,20 +1210,20 @@ export default {
 }
 
 .ios-action-btn {
-  --border-color: #daa520;
-  --color: #daa520;
+  --border-color: #1208a1;
+  --color: #1208a1;
   font-weight: 700;
   border-radius: 12px;
 }
 
 .pwa-btn {
-  --background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  --background: #1208a1;
   --color: #ffffff;
 }
 
 .pwa-status-msg {
   font-size: 0.8rem;
-  color: #b38209;
+  color: #1208a1;
   margin: 4px 0 0 0;
   text-align: center;
   font-weight: 600;
@@ -1238,7 +1238,7 @@ export default {
 }
 
 body.dark .install-card {
-  background: linear-gradient(180deg, rgba(218, 165, 32, 0.1) 0%, #16181c 100%) !important;
+  background: linear-gradient(180deg, rgba(18, 8, 161, 0.1) 0%, #16181c 100%) !important;
 }
 
 body.dark .install-info-box {
