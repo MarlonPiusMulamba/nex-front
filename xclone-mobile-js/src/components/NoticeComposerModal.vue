@@ -59,7 +59,8 @@
           </div>
         </transition>
 
-        <ion-item class="custom-item" v-if="departments.length > 0">
+        <!-- Admin: Can pick any target department or All Members -->
+        <ion-item class="custom-item" v-if="isAdmin && departments.length > 0">
           <ion-label position="stacked">Target Department</ion-label>
           <ion-select v-model="formData.dept_id" interface="popover">
             <ion-select-option :value="null">All Members</ion-select-option>
@@ -67,6 +68,22 @@
               {{ dept.name }}
             </ion-select-option>
           </ion-select>
+        </ion-item>
+
+        <!-- Department Manager with MULTIPLE managed departments: Select between their departments -->
+        <ion-item class="custom-item" v-else-if="managedDepartments.length > 1">
+          <ion-label position="stacked">Posting Department</ion-label>
+          <ion-select v-model="formData.dept_id" interface="popover">
+            <ion-select-option v-for="dept in managedDepartments" :key="dept.id" :value="dept.id">
+              {{ dept.name }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+
+        <!-- Department Manager with SINGLE managed department: Locked to that department -->
+        <ion-item class="custom-item" v-else-if="managedDepartments.length === 1">
+          <ion-label position="stacked">Posting Department</ion-label>
+          <ion-input :value="assignedDeptName || 'Assigned Department'" readonly disabled></ion-input>
         </ion-item>
 
         <div class="formatting-toolbar-row">
@@ -205,6 +222,29 @@ export default {
     },
     isEditMode() {
       return !!this.noticeToEdit;
+    },
+    managedDeptIds() {
+      if (Array.isArray(this.membership?.managed_dept_ids) && this.membership.managed_dept_ids.length > 0) {
+        return this.membership.managed_dept_ids.map(Number);
+      }
+      if (this.membership?.dept_id) {
+        return [Number(this.membership.dept_id)];
+      }
+      return [];
+    },
+    managedDepartments() {
+      const ids = this.managedDeptIds;
+      return (this.departments || []).filter(d => ids.includes(Number(d.id)));
+    },
+    assignedDeptName() {
+      if (this.managedDepartments.length === 1) {
+        return this.managedDepartments[0].name;
+      }
+      if (this.membership?.dept_id) {
+        const d = (this.departments || []).find(x => String(x.id) === String(this.membership.dept_id));
+        return d ? d.name : null;
+      }
+      return null;
     }
   },
   watch: {
@@ -228,11 +268,22 @@ export default {
   },
   methods: {
     populateForEdit(notice) {
+      let defaultDeptId = null;
+      if (this.isAdmin) {
+        defaultDeptId = notice.dept_id || null;
+      } else {
+        const validIds = this.managedDeptIds;
+        if (notice.dept_id && validIds.includes(Number(notice.dept_id))) {
+          defaultDeptId = notice.dept_id;
+        } else {
+          defaultDeptId = validIds[0] || null;
+        }
+      }
       this.formData = {
         title: notice.title || '',
         body: notice.body || '',
         category: notice.category || 'General',
-        dept_id: notice.dept_id || null,
+        dept_id: defaultDeptId,
         is_pinned: !!notice.is_pinned,
         urgent_duration: '24h',
         custom_expires_at: notice.expires_at || ''
@@ -326,7 +377,18 @@ export default {
         payload.append('body', this.formData.body);
         payload.append('category', this.formData.category);
         payload.append('is_pinned', this.formData.is_pinned);
-        if (this.formData.dept_id) payload.append('dept_id', this.formData.dept_id);
+        let effectiveDeptId = null;
+        if (this.isAdmin) {
+          effectiveDeptId = this.formData.dept_id;
+        } else {
+          const validIds = this.managedDeptIds;
+          if (this.formData.dept_id && validIds.includes(Number(this.formData.dept_id))) {
+            effectiveDeptId = this.formData.dept_id;
+          } else {
+            effectiveDeptId = validIds[0] || null;
+          }
+        }
+        if (effectiveDeptId) payload.append('dept_id', effectiveDeptId);
 
         // 🚨 Compute Urgent Expiry Timestamp
         let calculatedExpiresAt = null;
@@ -400,11 +462,12 @@ export default {
       this.imageFiles = [];
       this.imagePreviews = [];
       this.pdfFile = null;
+      const defaultDeptId = this.isAdmin ? null : (this.managedDeptIds[0] || null);
       this.formData = {
         title: '',
         body: '',
         category: 'General',
-        dept_id: null,
+        dept_id: defaultDeptId,
         is_pinned: false,
         urgent_duration: '24h',
         custom_expires_at: ''

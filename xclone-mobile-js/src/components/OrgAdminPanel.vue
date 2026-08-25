@@ -209,7 +209,22 @@
                       </ion-select>
                     </div>
 
-                    <div class="edit-field-group">
+                    <div class="edit-field-group" v-if="editRole === 'dept_manager'">
+                      <label class="edit-label">Assigned Departments (Select multiple)</label>
+                      <ion-select
+                        v-model="editDeptIds"
+                        :multiple="true"
+                        interface="alert"
+                        placeholder="Choose Departments"
+                        class="edit-select"
+                      >
+                        <ion-select-option v-for="d in departments" :key="d.id" :value="d.id">
+                          {{ d.name }}
+                        </ion-select-option>
+                      </ion-select>
+                    </div>
+
+                    <div class="edit-field-group" v-else>
                       <label class="edit-label">Department</label>
                       <ion-select
                         v-model="editDeptId"
@@ -436,6 +451,7 @@ export default {
       editingId: null,
       editRole: null,
       editDeptId: null,
+      editDeptIds: [],
       savingId: null,
 
       userId: localStorage.getItem('userId'),
@@ -447,14 +463,16 @@ export default {
     membersGroupedByDept() {
       const groups = {};
       this.members.forEach(m => {
-        const key = m.dept_name || '__none__';
-        const label = m.dept_name || 'General / No Department';
+        const key = m.role === 'org_admin' ? '__admin__' : (this.getMemberDeptDisplay(m));
+        const label = m.role === 'org_admin' ? 'Administrators' : (this.getMemberDeptDisplay(m));
         if (!groups[key]) groups[key] = { label, members: [] };
         groups[key].members.push(m);
       });
       return Object.values(groups).sort((a, b) => {
-        if (a.label === 'General / No Department') return 1;
-        if (b.label === 'General / No Department') return -1;
+        if (a.label === 'Administrators') return -1;
+        if (b.label === 'Administrators') return 1;
+        if (a.label.includes('General / No Department')) return 1;
+        if (b.label.includes('General / No Department')) return -1;
         return a.label.localeCompare(b.label);
       });
     }
@@ -477,6 +495,16 @@ export default {
     }
   },
   methods: {
+    getMemberDeptDisplay(member) {
+      if (member.role === 'org_admin') return 'Administrators';
+      if (Array.isArray(member.managed_dept_ids) && member.managed_dept_ids.length > 0) {
+        const names = (this.departments || [])
+          .filter(d => member.managed_dept_ids.includes(d.id))
+          .map(d => d.name);
+        if (names.length > 0) return names.join(', ');
+      }
+      return member.dept_name || 'General / No Department';
+    },
     async loadAll() {
       this.fetchRequests();
       this.fetchMembers();
@@ -541,18 +569,25 @@ export default {
         this.editingId = member.user_id;
         this.editRole = member.role;
         this.editDeptId = member.dept_id || null;
+        this.editDeptIds = Array.isArray(member.managed_dept_ids) && member.managed_dept_ids.length > 0
+          ? [...member.managed_dept_ids]
+          : (member.dept_id ? [member.dept_id] : []);
       }
     },
     async saveRoleAndDept(targetUserId) {
       this.savingId = targetUserId;
       try {
-        // Build body — only include dept_id if it's actually set (avoid sending null if backend FK rejects it)
         const body = {
           user_id: this.userId,
           role: this.editRole
         };
-        // Always send dept_id (null means 'remove from dept'), backend handles it
-        body.dept_id = this.editDeptId !== undefined ? this.editDeptId : null;
+        if (this.editRole === 'dept_manager') {
+          body.dept_ids = this.editDeptIds;
+          body.dept_id = this.editDeptIds.length > 0 ? this.editDeptIds[0] : null;
+        } else {
+          body.dept_id = this.editDeptId !== undefined ? this.editDeptId : null;
+          body.dept_ids = body.dept_id ? [body.dept_id] : [];
+        }
 
         console.log('[OrgAdminPanel] PATCH role/dept body:', body, 'target:', targetUserId);
 
@@ -568,9 +603,12 @@ export default {
           const m = this.members.find(x => Number(x.user_id) === Number(targetUserId));
           if (m) {
             m.role = this.editRole;
-            m.dept_id = this.editDeptId;
-            const dept = this.departments.find(d => d.id === this.editDeptId);
-            m.dept_name = dept ? dept.name : null;
+            m.dept_id = body.dept_id;
+            m.managed_dept_ids = body.dept_ids;
+            const deptNames = (this.departments || [])
+              .filter(d => (body.dept_ids || []).includes(d.id))
+              .map(d => d.name);
+            m.dept_name = deptNames.join(', ') || null;
           }
           this.editingId = null;
           this.showToast('Role & department updated!', 'success');
