@@ -110,8 +110,10 @@ export default {
       }
     });
     
-    // Initialize notification service for all users (logged-in or guest)
-    const userId = localStorage.getItem('userId') || '1';
+    // Initialize notification service only for authenticated users.
+    // Guests must never register push tokens (previously fell back to '1',
+    // which routed another user's DMs to logged-out devices).
+    const userId = localStorage.getItem('userId');
     try {
       await notificationService.initialize(userId);
       console.log('✓ Notification service initialized');

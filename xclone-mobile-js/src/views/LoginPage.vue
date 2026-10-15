@@ -330,7 +330,11 @@ export default {
         if (data.success) {
           localStorage.setItem('userId', data.user_id);
           localStorage.setItem('username', data.username);
-          
+
+          try {
+            window.dispatchEvent(new CustomEvent('user:login', { detail: { userId: data.user_id } }));
+          } catch (_) {}
+
           if (notificationService && notificationService.initialize) {
             notificationService.initialize(data.user_id).catch(e => console.warn('Notif init warning:', e));
           }

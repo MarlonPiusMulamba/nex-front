@@ -348,8 +348,9 @@ export default {
       this.$router.push('/tabs/profile');
     },
 
-    logout() {
+    async logout() {
       if (confirm('Are you sure you want to logout?')) {
+        try { await notificationService.handleLogout(); } catch (_) {}
         localStorage.removeItem('userId');
         localStorage.removeItem('username');
         localStorage.removeItem('userAvatar');

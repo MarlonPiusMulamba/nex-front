@@ -17,6 +17,7 @@ import VideoFeedPage from '../views/VideoFeedPage.vue';
 import NoticeBoardPage from '../views/NoticeBoardPage.vue';
 import OrgBoardPage from '../views/OrgBoardPage.vue';
 import OrgAuthPage from '../views/OrgAuthPage.vue';
+import TalkRoomView from '../views/TalkRoomView.vue';
 
 const standaloneOrg = (import.meta.env.VITE_STANDALONE_ORG || '').trim() || null;
 
@@ -60,6 +61,12 @@ const routes = [
   {
     path: '/notices/:slug',
     component: OrgBoardPage,
+    meta: { requiresAuth: false }
+  },
+  {
+    // Standalone meeting room: shareable link, guest-friendly, no tabs/feed
+    path: '/talk/:code',
+    component: TalkRoomView,
     meta: { requiresAuth: false }
   },
   {
@@ -167,8 +174,9 @@ router.beforeEach((to, from, next) => {
 
   if (standaloneOrg || isStandaloneMode()) {
     // In standalone mode, only allow the org notice board and its login/register pages
+    // plus standalone meeting rooms (shared talk links must open anywhere).
     const org = noticeSlug();
-    const allowedPrefixes = [`/notices/${org}`, `/tabs/notices/${org}`];
+    const allowedPrefixes = [`/notices/${org}`, `/tabs/notices/${org}`, '/talk/'];
     const isAllowed = allowedPrefixes.some(p => to.path.startsWith(p));
     if (!isAllowed) {
       return next(`/notices/${org}`);

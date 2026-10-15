@@ -122,8 +122,10 @@ try {
   app.config.globalProperties.$socketService = socketService;
   window.socketService = socketService;
 
-  // Auto-connect socket for real-time updates & notifications
-  const userId = localStorage.getItem('userId') || '1';
+  // Auto-connect socket for real-time updates & notifications.
+  // Guests connect unauthenticated (no personal room); the server ignores
+  // empty ids, so they only get public broadcasts until they log in.
+  const userId = localStorage.getItem('userId');
   socketService.connect(userId);
   window.appSocket = socketService.socket;
 

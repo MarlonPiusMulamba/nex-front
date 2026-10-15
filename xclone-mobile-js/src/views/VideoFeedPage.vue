@@ -80,7 +80,7 @@
                   <ion-icon v-else-if="video.verification_tier === 'gold'" :icon="star" class="badge-icon gold"></ion-icon>
                 </span>
               </span>
-              <span class="author-handle">@{{ video.username || 'user' }}</span>
+              <span class="author-handle">@{{ video.username || 'user' }} · {{ formatVideoTime(video.timestamp) }}</span>
             </div>
           </div>
           <div class="video-caption" v-if="video.content">{{ video.content }}</div>
@@ -266,13 +266,20 @@ export default {
           params: { user_id: this.userId || 0, limit: 20, offset: 0 }
         });
 
-        let feedVideos = (res.data.videos || []).map(v => {
+        let feedVideos = this.dedupeVideos((res.data.videos || []).map(v => {
           v.post_id = String(v.post_id);
           return v;
-        });
+        }));
 
         if (seedPost) {
-          this.videos = [seedPost, ...feedVideos.filter(v => String(v.post_id) !== String(startPostId))];
+          seedPost.post_id = String(seedPost.post_id);
+          const seedHasVideo = (seedPost.media || []).some(m => m && m.type === 'video' && m.data);
+          if (seedHasVideo && String(seedPost.post_id) !== '') {
+            const seedKey = this.getMediaKey(seedPost);
+            this.videos = [seedPost, ...feedVideos.filter(v => String(v.post_id) !== String(startPostId) && this.getMediaKey(v) !== seedKey)];
+          } else {
+            this.videos = feedVideos;
+          }
         } else {
           this.videos = feedVideos;
         }
@@ -437,7 +444,8 @@ export default {
     },
 
     togglePlay(index) {
-      const video = this.videoRefs[index];
+      const postId = this.resolvePostId(index);
+      const video = postId ? this.videoRefs[postId] : null;
       if (!video) return;
 
       if (video.paused) {
@@ -459,7 +467,8 @@ export default {
     },
 
     onVideoMeta(index) {
-      const video = this.videoRefs[index];
+      const postId = this.resolvePostId(index);
+      const video = postId ? this.videoRefs[postId] : null;
       if (video) {
         this.videoDurations[index] = video.duration || 0;
       }
@@ -468,7 +477,8 @@ export default {
     startProgressTracking() {
       if (this._progressInterval) clearInterval(this._progressInterval);
       this._progressInterval = setInterval(() => {
-        const video = this.videoRefs[this.currentIndex];
+        const current = this.videos[this.currentIndex];
+        const video = current ? this.videoRefs[String(current.post_id)] : null;
         if (video) {
           this.videoCurrentTimes[this.currentIndex] = video.currentTime;
         }
@@ -516,7 +526,8 @@ export default {
     },
 
     onVideoError(index, event) {
-      const video = this.videoRefs[index];
+      const postId = this.resolvePostId(index);
+      const video = postId ? this.videoRefs[postId] : null;
       const post = this.videos[index];
       console.error(`❌ Video error at index ${index}:`, {
         src: video?.src?.substring(0, 100),
@@ -550,17 +561,27 @@ export default {
         const res = await axios.get(`${this.API_URL}/api/videos`, {
           params: { user_id: this.userId || 0, limit: 20, offset: this.offset }
         });
-        const newVideos = res.data.videos || [];
-        const prevLen = this.videos.length;
+        const rawNew = (res.data.videos || []).map(v => {
+          v.post_id = String(v.post_id);
+          return v;
+        });
+        const existingIds = new Set(this.videos.map(v => String(v.post_id)));
+        const existingKeys = new Set(this.videos.map(v => this.getMediaKey(v)));
+        const newVideos = rawNew.filter(v => {
+          if (existingIds.has(String(v.post_id))) return false;
+          const key = this.getMediaKey(v);
+          if (key && existingKeys.has(key)) return false;
+          if (key) existingKeys.add(key);
+          return (v.media || []).some(m => m && m.type === 'video' && m.data);
+        });
         this.videos.push(...newVideos);
-        this.offset += newVideos.length;
-        this.hasMore = newVideos.length >= 20;
+        this.offset += rawNew.length;
+        this.hasMore = rawNew.length >= 20;
 
         await this.$nextTick();
-        // Observe new slides (src binding is handled reactively by template)
-        newVideos.forEach((video, i) => {
-          const index = prevLen + i;
-          const slide = this.slideRefs[index];
+        // Observe new slides (slideRefs are keyed by post_id)
+        newVideos.forEach((video) => {
+          const slide = this.slideRefs[String(video.post_id)];
           if (slide && this.observer) this.observer.observe(slide);
         });
       } catch (e) {
@@ -623,7 +644,8 @@ export default {
     },
 
     getVideoSrc(video) {
-      const item = video.media?.[0];
+      const media = video.media || [];
+      const item = media.find(m => m && m.type === 'video' && m.data) || media[0];
       if (!item) return '';
       const src = item.data || '';
       if (!src) return '';
@@ -631,6 +653,31 @@ export default {
       if (src.startsWith('/static/')) return `${this.API_URL}${src}`;
       if (src.startsWith('data:')) return src;
       return '';
+    },
+
+    getMediaKey(video) {
+      const src = this.getVideoSrc(video);
+      return src.split('?')[0].trim().toLowerCase();
+    },
+
+    dedupeVideos(list) {
+      const seen = new Set();
+      return (list || []).filter(v => {
+        const hasVideo = (v.media || []).some(m => m && m.type === 'video' && m.data);
+        if (!hasVideo) return false;
+        const key = this.getMediaKey(v);
+        if (key && seen.has(key)) return false;
+        if (key) seen.add(key);
+        return true;
+      });
+    },
+
+    resolvePostId(indexOrId) {
+      if (indexOrId === null || indexOrId === undefined) return null;
+      const byId = this.videoRefs[String(indexOrId)];
+      if (byId) return String(indexOrId);
+      const v = this.videos[indexOrId];
+      return v ? String(v.post_id) : null;
     },
 
     getImageUrl(imageData) {
@@ -650,6 +697,18 @@ export default {
       if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
       if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
       return String(n);
+    },
+
+    formatVideoTime(ts) {
+      if (!ts) return '';
+      const t = new Date(ts).getTime();
+      if (isNaN(t)) return '';
+      const s = Math.floor((Date.now() - t) / 1000);
+      if (s < 60) return 'just now';
+      if (s < 3600) return `${Math.floor(s / 60)}m`;
+      if (s < 86400) return `${Math.floor(s / 3600)}h`;
+      if (s < 86400 * 7) return `${Math.floor(s / 86400)}d`;
+      return new Date(t).toLocaleDateString();
     }
   }
 };

@@ -11,8 +11,16 @@
 
       <!-- Video/Audio Player -->
       <div class="player-container">
+        <iframe
+          v-if="youtubeId"
+          :src="`https://www.youtube.com/embed/${youtubeId}`"
+          class="youtube-player"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+        ></iframe>
         <video
-          v-if="isVideo"
+          v-else-if="isVideo"
           ref="videoPlayer"
           :src="recordingUrl"
           controls
@@ -90,9 +98,16 @@ const recordingUrl = computed(() => {
 });
 
 const isVideo = computed(() => {
+  if (youtubeId.value) return false;
   return recordingUrl.value.endsWith('.webm') || 
          recordingUrl.value.endsWith('.mp4') || 
          recordingUrl.value.endsWith('.mov');
+});
+
+const youtubeId = computed(() => {
+  const url = props.space.recording_url || '';
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
 });
 
 const closeModal = () => {
@@ -178,6 +193,15 @@ watch(() => props.isOpen, (newVal) => {
   max-width: 100%;
   max-height: 100%;
   border-radius: 8px;
+}
+
+.youtube-player {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 100%;
+  border: none;
+  border-radius: 8px;
+  background: #000;
 }
 
 .audio-player {

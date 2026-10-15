@@ -96,6 +96,40 @@
         <p class="loading-text">Loading Bugema Notice Board...</p>
       </div>
 
+      <!-- Domain Verification Pending State -->
+      <div v-else-if="pendingVerification" class="locked-state" style="padding: 60px 20px; text-align: center;">
+        <div class="lock-visual">
+          <div class="lock-circle" style="background: rgba(255, 215, 0, 0.15); border-color: rgba(255, 215, 0, 0.4);">
+            <ion-icon :icon="globeOutline" class="lock-icon" style="color: #ffd700;"></ion-icon>
+          </div>
+        </div>
+        <h2 class="locked-title" style="color: #ffd700;">DNS Verification Pending</h2>
+        <p class="locked-desc">
+          This notice board (<strong>{{ pendingOrg?.official_domain || $route.params.slug }}</strong>) is not active because domain DNS ownership has not been verified yet.
+        </p>
+        <div class="action-box">
+          <ion-button @click="$router.push('/tabs/notices')" class="join-btn" style="--background: #ffd700; --color: #000; font-weight: 800;">
+            Back to Notice Boards Directory
+          </ion-button>
+        </div>
+      </div>
+
+      <!-- Board Not Found State -->
+      <div v-else-if="boardNotFound" class="locked-state" style="padding: 60px 20px; text-align: center;">
+        <div class="lock-visual">
+          <div class="lock-circle" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4);">
+            <ion-icon :icon="alertCircleOutline" class="lock-icon" style="color: #ef4444;"></ion-icon>
+          </div>
+        </div>
+        <h2 class="locked-title" style="color: #ef4444;">Notice Board Not Found</h2>
+        <p class="locked-desc">{{ errorMessage || 'This notice board does not exist or has been removed.' }}</p>
+        <div class="action-box">
+          <ion-button @click="$router.push('/tabs/notices')" class="join-btn" style="--background: #ffd700; --color: #000; font-weight: 800;">
+            Back to Notice Boards Directory
+          </ion-button>
+        </div>
+      </div>
+
       <!-- Connection Error / Failed to Load State -->
       <div v-else-if="!org" class="locked-state" style="padding: 60px 20px; text-align: center;">
         <div class="lock-visual">
@@ -104,10 +138,10 @@
             <ion-icon :icon="cloudOfflineOutline" class="lock-icon" style="color: #ef4444;"></ion-icon>
           </div>
         </div>
-        <h2 class="locked-title" style="color: #ef4444;">Oops! Internet Connection Needed 📶</h2>
-        <p class="locked-desc">Oops! Please check your internet connection and try again.</p>
+        <h2 class="locked-title" style="color: #ef4444;">Oops! Notice Board Unavailable</h2>
+        <p class="locked-desc">{{ errorMessage || 'Could not load this notice board. Please check your connection and try again.' }}</p>
         <div class="action-box">
-          <ion-button @click="loadAll" class="join-btn" style="--background: #1208a1; --color: #000; font-weight: 800;">
+          <ion-button @click="loadAll" class="join-btn" style="--background: #ffd700; --color: #000; font-weight: 800;">
             <ion-icon :icon="refresh" slot="start"></ion-icon>
             Retry Connection
           </ion-button>
@@ -958,7 +992,7 @@ import {
 } from 'ionicons/icons';
 import api from '@/utils/api.js';
 import config from '@/config';
-import { saveBoardOffline, getOfflineBoard } from '@/utils/offlineDb.js';
+import { saveBoardOffline, getOfflineBoard, deleteOfflineBoard } from '@/utils/offlineDb.js';
 import notificationService from '@/utils/notificationService.js';
 import { i18nState, t } from '@/utils/i18n.js';
 import { translateNotice } from '@/utils/translationService.js';
@@ -1039,6 +1073,9 @@ export default {
       originalFavicon: null,
       originalTitle: '',
       errorMessage: null,
+      boardNotFound: false,
+      pendingVerification: false,
+      pendingOrg: null,
       _pollInterval: null,
       _lastKnownNoticeId: null,
       expandedNotices: {},
@@ -2305,6 +2342,9 @@ export default {
     async loadAll() {
       this.loading = true;
       this.errorMessage = null;
+      this.boardNotFound = false;
+      this.pendingVerification = false;
+      this.pendingOrg = null;
       const slug = this.$route?.params?.slug || import.meta.env.VITE_STANDALONE_ORG || 'bugema';
       const savedLastVisit = localStorage.getItem('last_visit_' + slug);
       this.lastVisitTimestamp = savedLastVisit ? Number(savedLastVisit) : null;
@@ -2351,6 +2391,22 @@ export default {
         }
       } catch (err) {
         console.error('Load board error:', err);
+        // If server explicitly returned 404 or 403, do NOT use offline cache!
+        if (err.response && (err.response.status === 404 || err.response.status === 403)) {
+          await deleteOfflineBoard(slug);
+          this.org = null;
+          this.isOfflineMode = false;
+          if (err.response.data?.pending_verification) {
+            this.pendingVerification = true;
+            this.pendingOrg = err.response.data.org;
+            this.errorMessage = err.response.data.error || 'This notice board is pending DNS domain verification.';
+          } else {
+            this.boardNotFound = true;
+            this.errorMessage = err.response.data?.error || 'Notice board not found.';
+          }
+          return;
+        }
+
         // Offline / network failure fallback: Load cached notices from offline storage
         const cached = await getOfflineBoard(slug);
         if (cached && (cached.org || (cached.notices && cached.notices.length > 0))) {

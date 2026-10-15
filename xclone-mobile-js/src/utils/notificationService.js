@@ -21,7 +21,9 @@ class NotificationService {
     }
 
     async initialize(userId) {
-        this.userId = userId;
+        const cleanUid = (userId && String(userId) !== '0' && String(userId) !== 'null' && String(userId) !== 'undefined')
+            ? String(userId) : null;
+        this.userId = cleanUid;
 
         // Preload default notice audio
         this.audio = new Audio('/msg-ton.mp3');
@@ -63,6 +65,15 @@ class NotificationService {
         const isSecure = typeof window !== 'undefined' && window.isSecureContext;
         console.log('🛡️ Secure Context:', isSecure);
         console.log('📢 Notification Supported:', (typeof window !== 'undefined' && 'Notification' in window));
+
+        // Guests / logged-out installs still register their token ANONYMOUSLY
+        // (user_id null) so open-board broadcasts reach everyone who installed
+        // the app. Anonymous rows can never receive DMs/calls (those queries
+        // filter by user_id). Any stale mapping from a previous account is
+        // moved to anonymous by the upsert below (self-healing).
+        if (!cleanUid) {
+            console.log('📢 Notification service: guest mode, registering anonymous token for open-board alerts');
+        }
 
         if (typeof window !== 'undefined' && 'Notification' in window) {
             // Clear legacy token format if present
@@ -285,8 +296,9 @@ class NotificationService {
                         await this.registerToken(currentToken, 'fcm-web');
 
                         // Only show the welcome notification on first registration
+                        // for logged-in users (guests get open-board alerts silently).
                         const wasRegistered = localStorage.getItem('fcm_token_registered');
-                        if (!wasRegistered) {
+                        if (!wasRegistered && this.userId) {
                             this.showWebNotification(
                                 'Notifications Enabled!',
                                 'You will now receive notifications for DMs, calls, and more.'
@@ -298,6 +310,8 @@ class NotificationService {
                     }
 
                     // Step 4: Handle foreground messages (when app is open)
+                    // Route via handleIncomingNotification so recipient/login
+                    // checks apply — never show another user's DM/call here.
                     onMessage(messaging, (payload) => {
                         console.log('📨 Foreground FCM message received:', payload);
                         const data = payload.data || {};
@@ -305,24 +319,35 @@ class NotificationService {
 
                         const title = data.title || notification.title || 'NexFi';
                         const body = data.body || notification.body || data.message || 'New update';
+                        const msgType = data.type || 'general';
 
-                        // Play notification sound
-                        this.playSound();
-
-                        // Show notification (foreground messages don't auto-show)
-                        this.showWebNotification(title, body);
+                        this.handleIncomingNotification({
+                            title,
+                            message: body,
+                            body,
+                            type: msgType,
+                            to_user_id: data.to_user_id || data.target_user_id || data.user_id,
+                            target_user_id: data.to_user_id || data.target_user_id,
+                            from_user_id: data.from_user_id || data.caller_id || data.sender_id,
+                            from_username: data.from_username || data.caller_username,
+                            url: data.url
+                        });
 
                         // If it's a call, dispatch event so CallOverlay can handle it
                         if (data.type === 'call') {
-                            window.dispatchEvent(new CustomEvent('call:incoming', {
-                                detail: {
-                                    call_id: data.call_id,
-                                    caller_id: data.caller_id,
-                                    caller_username: data.caller_username,
-                                    media: data.media,
-                                    status: 'ringing'
-                                }
-                            }));
+                            const currentUserId = (typeof localStorage !== 'undefined' && localStorage.getItem('userId')) || null;
+                            const targetId = String(data.to_user_id || data.callee_id || '');
+                            if (!targetId || (currentUserId && String(currentUserId) === targetId)) {
+                                window.dispatchEvent(new CustomEvent('call:incoming', {
+                                    detail: {
+                                        call_id: data.call_id,
+                                        caller_id: data.caller_id,
+                                        caller_username: data.caller_username,
+                                        media: data.media,
+                                        status: 'ringing'
+                                    }
+                                }));
+                            }
                         }
                     });
 
@@ -444,17 +469,20 @@ class NotificationService {
 
             PushNotifications.addListener('pushNotificationReceived', (notification) => {
                 console.log('Push notification received:', notification);
-                this.playSound();
-                LocalNotifications.schedule({
-                    notifications: [{
-                        title: notification.title || 'NexFi Notice',
-                        body: notification.body || '',
-                        id: Math.floor(Date.now() % 1000000),
-                        schedule: { at: new Date(Date.now() + 100) },
-                        channelId: 'notices',
-                        extra: notification.data || notification.extra || {}
-                    }]
-                }).catch(() => {});
+                const extra = notification.data || notification.extra || {};
+                // Route via the guarded handler so DMs/calls only notify
+                // their actual recipient (never logged-out users or others).
+                this.handleIncomingNotification({
+                    title: notification.title || extra.title || 'NexFi Notice',
+                    message: notification.body || extra.body || extra.message || '',
+                    body: notification.body || extra.body || extra.message || '',
+                    type: extra.type || 'notice',
+                    to_user_id: extra.to_user_id || extra.target_user_id || extra.user_id,
+                    target_user_id: extra.to_user_id || extra.target_user_id,
+                    from_user_id: extra.from_user_id || extra.caller_id || extra.sender_id,
+                    from_username: extra.from_username || extra.caller_username,
+                    url: extra.url
+                });
             });
 
             const routeTap = (rawExtra) => {
@@ -512,10 +540,14 @@ class NotificationService {
 
     async registerToken(token, deviceType, prefDeptId) {
         try {
+            if (!token || !String(token).strip() || String(token).strip().startsWith('{')) return;
             const apiUrl = config.api?.baseURL || config.baseURL;
             const currentPref = prefDeptId !== undefined ? prefDeptId : (localStorage.getItem('pref_dept_bugema') || null);
             const rawUid = this.userId || localStorage.getItem('userId');
-            const cleanUid = (rawUid && rawUid !== '0' && rawUid !== 'null' && rawUid !== 'undefined') ? Number(rawUid) : null;
+            // null = anonymous install: backend keeps the token for open-board
+            // broadcasts only (DMs/calls can never match it).
+            const cleanUid = (rawUid && String(rawUid) !== '0' && String(rawUid) !== 'null' && String(rawUid) !== 'undefined') ? Number(rawUid) : null;
+            try { localStorage.setItem('fcm_token', String(token).strip()); } catch (_) {}
             await axios.post(`${apiUrl}/api/notifications/register-token`, {
                 user_id: cleanUid,
                 token: token,
@@ -538,14 +570,53 @@ class NotificationService {
     async removeToken(token) {
         try {
             const apiUrl = config.api?.baseURL || config.baseURL;
+            const effectiveToken = token || (typeof localStorage !== 'undefined' && localStorage.getItem('fcm_token')) || this.token;
+            if (!effectiveToken) return;
             await axios.post(`${apiUrl}/api/notifications/remove-token`, {
-                user_id: this.userId,
-                token: token
-            });
+                user_id: this.userId || (typeof localStorage !== 'undefined' && localStorage.getItem('userId')) || null,
+                token: effectiveToken
+            }).catch(() => {});
+            try {
+                localStorage.removeItem('fcm_token');
+                localStorage.removeItem('fcm_token_registered');
+                localStorage.removeItem('fcm_token_sent');
+            } catch (_) {}
             console.log('✓ Notification token removed');
         } catch (error) {
             console.error('Error removing notification token:', error);
         }
+    }
+
+    // Call this BEFORE clearing localStorage on logout. The token is moved
+    // to anonymous (user_id NULL) so this install keeps receiving open-board
+    // broadcasts but immediately stops getting the old account's DMs/calls.
+    // The stored fcm_token is KEPT so the next login can move it to the new user.
+    async handleLogout() {
+        try {
+            const stored = (typeof localStorage !== 'undefined' && localStorage.getItem('fcm_token')) || this.token;
+            if (stored) {
+                const apiUrl = config.api?.baseURL || config.baseURL;
+                await axios.post(`${apiUrl}/api/notifications/register-token`, {
+                    user_id: null,
+                    token: stored,
+                    device_type: 'fcm-anon',
+                    pref_dept_id: null
+                }).catch(() => {});
+                console.log('📢 Device token moved to anonymous (open-board broadcasts only)');
+            }
+        } catch (_) {}
+        try {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem('fcm_token_registered');
+                localStorage.removeItem('fcm_token_sent');
+            }
+        } catch (_) {}
+        try {
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new Event('user:logout'));
+            }
+        } catch (_) {}
+        this.userId = null;
     }
 
     playSound() {

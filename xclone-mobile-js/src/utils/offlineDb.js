@@ -428,6 +428,19 @@ export async function saveBoardOffline(slug, boardData) {
     } catch (_) {}
 }
 
+export async function deleteOfflineBoard(slug) {
+    if (!slug) return;
+    const key = `board_${slug}`;
+    try {
+        await db.appState.delete(key);
+    } catch (err) {
+        console.warn('Dexie deleteOfflineBoard warning:', err);
+    }
+    try {
+        localStorage.removeItem(`cached_board_${slug}`);
+    } catch (_) {}
+}
+
 /**
  * Retrieve cached notice board state offline
  */

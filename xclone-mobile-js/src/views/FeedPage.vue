@@ -68,6 +68,13 @@
         @notices-updated="handleNoticesUpdated"
       />
 
+      <!-- Upcoming Talks (scheduled meetings) -->
+      <UpcomingTalks
+        v-if="activeTab === 'foryou' && userId"
+        :currentUser="{ id: userId, username: username }"
+        @join-space="handleJoinSpace"
+      />
+
       <div v-if="showNewPostsBanner" class="new-posts-banner" @click="viewNewPosts">
         Click to view new posts
       </div>
@@ -824,7 +831,18 @@
       @close="showSpaceModal = false"
       @minimize="showSpaceModal = false"
       @leave="leaveSpace"
+      @switch-space="switchSpaceRoom"
     />
+
+    <!-- Breakout room invite (when the meeting is minimized/closed) -->
+    <div v-if="pendingBreakout" class="breakout-pending-banner">
+      <div class="breakout-pending-text">
+        <strong>You've been assigned to {{ pendingBreakout.room_title }}</strong>
+        <span>Breakout rooms are open — join the discussion</span>
+      </div>
+      <button class="breakout-pending-join" @click="joinPendingBreakout">Join</button>
+      <button class="breakout-pending-dismiss" @click="pendingBreakout = null">✕</button>
+    </div>
 
     <!-- Audio Space Recording Modal -->
     <AudioSpaceRecordingModal
@@ -861,6 +879,7 @@ import { savePostsOffline, getOfflinePosts, isNetworkOffline } from '@/utils/off
 import PollDisplay from '@/components/PollDisplay.vue';
 import AudioSpaceCard from '@/components/AudioSpaceCard.vue';
 import AudioSpaceModal from '@/components/AudioSpaceModal.vue';
+import UpcomingTalks from '@/components/UpcomingTalks.vue';
 import AudioSpaceRecordingModal from '@/components/AudioSpaceRecordingModal.vue';
 import VerificationBadge from '@/components/VerificationBadge.vue';
 import NoticeCarousel from '@/components/NoticeCarousel.vue';
@@ -872,7 +891,7 @@ export default {
     IonContent, IonFab, IonFabButton, IonIcon, IonModal, IonTextarea, 
     IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent,
     IonActionSheet, VideoPlayer, PollDisplay, EmojiPicker, PostComposerModal, AMACard,
-    AudioSpaceCard, AudioSpaceModal, AudioSpaceRecordingModal, VerificationBadge,
+    AudioSpaceCard, AudioSpaceModal, AudioSpaceRecordingModal, UpcomingTalks, VerificationBadge,
     NoticeCarousel
   },
   data() {
@@ -951,6 +970,8 @@ export default {
       // Audio Space
       showSpaceModal: false,
       currentSpace: null,
+      spaceHistory: [],
+      pendingBreakout: null,
       showRecordingModal: false,
       currentRecordingSpace: null,
 
@@ -1090,7 +1111,72 @@ export default {
     leaveSpace() {
         this.showSpaceModal = false;
         this.currentSpace = null;
+        this.spaceHistory = [];
+        this.pendingBreakout = null;
         // Logic to notify backend about leaving
+    },
+
+    // BBB-style room switching: main room <-> breakout rooms.
+    async switchSpaceRoom(room) {
+        if (!room || !room.id) return;
+        const last = this.spaceHistory[this.spaceHistory.length - 1];
+        if (room.__returnMain && last && String(last.id) === String(room.id)) {
+          this.currentSpace = this.spaceHistory.pop();
+          return;
+        }
+        if (this.currentSpace) {
+          this.spaceHistory.push(this.currentSpace);
+          if (this.spaceHistory.length > 10) this.spaceHistory.shift();
+        }
+        this.pendingBreakout = null;
+        try {
+          const res = await axios.get(`${this.API_URL}/api/audio-spaces/${room.id}`);
+          if (res.data && res.data.success) {
+            this.currentSpace = res.data.space;
+          } else {
+            this.currentSpace = { id: room.id, title: room.title || 'Breakout room' };
+          }
+        } catch (e) {
+          console.warn('switchSpaceRoom fetch failed, using stub', e);
+          this.currentSpace = { id: room.id, title: room.title || 'Breakout room' };
+        }
+        this.showSpaceModal = true;
+    },
+
+    async joinPendingBreakout() {
+        const invite = this.pendingBreakout;
+        this.pendingBreakout = null;
+        if (!invite) return;
+        this.spaceHistory = [];
+        try {
+          const res = await axios.get(`${this.API_URL}/api/audio-spaces/${invite.room_id}`);
+          if (res.data && res.data.success && res.data.space) {
+            if (res.data.space.parent_space_id) {
+              // Fetch the main room too so "return to main" works
+              try {
+                const main = await axios.get(`${this.API_URL}/api/audio-spaces/${res.data.space.parent_space_id}`);
+                if (main.data && main.data.success) this.spaceHistory.push(main.data.space);
+              } catch (_) { /* non-fatal */ }
+            }
+            this.currentSpace = res.data.space;
+            this.showSpaceModal = true;
+          }
+        } catch (e) {
+          console.error('joinPendingBreakout failed', e);
+        }
+    },
+
+    handleBreakoutAssigned(e) {
+        // Only surface here when the meeting modal is closed —
+        // the modal itself shows the invite when open.
+        if (this.showSpaceModal) return;
+        const d = (e && e.detail) || {};
+        if (!d.room_id) return;
+        this.pendingBreakout = {
+          room_id: d.room_id,
+          room_title: d.room_title || 'Breakout room',
+          parent_id: d.parent_id
+        };
     },
 
     handlePollUpdate(event) {
@@ -2503,8 +2589,9 @@ export default {
       this.$root.toggleTheme?.();
     },
     
-    logout() {
+    async logout() {
       if (confirm('Are you sure you want to logout?')) {
+        try { await notificationService.handleLogout(); } catch (_) {}
         localStorage.removeItem('userId');
         localStorage.removeItem('username');
         localStorage.removeItem('userAvatar');
@@ -2764,6 +2851,8 @@ export default {
       this.scrollToTop();
     };
     window.addEventListener('feed-refresh', this._feedRefreshHandler);
+
+    window.addEventListener('space:breakout_assigned', this.handleBreakoutAssigned);
   },
   
   beforeUnmount() {
@@ -2807,6 +2896,8 @@ export default {
       window.removeEventListener('feed-refresh', this._feedRefreshHandler);
       this._feedRefreshHandler = null;
     }
+
+    window.removeEventListener('space:breakout_assigned', this.handleBreakoutAssigned);
   }
 }
 </script>
@@ -2853,6 +2944,33 @@ ion-toolbar {
   font-size: 14px;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(218, 165, 32, 0.35);
+}
+
+.breakout-pending-banner {
+  position: fixed;
+  bottom: 86px;
+  left: 12px;
+  right: 12px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1a2233;
+  border: 1px solid #1f6feb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.breakout-pending-text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.breakout-pending-text strong { font-size: 14px; color: #fff; }
+.breakout-pending-text span { font-size: 12px; color: #8b949e; }
+.breakout-pending-join {
+  background: #238636; color: #fff; border: none; border-radius: 8px;
+  padding: 9px 18px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.breakout-pending-dismiss {
+  background: transparent; border: none; color: #8b949e;
+  font-size: 16px; cursor: pointer; padding: 6px;
 }
 
 .gold-fab {

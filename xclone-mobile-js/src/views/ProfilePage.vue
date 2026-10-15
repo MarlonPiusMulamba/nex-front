@@ -604,6 +604,7 @@ import VideoPlayer from '@/components/VideoPlayer.vue';
 import PollDisplay from '@/components/PollDisplay.vue';
 import LanModePanel from '@/components/LanModePanel.vue';
 import VerificationBadge from '@/components/VerificationBadge.vue';
+import notificationService from '@/utils/notificationService.js';
 import { saveProfileOffline, getOfflineProfile, isNetworkOffline, savePostsOffline, getOfflinePosts } from '@/utils/offlineDb.js';
 
 export default {
@@ -1252,8 +1253,9 @@ export default {
       this.$root.toggleTheme?.();
     },
 
-    logout() {
+    async logout() {
       if (confirm('Are you sure you want to logout?')) {
+        try { await notificationService.handleLogout(); } catch (_) {}
         localStorage.removeItem('userId');
         localStorage.removeItem('username');
         localStorage.removeItem('userAvatar');

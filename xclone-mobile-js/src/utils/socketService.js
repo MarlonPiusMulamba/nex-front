@@ -153,6 +153,22 @@ class SocketService {
             window.dispatchEvent(new CustomEvent('space:signal', { detail: data }));
         });
 
+        // Breakout rooms (BBB-style)
+        ['space:breakouts_started', 'space:breakouts_updated', 'space:breakouts_ended', 'space:breakout_assigned', 'space:breakout_broadcast'].forEach((evt) => {
+            this.socket.on(evt, (data) => {
+                console.log('🏢', evt, data);
+                window.dispatchEvent(new CustomEvent(evt, { detail: data }));
+            });
+        });
+
+        // Talk extras: live polls + breakout help requests
+        ['space:poll_updated', 'space:help_requested', 'space:recording'].forEach((evt) => {
+            this.socket.on(evt, (data) => {
+                console.log('🏢', evt, data);
+                window.dispatchEvent(new CustomEvent(evt, { detail: data }));
+            });
+        });
+
         // Listen for Join Requests (Locked Talks)
         this.socket.on('join_request', (data) => {
             console.log('🔒 New join request:', data);
