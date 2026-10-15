@@ -68,13 +68,6 @@
         @notices-updated="handleNoticesUpdated"
       />
 
-      <!-- Upcoming Talks (scheduled meetings) -->
-      <UpcomingTalks
-        v-if="activeTab === 'foryou' && userId"
-        :currentUser="{ id: userId, username: username }"
-        @join-space="handleJoinSpace"
-      />
-
       <div v-if="showNewPostsBanner" class="new-posts-banner" @click="viewNewPosts">
         Click to view new posts
       </div>
@@ -879,7 +872,6 @@ import { savePostsOffline, getOfflinePosts, isNetworkOffline } from '@/utils/off
 import PollDisplay from '@/components/PollDisplay.vue';
 import AudioSpaceCard from '@/components/AudioSpaceCard.vue';
 import AudioSpaceModal from '@/components/AudioSpaceModal.vue';
-import UpcomingTalks from '@/components/UpcomingTalks.vue';
 import AudioSpaceRecordingModal from '@/components/AudioSpaceRecordingModal.vue';
 import VerificationBadge from '@/components/VerificationBadge.vue';
 import NoticeCarousel from '@/components/NoticeCarousel.vue';
@@ -891,7 +883,7 @@ export default {
     IonContent, IonFab, IonFabButton, IonIcon, IonModal, IonTextarea, 
     IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent,
     IonActionSheet, VideoPlayer, PollDisplay, EmojiPicker, PostComposerModal, AMACard,
-    AudioSpaceCard, AudioSpaceModal, AudioSpaceRecordingModal, UpcomingTalks, VerificationBadge,
+    AudioSpaceCard, AudioSpaceModal, AudioSpaceRecordingModal, VerificationBadge,
     NoticeCarousel
   },
   data() {
