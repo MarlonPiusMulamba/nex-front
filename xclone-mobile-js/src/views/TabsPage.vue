@@ -480,20 +480,63 @@ ion-page {
 .mobile-tab-bar {
   --background: var(--ion-tab-bar-background, #ffffff);
   --border: 0 none;
-  box-shadow: 0 -1px 0 rgba(0,0,0,0.07), 0 -4px 16px rgba(0,0,0,0.06);
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+  box-shadow: 0 -8px 28px rgba(16, 24, 40, 0.1);
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+@supports (backdrop-filter: blur(18px)) {
+  .mobile-tab-bar {
+    backdrop-filter: blur(18px) saturate(1.3);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  }
 }
 
 /* Each tab button — force equal width so all 8 fit */
 .tab-btn {
-  --padding-top: 6px;
-  --padding-bottom: 6px;
+  --padding-top: 8px;
+  --padding-bottom: 8px;
   min-width: 0;
   flex: 1 1 0;
   max-width: none;
+  position: relative;
+  transition: transform var(--nx-dur-fast, 0.15s) ease;
+}
+
+.tab-btn:active {
+  transform: scale(0.9);
 }
 
 .tab-btn ion-icon {
   font-size: 22px;
+  transition: color var(--nx-dur-fast, 0.15s) ease, transform var(--nx-dur-fast, 0.15s) ease;
+}
+
+/* Active tab: gold icon + label with a top indicator pill */
+.mobile-tab-bar ion-tab-button.tab-selected ion-icon,
+.mobile-tab-bar .tab-btn.tab-selected ion-icon {
+  color: var(--nx-gold, #daa520);
+  transform: translateY(-1px);
+}
+
+.mobile-tab-bar ion-tab-button.tab-selected .tab-lbl,
+.mobile-tab-bar .tab-btn.tab-selected .tab-lbl {
+  color: var(--nx-gold, #daa520);
+}
+
+.mobile-tab-bar ion-tab-button.tab-selected::after,
+.mobile-tab-bar .tab-btn.tab-selected::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--nx-brand-gradient, #daa520);
 }
 
 /* Labels shown normally when there's room */

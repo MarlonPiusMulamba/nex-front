@@ -20,6 +20,7 @@ import '@ionic/vue/css/display.css';
 
 // Desktop layout & Theme styles
 import './theme/variables.css';
+import './theme/design-system.css';
 import './theme/desktop.css';
 
 // 🌐 PWA Install — capture the install prompt as early as possible.

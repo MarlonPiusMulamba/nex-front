@@ -2908,6 +2908,17 @@ ion-header {
   --background: var(--ion-background-color, #fff);
 }
 
+ion-header ion-toolbar {
+  --background: color-mix(in srgb, var(--ion-background-color, #fff) 82%, transparent);
+}
+
+@supports (backdrop-filter: blur(18px)) {
+  ion-header {
+    backdrop-filter: blur(18px) saturate(1.3);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  }
+}
+
 ion-toolbar {
   --background: var(--ion-background-color, #fff);
   --border-width: 0;
@@ -2915,9 +2926,10 @@ ion-toolbar {
 }
 
 .feed-title {
-  font-family: "Times New Roman", Times, serif !important;
-  font-weight: 700;
-  font-size: 24px;
+  font-family: var(--nx-font, 'Inter', sans-serif);
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.5px;
   text-align: center;
   position: absolute;
   left: 0;
@@ -3093,9 +3105,9 @@ ion-toolbar {
 /* Post Item */
 .post-item {
   display: flex;
-  padding: 12px 16px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--ion-border-color, #eff3f4);
-  transition: background-color 0.2s;
+  transition: background-color var(--nx-dur-fast, 0.15s) ease;
 }
 
 .post-item:hover {
@@ -3108,10 +3120,11 @@ ion-toolbar {
 }
 
 .avatar-img {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   object-fit: cover;
+  box-shadow: var(--nx-shadow-sm);
 }
 
 .post-content-wrapper {
@@ -3138,6 +3151,7 @@ ion-toolbar {
 
 .post-user-info .display-name {
   font-weight: 700;
+  letter-spacing: -0.1px;
   color: var(--ion-text-color, #0f1419);
   white-space: nowrap;
   overflow: hidden;

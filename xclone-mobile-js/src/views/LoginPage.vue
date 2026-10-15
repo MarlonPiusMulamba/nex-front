@@ -509,23 +509,24 @@ export default {
 }
 
 .logo-image {
-  width: 84px;
-  height: 84px;
+  width: 88px;
+  height: 88px;
   margin: 0 auto 14px;
   display: block;
   object-fit: contain;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
-  box-shadow: none;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #fff8e6 0%, #ffffff 100%);
+  padding: 12px;
+  box-shadow: 0 10px 28px rgba(218, 165, 32, 0.25);
+  border: 1px solid rgba(218, 165, 32, 0.3);
 }
 
 .brand-name {
   font-size: 36px;
-  font-weight: 700;
+  font-weight: 800;
   color: #000000;
   margin: 0;
-  letter-spacing: -0.5px;
+  letter-spacing: -1px;
 }
 
 .tagline {

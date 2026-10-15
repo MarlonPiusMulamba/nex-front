@@ -1,0 +1,150 @@
+/* ── NEXFI Design System ────────────────────────────────────────────────
+   Single source of truth for type, shape, elevation, motion and brand.
+   Light-first tokens; `body.dark` overrides keep dark mode coherent.
+   Import AFTER variables.css so these tokens win. */
+
+:root {
+  --nx-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Type scale */
+  --nx-text-display: 28px;
+  --nx-text-title: 20px;
+  --nx-text-body: 15px;
+  --nx-text-small: 13px;
+  --nx-text-tiny: 11px;
+
+  /* Shape */
+  --nx-radius-sm: 8px;
+  --nx-radius-md: 12px;
+  --nx-radius-lg: 16px;
+  --nx-radius-xl: 24px;
+  --nx-radius-pill: 999px;
+
+  /* Elevation (light) */
+  --nx-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --nx-shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08);
+  --nx-shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.14);
+
+  /* Brand */
+  --nx-gold: #daa520;
+  --nx-gold-bright: #ffd700;
+  --nx-gold-deep: #b8860b;
+  --nx-brand-gradient: linear-gradient(135deg, #daa520 0%, #ffd700 100%);
+  --nx-accent: #1208a1;
+  --nx-accent-soft: rgba(18, 8, 161, 0.08);
+  --nx-danger: #ef4444;
+
+  /* Motion */
+  --nx-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --nx-dur-fast: 0.15s;
+  --nx-dur-med: 0.25s;
+}
+
+body.dark,
+body.dark-theme,
+html.dark {
+  --nx-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --nx-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --nx-shadow-lg: 0 12px 34px rgba(0, 0, 0, 0.6);
+  --nx-accent: #ffd700;
+  --nx-accent-soft: rgba(255, 215, 0, 0.1);
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────── */
+html, body, ion-app, .ion-page {
+  font-family: var(--nx-font);
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgba(218, 165, 32, 0.28);
+}
+
+button {
+  font-family: var(--nx-font);
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--nx-gold);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Refined scrollbars (desktop/web) */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(120, 130, 140, 0.35);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ── Utilities ────────────────────────────────────────────────────────── */
+.nx-card {
+  background: var(--ion-card-background, #fff);
+  border: 1px solid var(--ion-border-color, #e5e7eb);
+  border-radius: var(--nx-radius-lg);
+  box-shadow: var(--nx-shadow-sm);
+}
+
+/* Tactile press feedback for icon buttons */
+.nx-press {
+  transition: transform var(--nx-dur-fast) var(--nx-ease), background-color var(--nx-dur-fast);
+}
+.nx-press:active {
+  transform: scale(0.92);
+}
+
+/* Gentle entrance */
+@keyframes nx-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.nx-fade-in {
+  animation: nx-rise var(--nx-dur-med) var(--nx-ease) both;
+}
+
+/* Small status chip */
+.nx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--nx-text-tiny);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 3px 9px;
+  border-radius: var(--nx-radius-pill);
+  background: var(--ion-color-light, #f1f3f5);
+  color: var(--ion-text-color, #111827);
+}
+
+/* Brand wordmark */
+.nx-brand {
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: var(--nx-brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: var(--nx-gold-deep);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-fade-in {
+    animation: none;
+  }
+  .nx-press {
+    transition: none;
+  }
+}

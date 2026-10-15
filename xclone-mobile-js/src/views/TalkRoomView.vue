@@ -224,11 +224,25 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: #161b22;
+  background: color-mix(in srgb, #161b22 88%, transparent);
   border-bottom: 1px solid #30363d;
   font-size: 13px;
 }
-.talk-brand { font-weight: 800; color: #daa520; }
+@supports (backdrop-filter: blur(18px)) {
+  .talk-topbar {
+    backdrop-filter: blur(18px) saturate(1.3);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  }
+}
+.talk-brand {
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  background: linear-gradient(135deg, #daa520 0%, #ffd700 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #daa520;
+}
 .talk-room-name {
   color: #c9d1d9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
