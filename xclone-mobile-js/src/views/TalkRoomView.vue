@@ -31,6 +31,14 @@
           class="talk-name-input"
           @keyup.enter="claimGuest"
         />
+        <input
+          v-model="contactEmail"
+          placeholder="Email for attendance (optional)"
+          maxlength="120"
+          inputmode="email"
+          class="talk-name-input"
+          @keyup.enter="claimGuest"
+        />
         <button class="talk-primary-btn" @click="claimGuest" :disabled="claiming || !displayName.trim()">
           {{ claiming ? 'Joining…' : 'Join meeting' }}
         </button>
@@ -78,6 +86,7 @@ const status = ref('loading'); // loading | need-name | meeting | left | error
 const space = ref(null);
 const me = ref(null);
 const displayName = ref('');
+const contactEmail = ref('');
 const claiming = ref(false);
 const errorMsg = ref('Meeting not found');
 const ended = ref(false);
@@ -100,7 +109,8 @@ const storedIdentity = () => {
         id: uid,
         username: localStorage.getItem('username') || 'user',
         first_name: '',
-        profile_pic: localStorage.getItem('userAvatar') || ''
+        profile_pic: localStorage.getItem('userAvatar') || '',
+        fromLogin: true
       };
     }
     const g = sessionStorage.getItem(guestKey());
@@ -114,6 +124,23 @@ const storedIdentity = () => {
   return null;
 };
 
+const joinAsMemberViaLink = async (uid) => {
+  // Logged-in member presenting a valid link: the code itself authorizes
+  // entry (invite recorded server-side), including to unlisted rooms.
+  try {
+    const res = await axios.post(`${API_URL}/api/talks/join/${encodeURIComponent(code.value)}/member`, {
+      user_id: uid
+    });
+    if (res.data?.success && res.data.space) {
+      space.value = res.data.space;
+      return true;
+    }
+  } catch (err) {
+    console.warn('member link join:', err.response?.data?.message || err.message);
+  }
+  return false;
+};
+
 const resolveSpace = async () => {
   status.value = 'loading';
   ended.value = false;
@@ -123,6 +150,12 @@ const resolveSpace = async () => {
       space.value = res.data.space;
       const identity = storedIdentity();
       if (identity) {
+        if (identity.fromLogin) {
+          // Ensure link-based authorization is recorded (matters for
+          // unlisted rooms the member was never explicitly invited to).
+          await joinAsMemberViaLink(identity.id);
+          delete identity.fromLogin;
+        }
         me.value = identity;
         status.value = 'meeting';
       } else {
@@ -145,7 +178,8 @@ const claimGuest = async () => {
   claiming.value = true;
   try {
     const res = await axios.post(`${API_URL}/api/talks/join/${encodeURIComponent(code.value)}/guest`, {
-      display_name: name
+      display_name: name,
+      email: (contactEmail.value || '').trim() || undefined
     });
     if (res.data?.success) {
       if (res.data.space) space.value = res.data.space;
@@ -193,7 +227,9 @@ const switchSpaceRoom = async (room) => {
     if (spaceHistory.value.length > 10) spaceHistory.value.shift();
   }
   try {
-    const res = await axios.get(`${API_URL}/api/audio-spaces/${room.id}`);
+    const res = await axios.get(`${API_URL}/api/audio-spaces/${room.id}`, {
+      params: { user_id: me.value?.id }
+    });
     space.value = res.data?.success ? res.data.space : { id: room.id, title: room.title || 'Breakout room' };
   } catch (_) {
     space.value = { id: room.id, title: room.title || 'Breakout room' };

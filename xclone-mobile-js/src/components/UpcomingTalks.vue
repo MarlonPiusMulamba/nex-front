@@ -14,18 +14,54 @@
         No talks scheduled. Plan the next one below.
       </div>
       <div v-for="t in talks" :key="t.id" class="talk-item">
-        <div class="talk-info">
+        <div class="talk-info" @click="toggleAudience(t)">
           <span class="talk-name">{{ t.title }}</span>
           <span class="talk-sub">@{{ t.host_username }} · {{ talkWhen(t) }}</span>
+          <span v-if="(t.rsvp_count || 0) > 0" class="talk-rsvp-count">🔔 {{ t.rsvp_count }} interested</span>
         </div>
         <span v-if="t.live_space_id" class="talk-live-dot">LIVE</span>
         <button
           v-if="String(t.host_user_id) === String(currentUser.id) && !t.live_space_id"
           class="talk-btn start" @click="startTalk(t)">Start</button>
         <button
+          v-if="String(t.host_user_id) === String(currentUser.id) && t.live_space_id"
+          class="talk-btn join" @click="joinTalk(t)">Join</button>
+        <button
+          v-if="String(t.host_user_id) === String(currentUser.id) && t.live_space_id"
+          class="talk-btn end" @click="endTalk(t)">End</button>
+        <button
           v-else-if="t.live_space_id"
           class="talk-btn join" @click="joinTalk(t)">Join</button>
-        <span v-else class="talk-wait">soon</span>
+        <button
+          v-else-if="String(t.host_user_id) !== String(currentUser.id)"
+          class="talk-btn" :class="t.my_rsvp ? 'joined' : 'ghost'" @click="toggleRsvp(t)">
+          {{ t.my_rsvp ? '✓ On' : 'Notify me' }}
+        </button>
+      </div>
+
+      <!-- Host audience manager -->
+      <div v-if="audienceFor && audienceData" class="talk-audience">
+        <div class="talk-audience-head">
+          <strong>{{ audienceFor.title }}</strong>
+          <button class="talk-btn ghost" @click="audienceFor = null; audienceData = null;">Close</button>
+        </div>
+        <div class="talk-audience-stats">
+          <span>👥 {{ audienceData.follower_count }} followers</span>
+          <span>🔔 {{ audienceData.rsvps.length }} RSVPs</span>
+          <span>✉️ {{ audienceData.invites.length }} invited</span>
+        </div>
+        <div class="talk-audience-names" v-if="audienceData.invites.length > 0 || audienceData.rsvps.length > 0">
+          <span v-for="u in audienceData.invites" :key="'i'+u.id" class="talk-user-pill invited">@{{ u.username }}</span>
+          <span v-for="u in audienceData.rsvps" :key="'r'+u.id" class="talk-user-pill">@{{ u.username }}</span>
+        </div>
+        <div class="talk-invite-row">
+          <input v-model="inviteName" placeholder="@username to invite" class="talk-input" @keyup.enter="sendInvite" />
+          <button class="talk-btn start" @click="sendInvite" :disabled="inviting || !inviteName.trim()">
+            {{ inviting ? '…' : 'Invite' }}
+          </button>
+        </div>
+        <p v-if="inviteMsg" class="talk-invite-msg">{{ inviteMsg }}</p>
+        <p class="talk-hint">Only followers, RSVPs and invited users get the reminder and live alerts.</p>
       </div>
 
       <button v-if="!showForm" class="talk-schedule-toggle" @click="showForm = true">
@@ -64,18 +100,27 @@ import config from '@/config/index.js';
 const API_URL = config.api.baseURL;
 
 const props = defineProps({
-  currentUser: Object
+  currentUser: Object,
+  forceExpanded: {
+    type: Boolean,
+    default: false
+  }
 });
 const emit = defineEmits(['join-space']);
 
 const talks = ref([]);
 const loading = ref(false);
-const expanded = ref(false);
+const expanded = ref(!!props.forceExpanded);
 const showForm = ref(false);
 const scheduling = ref(false);
 const formTitle = ref('');
 const formStartsAt = ref('');
 const formDuration = ref(30);
+const audienceFor = ref(null);
+const audienceData = ref(null);
+const inviteName = ref('');
+const inviting = ref(false);
+const inviteMsg = ref('');
 let refreshTimer = null;
 
 const liveCount = computed(() => talks.value.filter(t => t.live_space_id).length);
@@ -98,7 +143,9 @@ const talkWhen = (t) => {
 const fetchTalks = async () => {
   loading.value = true;
   try {
-    const res = await axios.get(`${API_URL}/api/talks/upcoming`);
+    const res = await axios.get(`${API_URL}/api/talks/upcoming`, {
+      params: { user_id: props.currentUser?.id }
+    });
     if (res.data?.success) {
       talks.value = res.data.talks || [];
       if (talks.value.length > 0) expanded.value = true;
@@ -108,6 +155,69 @@ const fetchTalks = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+const toggleRsvp = async (t) => {
+  try {
+    const res = await axios.post(`${API_URL}/api/talks/${t.id}/rsvp`, {
+      user_id: props.currentUser.id
+    });
+    if (res.data?.success) fetchTalks();
+  } catch (err) {
+    console.error('rsvp error', err);
+  }
+};
+
+const toggleAudience = async (t) => {
+  if (String(t.host_user_id) !== String(props.currentUser?.id)) return;
+  if (audienceFor.value && audienceFor.value.id === t.id) {
+    audienceFor.value = null;
+    audienceData.value = null;
+    return;
+  }
+  audienceFor.value = t;
+  audienceData.value = null;
+  inviteMsg.value = '';
+  try {
+    const res = await axios.get(`${API_URL}/api/talks/${t.id}/audience`, {
+      params: { host_id: props.currentUser.id }
+    });
+    if (res.data?.success) audienceData.value = res.data.audience;
+  } catch (err) {
+    console.error('audience error', err);
+  }
+};
+
+const sendInvite = async () => {
+  const name = (inviteName.value || '').trim();
+  if (!name || !audienceFor.value || inviting.value) return;
+  inviting.value = true;
+  inviteMsg.value = '';
+  try {
+    const res = await axios.post(`${API_URL}/api/talks/${audienceFor.value.id}/invite`, {
+      host_id: props.currentUser.id,
+      username: name
+    });
+    if (res.data?.success) {
+      inviteMsg.value = `Invited @${res.data.username}`;
+      inviteName.value = '';
+      fetchTalks();
+      toggleAudienceRefresh();
+    } else {
+      inviteMsg.value = res.data?.message || 'Invite failed';
+    }
+  } catch (err) {
+    inviteMsg.value = err.response?.data?.message || 'Invite failed';
+  } finally {
+    inviting.value = false;
+  }
+};
+
+const toggleAudienceRefresh = async () => {
+  if (!audienceFor.value) return;
+  const t = audienceFor.value;
+  audienceFor.value = null;
+  await toggleAudience(t);
 };
 
 const schedule = async () => {
@@ -176,6 +286,22 @@ const joinTalk = async (t) => {
   }
 };
 
+const endTalk = async (t) => {
+  if (!t.live_space_id) return;
+  if (!confirm(`End "${t.title}" for everyone?`)) return;
+  try {
+    await axios.post(`${API_URL}/api/audio-spaces/${t.live_space_id}/end`, {
+      user_id: props.currentUser.id
+    }).catch(() => {});
+    await axios.post(`${API_URL}/api/talks/${t.id}/unlink`, {
+      host_id: props.currentUser.id
+    }).catch(() => {});
+    fetchTalks();
+  } catch (err) {
+    console.error('end talk error', err);
+  }
+};
+
 onMounted(() => {
   fetchTalks();
   refreshTimer = setInterval(fetchTalks, 60000);
@@ -221,12 +347,30 @@ onUnmounted(() => {
 .talk-sub { font-size: 12px; color: #8b949e; }
 .talk-live-dot { color: #ef4444; font-size: 11px; font-weight: 700; }
 .talk-wait { font-size: 12px; color: #8b949e; font-style: italic; }
+.talk-btn.joined { background: rgba(35, 134, 54, 0.2); color: #4ade80; border: 1px solid #238636; }
+.talk-rsvp-count { font-size: 11px; color: #7dd3fc; font-weight: 600; }
+.talk-audience {
+  background: #0d1117; border: 1px solid #1f6feb; border-radius: 10px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.talk-audience-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.talk-audience-stats { display: flex; gap: 12px; font-size: 12px; color: #8b949e; flex-wrap: wrap; }
+.talk-audience-names { display: flex; flex-wrap: wrap; gap: 6px; }
+.talk-user-pill {
+  background: #21262d; border-radius: 12px; padding: 3px 10px;
+  font-size: 12px; color: #c9d1d9;
+}
+.talk-user-pill.invited { border: 1px solid #1f6feb; color: #7dd3fc; }
+.talk-invite-row { display: flex; gap: 8px; }
+.talk-invite-row .talk-input { flex: 1; }
+.talk-invite-msg { font-size: 12px; color: #4ade80; margin: 0; }
 .talk-btn {
   border: none; border-radius: 8px; padding: 8px 16px;
   font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
 }
 .talk-btn.start { background: #238636; color: #fff; }
 .talk-btn.join { background: #1f6feb; color: #fff; }
+.talk-btn.end { background: rgba(220, 38, 38, 0.15); color: #f87171; border: 1px solid rgba(220, 38, 38, 0.4); }
 .talk-btn.ghost { background: transparent; color: #c9d1d9; border: 1px solid #30363d; }
 .talk-schedule-toggle {
   background: transparent; border: 1px dashed #30363d; color: #58a6ff;

@@ -1,6 +1,6 @@
 <template>
   <ion-modal :is-open="isOpen" @did-dismiss="closeModal" class="audio-space-modal">
-    <div class="space-container">
+    <div class="space-container" @mousemove="pokeControls" @touchstart.passive="pokeControls">
       <!-- Top Header -->
       <div class="meeting-header">
         <div class="header-left">
@@ -249,6 +249,13 @@
           
           <!-- Participants List -->
           <div class="sidebar-body" v-if="activeSidebar === 'participants'">
+             <div v-if="isHost" class="invite-row">
+               <input v-model="inviteName" placeholder="@username to invite" class="invite-input" @keyup.enter="inviteMember" />
+               <button class="invite-btn" @click="inviteMember" :disabled="inviting || !inviteName.trim()">
+                 {{ inviting ? '…' : 'Invite' }}
+               </button>
+             </div>
+             <p v-if="inviteMsg" class="invite-msg">{{ inviteMsg }}</p>
              <div class="participant-list-item local-user">
                <img :src="getAvatarUrl(currentUser?.profile_pic)" class="p-avatar" />
                <div class="p-info">
@@ -358,6 +365,7 @@
                  <span class="attend-name">{{ t.name }}</span>
                  <span v-if="t.present" class="attend-present">in room</span>
                </div>
+               <div v-if="t.email" class="attend-email">{{ t.email }}</div>
                <div class="attend-sub">{{ t.sessions }} session{{ t.sessions === 1 ? '' : 's' }} · {{ fmtDur(t.seconds) }}</div>
              </div>
           </div>
@@ -365,15 +373,16 @@
       </div>
 
       <!-- Controls Bar -->
-      <div class="meeting-controls-wrapper">
+      <div class="meeting-controls-wrapper" :class="{ 'controls-hidden': !controlsVisible }">
         <div class="meeting-controls">
           <div class="controls-left">
              <span class="meeting-time">{{ formattedTime }}</span>
           </div>
           
           <div class="controls-center">
-            <button class="ctrl-btn main-btn" :class="{ 'danger': isMuted }" @click="toggleMic" :title="isMuted ? 'Turn on microphone' : 'Turn off microphone'">
+            <button class="ctrl-btn main-btn labeled-btn" :class="{ 'danger': isMuted }" @click="toggleMic" :title="isMuted ? 'Turn on microphone' : 'Turn off microphone'">
               <ion-icon :icon="isMuted ? micOffOutline : micOutline"></ion-icon>
+              <span class="ctrl-label">{{ isMuted ? 'Unmute' : 'Mute' }}</span>
             </button>
             <button class="ctrl-btn main-btn" :class="{ 'danger': !isVideoOn }" @click="toggleCamera" :title="isVideoOn ? 'Turn off camera' : 'Turn on camera'">
               <ion-icon :icon="isVideoOn ? videocamOutline : videocamOffOutline"></ion-icon>
@@ -399,11 +408,13 @@
               </div>
             </div>
             
-            <button class="ctrl-btn end-btn" @click="confirmEnd" v-if="isHost" title="End call for everyone">
+            <button class="ctrl-btn end-btn labeled-btn" @click="confirmEnd" v-if="isHost" title="End call for everyone">
               <ion-icon :icon="powerOutline"></ion-icon>
+              <span class="ctrl-label">End</span>
             </button>
-            <button class="ctrl-btn leave-btn" @click="confirmLeave" v-else title="Leave call">
+            <button class="ctrl-btn leave-btn labeled-btn" @click="confirmLeave" v-else title="Leave call">
               <ion-icon :icon="logOutOutline"></ion-icon>
+              <span class="ctrl-label">Leave</span>
             </button>
           </div>
           
@@ -579,6 +590,21 @@ const roomActive = ref(false);
 const leftRoom = ref(false);
 let enteringRoom = false;
 
+// Meet-style controls: visible on activity, fade out when idle
+const controlsVisible = ref(true);
+let controlsIdleTimer = null;
+const pokeControls = () => {
+  controlsVisible.value = true;
+  if (controlsIdleTimer) clearTimeout(controlsIdleTimer);
+  controlsIdleTimer = setTimeout(() => {
+    if (roomActive.value && stage.value === 'meeting') controlsVisible.value = false;
+  }, 4000);
+};
+const clearControlsIdle = () => {
+  if (controlsIdleTimer) { clearTimeout(controlsIdleTimer); controlsIdleTimer = null; }
+  controlsVisible.value = true;
+};
+
 // Live polls
 const polls = ref([]);
 const showPollCreate = ref(false);
@@ -602,11 +628,13 @@ const attendanceTotals = computed(() => {
       map[uid] = {
         user_id: uid,
         name: [s.first_name, s.last_name].filter(Boolean).join(' ') || s.username || `User ${uid}`,
+        email: s.contact_email || '',
         sessions: 0,
         seconds: 0,
         present: false
       };
     }
+    if (s.contact_email && !map[uid].email) map[uid].email = s.contact_email;
     const start = new Date(s.joined_at).getTime();
     const end = s.left_at ? new Date(s.left_at).getTime() : now;
     if (!isNaN(start)) {
@@ -1204,7 +1232,9 @@ const upsertParticipants = (parts) => {
 const refreshRoster = async () => {
   if (!props.space) return;
   try {
-    const res = await axios.get(`${API_URL}/api/audio-spaces/${props.space.id}`);
+    const res = await axios.get(`${API_URL}/api/audio-spaces/${props.space.id}`, {
+      params: { user_id: props.currentUser?.id }
+    });
     upsertParticipants(res.data?.space?.participants || res.data?.participants || []);
   } catch (err) {
     console.warn('roster refresh failed', err);
@@ -1789,18 +1819,18 @@ const fetchAttendance = async () => {
 };
 
 const downloadAttendanceCsv = () => {
-  const rows = [['Name', 'Sessions', 'Total time', 'Currently present']];
+  const rows = [['Name', 'Contact email', 'Sessions', 'Total time', 'Currently present']];
   attendanceTotals.value.forEach(t => {
-    rows.push([t.name, String(t.sessions), fmtDur(t.seconds), t.present ? 'Yes' : 'No']);
+    rows.push([t.name, t.email, String(t.sessions), fmtDur(t.seconds), t.present ? 'Yes' : 'No']);
   });
   rows.push([]);
   rows.push(['Session detail']);
-  rows.push(['Name', 'Joined', 'Left / still in', 'Duration']);
+  rows.push(['Name', 'Contact email', 'Joined', 'Left / still in', 'Duration']);
   attendanceRows.value.forEach(s => {
     const name = [s.first_name, s.last_name].filter(Boolean).join(' ') || s.username || `User ${s.user_id}`;
     const start = new Date(s.joined_at).getTime();
     const end = s.left_at ? new Date(s.left_at).getTime() : Date.now();
-    rows.push([name, fmtTime(s.joined_at), s.left_at ? fmtTime(s.left_at) : 'Still in', fmtDur((end - start) / 1000)]);
+    rows.push([name, s.contact_email || '', fmtTime(s.joined_at), s.left_at ? fmtTime(s.left_at) : 'Still in', fmtDur((end - start) / 1000)]);
   });
   const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -1836,7 +1866,33 @@ const copyInviteLink = async () => {
   }
 };
 
-// Real-time Event Handlers
+// Host invite-by-username (locked + unlisted rooms)
+const inviteName = ref('');
+const inviting = ref(false);
+const inviteMsg = ref('');
+
+const inviteMember = async () => {
+  const name = (inviteName.value || '').trim();
+  if (!name || !props.space || inviting.value) return;
+  inviting.value = true;
+  inviteMsg.value = '';
+  try {
+    const res = await axios.post(`${API_URL}/api/audio-spaces/${props.space.id}/invite-user`, {
+      host_id: props.currentUser.id,
+      username: name
+    });
+    if (res.data?.success) {
+      inviteMsg.value = `Invited @${res.data.username}`;
+      inviteName.value = '';
+    } else {
+      inviteMsg.value = res.data?.message || 'Invite failed';
+    }
+  } catch (err) {
+    inviteMsg.value = err.response?.data?.message || 'Invite failed';
+  } finally {
+    inviting.value = false;
+  }
+};
 const handleSpaceEnded = (e) => {
   if (String(e.detail.space_id) === String(props.space?.id)) {
     markLeftAndLeave();
@@ -1962,7 +2018,9 @@ const enterRoom = async () => {
   enteringRoom = true;
   try {
     socketService.joinRoom(`space_${props.space.id}`);
-    socketService.joinRoom(`user_${props.currentUser.id}`);
+    // Personal room + presence: critical for guests (approvals, DMs) whose
+    // accounts were never registered at app startup.
+    socketService.registerUser(props.currentUser.id);
 
     startTime.value = new Date(props.space.created_at || Date.now()).getTime();
     if (timerInterval) clearInterval(timerInterval);
@@ -1984,6 +2042,9 @@ const enterRoom = async () => {
     helpBanner.value = null;
     helpSent.value = false;
     remoteRecording.value = false;
+    // Fresh approval per room: a grant for one locked room must never
+    // carry over into the next room.
+    isApproved.value = false;
 
     // Device check before anything media-related happens
     if (!prejoinDone.value) {
@@ -2018,12 +2079,14 @@ const enterRoom = async () => {
     if (isHost.value) startRecording();
   }
   roomActive.value = true;
+  pokeControls();
   } finally {
     enteringRoom = false;
   }
 };
 
 const exitRoom = () => {
+  clearControlsIdle();
   if (prejoinResolve) {
     const r = prejoinResolve;
     prejoinResolve = null;
@@ -2058,6 +2121,7 @@ const exitRoom = () => {
   attendanceRows.value = [];
   helpBanner.value = null;
   remoteRecording.value = false;
+  isApproved.value = false;
 };
 
 const markLeftAndLeave = () => {
@@ -2477,6 +2541,7 @@ const confirmEnd = () => {
   background: #0d1117;
   color: #fff;
   overflow: hidden;
+  position: relative;
 }
 
 /* Header */
@@ -2559,9 +2624,11 @@ const confirmEnd = () => {
   display: grid;
   padding: 16px;
   gap: 16px;
-  align-content: center;
+  align-content: stretch;
+  grid-auto-rows: minmax(0, 1fr);
   transition: all 0.3s ease;
   position: relative;
+  min-height: 0;
 }
 
 .grid-1 { grid-template-columns: 1fr; max-width: 800px; margin: 0 auto; width: 100%; }
@@ -2629,6 +2696,9 @@ const confirmEnd = () => {
   position: relative;
   transition: all 0.2s ease;
   aspect-ratio: 16/9;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
   border: 3px solid transparent;
 }
 .participant-tile.is-speaking { border-color: #22c55e; box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.4); }
@@ -2852,8 +2922,24 @@ const confirmEnd = () => {
 .attend-name { font-size: 14px; font-weight: 700; }
 .attend-present { font-size: 11px; font-weight: 700; color: #22c55e; text-transform: uppercase; }
 .attend-sub { font-size: 12px; color: #8b949e; }
+.attend-email { font-size: 12px; color: #7dd3fc; word-break: break-all; }
 
-.avatar-fallback img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; background: #30363d; }
+/* Host invite-by-username row */
+.invite-row { display: flex; gap: 8px; margin-bottom: 4px; }
+.invite-input {
+  flex: 1; background: #0d1117; border: 1px solid #30363d; border-radius: 8px;
+  padding: 8px 10px; color: #fff; font-size: 13px; outline: none; min-width: 0;
+}
+.invite-input:focus { border-color: #1f6feb; }
+.invite-btn {
+  background: #238636; color: #fff; border: none; border-radius: 8px;
+  padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.invite-btn:disabled { opacity: 0.5; }
+.invite-msg { font-size: 12px; color: #4ade80; margin: 0 0 4px; }
+
+.avatar-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.avatar-fallback img { width: clamp(72px, 24%, 128px); aspect-ratio: 1/1; height: auto; border-radius: 50%; object-fit: cover; background: #30363d; }
 
 .tile-overlays {
   position: absolute; inset: 0; pointer-events: none;
@@ -2897,12 +2983,57 @@ const confirmEnd = () => {
 }
 
 /* Controls Bar */
-.meeting-controls-wrapper { padding: 16px; background: #0d1117; z-index: 20; border-top: 1px solid #30363d; }
+.meeting-controls-wrapper {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: none;
+  border-top: none;
+  pointer-events: none;
+  transition: opacity var(--nx-dur-med, 0.25s) ease, transform var(--nx-dur-med, 0.25s) ease;
+}
+.meeting-controls-wrapper > * {
+  pointer-events: auto;
+}
+/* Meet-style idle fade: the bar hides until you move the mouse / touch */
+.meeting-controls-wrapper.controls-hidden {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none !important;
+}
+.meeting-controls-wrapper.controls-hidden > * {
+  pointer-events: none !important;
+}
+.meeting-controls {
+  background: rgba(22, 27, 34, 0.94);
+  border: 1px solid #3d444d;
+  border-radius: 28px;
+  padding: 8px 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  width: 100%;
+  max-width: 1100px;
+}
+@supports (backdrop-filter: blur(16px)) {
+  .meeting-controls {
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  }
+}
 .meeting-controls { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto; width: 100%; }
 
 .controls-left, .controls-right { display: flex; gap: 8px; flex: 1; align-items: center; }
 .controls-right { justify-content: flex-end; }
-.controls-center { display: flex; gap: 12px; justify-content: center; flex: 2; }
+.controls-center {
+  display: flex; gap: 12px; justify-content: center; align-items: center; flex: 2;
+  max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 2px;
+}
+.controls-center::-webkit-scrollbar { display: none; }
+.controls-center .ctrl-btn { flex-shrink: 0; }
 
 .meeting-time { font-size: 14px; font-weight: 500; color: #e6edf3; }
 
@@ -2914,6 +3045,25 @@ const confirmEnd = () => {
 .ctrl-btn.active-hand { background: #f59e0b; color: #000; }
 
 .end-btn, .leave-btn { width: auto; padding: 0 16px; border-radius: 24px; font-size: 24px; }
+.end-btn { background: #da3633; color: #fff; }
+.end-btn:hover { background: #b3261e; }
+.leave-btn { background: #30363d; color: #e6edf3; }
+
+/* Labeled action pills: icon + text so Mute / End / Leave are unmistakable */
+.labeled-btn {
+  width: auto;
+  height: 44px;
+  padding: 0 16px 0 12px;
+  border-radius: 22px;
+  gap: 7px;
+  font-size: 20px;
+}
+.ctrl-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
 
 .reactions-container { position: relative; }
 .reactions-popup { position: absolute; bottom: 56px; left: 50%; transform: translateX(-50%); background: #21262d; border: 1px solid #30363d; border-radius: 12px; padding: 8px; display: flex; gap: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
@@ -2947,8 +3097,75 @@ const confirmEnd = () => {
 @media (max-width: 768px) {
   .main-content { flex-direction: column; }
   .sidebar-panel { width: 100%; height: 40vh; border-left: none; border-top: 1px solid #30363d; }
-  .meeting-controls-wrapper { padding: 12px 8px; }
-  .controls-left, .controls-right { display: none; }
+
+  /* Phone video layout: vertical stack of full-width 16:9 tiles that fills
+     the screen instead of one small tile floating in black. The last tile
+     gets bottom clearance for the floating control dock. */
+  .meeting-viewport {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    align-content: unset;
+    overflow-y: auto;
+    gap: 10px;
+    padding: 10px 10px 120px;
+  }
+  .meeting-viewport.grid-1,
+  .meeting-viewport.grid-2,
+  .meeting-viewport.grid-4,
+  .meeting-viewport.grid-6,
+  .meeting-viewport.grid-many {
+    grid-template-columns: unset;
+    grid-template-rows: unset;
+    max-width: none;
+    margin: 0;
+  }
+  .participant-tile {
+    width: 100%;
+    height: auto;
+    flex-shrink: 0;
+    aspect-ratio: 16/9;
+  }
   .grid-many { grid-template-columns: 1fr 1fr; }
+}
+
+/* Compact meeting header for narrow screens: truncate the title to one
+   line, shrink chrome, keep every action reachable. */
+@media (max-width: 640px) {
+  .meeting-header {
+    padding: 8px 10px;
+    height: auto;
+    min-height: 52px;
+    gap: 8px;
+  }
+  .header-left {
+    gap: 7px;
+    min-width: 0;
+    flex: 1;
+  }
+  .meeting-title {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .live-indicator { padding: 3px 6px; }
+  .live-indicator span { display: none; }
+  .timer-badge {
+    font-size: 12px;
+    padding-left: 8px;
+    white-space: nowrap;
+  }
+  .recording-badge { font-size: 0; gap: 0; }
+  .header-right { gap: 0; flex-shrink: 0; }
+  .header-right ion-button {
+    font-size: 17px;
+    --padding-start: 6px;
+    --padding-end: 6px;
+  }
+  .btn-label { font-size: 10px; margin-left: 2px; }
+  .meeting-controls { gap: 6px; padding: 8px 10px; }
+  .controls-center { gap: 8px; }
 }
 </style>

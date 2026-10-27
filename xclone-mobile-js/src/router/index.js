@@ -13,6 +13,7 @@ import FraternityDiscoverPage from '../views/FraternityDiscoverPage.vue';
 import FraternityPage from '../views/FraternityPage.vue';
 import VerificationPortal from '../views/VerificationPortal.vue';
 import VideoFeedPage from '../views/VideoFeedPage.vue';
+import TalksPage from '../views/TalksPage.vue';
 
 import NoticeBoardPage from '../views/NoticeBoardPage.vue';
 import OrgBoardPage from '../views/OrgBoardPage.vue';
@@ -152,6 +153,11 @@ const routes = [
         path: 'videos',
         component: VideoFeedPage,
         meta: { requiresAuth: false }
+      },
+      {
+        path: 'talks',
+        component: TalksPage,
+        meta: { requiresAuth: true }
       }
     ]
   }

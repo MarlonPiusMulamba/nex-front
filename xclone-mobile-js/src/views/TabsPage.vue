@@ -32,6 +32,12 @@
             <span class="nav-label">Videos</span>
           </router-link>
 
+          <router-link to="/tabs/talks" class="nav-item">
+            <ion-icon :icon="videocamOutline" class="nav-icon"></ion-icon>
+            <span class="nav-label">Talks</span>
+            <span v-if="liveTalkCount > 0" class="nav-badge">{{ liveTalkCount }} live</span>
+          </router-link>
+
           <router-link to="/tabs/dm" class="nav-item">
             <ion-icon :icon="mail" class="nav-icon"></ion-icon>
             <span class="nav-label">Messages</span>
@@ -106,6 +112,12 @@
               <ion-label class="tab-lbl">Videos</ion-label>
             </ion-tab-button>
 
+            <ion-tab-button tab="talks" href="/tabs/talks" class="tab-btn">
+              <ion-icon :icon="videocamOutline"></ion-icon>
+              <ion-badge v-if="liveTalkCount > 0" class="notif-badge">{{ liveTalkCount }}</ion-badge>
+              <ion-label class="tab-lbl">Talks</ion-label>
+            </ion-tab-button>
+
             <ion-tab-button tab="dm" href="/tabs/dm" class="tab-btn">
               <ion-icon :icon="mail"></ion-icon>
               <ion-badge v-if="unreadCount > 0" class="dm-badge">{{ unreadCount }}</ion-badge>
@@ -176,7 +188,7 @@ import {
   IonPage, IonTabs, IonRouterOutlet, IonTabBar, IonTabButton, 
   IonIcon, IonLabel, IonBadge, IonFab, IonFabButton 
 } from '@ionic/vue';
-import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline, add, shieldOutline, playCircleOutline, megaphoneOutline, settingsOutline } from 'ionicons/icons';
+import { home, search, mail, person, notificationsOutline, logoTwitter, logOutOutline, add, shieldOutline, playCircleOutline, megaphoneOutline, settingsOutline, videocamOutline } from 'ionicons/icons';
 import axios from 'axios';
 import config from '@/config/index.js';
 import TrendingWidget from '@/components/TrendingWidget.vue';
@@ -214,6 +226,7 @@ export default {
       playCircleOutline,
       megaphoneOutline,
       settingsOutline,
+      videocamOutline,
       showSettingsModal: false,
       i18nState,
       unreadCount: 0,
@@ -227,6 +240,8 @@ export default {
       API_URL: config.api.baseURL,
       pollInterval: null,
       notifPollInterval: null,
+      liveTalkCount: 0,
+      liveTalkInterval: null,
       audioCtx: null,
       audioUnlocked: false,
       _unlockAudio: null,
@@ -324,6 +339,16 @@ export default {
         console.error('Failed to fetch unread notices count:', err);
       }
     },
+
+    async fetchLiveTalkCount() {
+      try {
+        const res = await axios.get(`${this.API_URL}/api/talks/upcoming`);
+        const talks = res.data?.talks || [];
+        this.liveTalkCount = talks.filter(t => t.live_space_id).length;
+      } catch (err) {
+        console.error('Failed to fetch live talks count:', err);
+      }
+    },
     
     triggerGlobalPost() {
       // Open selector first
@@ -366,6 +391,9 @@ export default {
     this.fetchUnreadCount();
     this.fetchUnreadNotifCount();
     this.fetchUnreadNoticeCount();
+    this.fetchLiveTalkCount();
+    if (this.liveTalkInterval) clearInterval(this.liveTalkInterval);
+    this.liveTalkInterval = setInterval(() => this.fetchLiveTalkCount(), 60000);
     
     // Listen for custom events to refresh count
     window.addEventListener('dm-refresh', this.fetchUnreadCount);
@@ -439,6 +467,10 @@ export default {
     }
     if (this.notifPollInterval) {
       clearInterval(this.notifPollInterval);
+    }
+    if (this.liveTalkInterval) {
+      clearInterval(this.liveTalkInterval);
+      this.liveTalkInterval = null;
     }
     window.removeEventListener('dm-refresh', this.fetchUnreadCount);
     window.removeEventListener('notifications-refresh', this.fetchUnreadNotifCount);

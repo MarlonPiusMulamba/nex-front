@@ -1122,7 +1122,9 @@ export default {
         }
         this.pendingBreakout = null;
         try {
-          const res = await axios.get(`${this.API_URL}/api/audio-spaces/${room.id}`);
+          const res = await axios.get(`${this.API_URL}/api/audio-spaces/${room.id}`, {
+            params: { user_id: this.userId }
+          });
           if (res.data && res.data.success) {
             this.currentSpace = res.data.space;
           } else {
@@ -2699,6 +2701,23 @@ export default {
     },
 
     async handleDeepLinks() {
+      // Space invite deep link (?space=<id>): open the meeting directly
+      const spaceId = this.$route.query.space;
+      if (spaceId) {
+        console.log('🔗 Deep link detected for space:', spaceId);
+        try {
+          const res = await axios.get(`${this.API_URL}/api/audio-spaces/${spaceId}`, {
+            params: { user_id: this.userId }
+          });
+          if (res.data && res.data.success) {
+            this.currentSpace = res.data.space;
+            this.showSpaceModal = true;
+            return;
+          }
+        } catch (err) {
+          console.error('❌ Failed to fetch deep linked space:', err);
+        }
+      }
       const postId = this.$route.query.post;
       if (postId) {
         console.log('🔗 Deep link detected for post:', postId);

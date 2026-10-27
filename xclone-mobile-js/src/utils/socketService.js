@@ -44,6 +44,7 @@ class SocketService {
             this.socket.emit('user:register', { user_id: this.userId });
             // Also join personal room explicitly (needed after reconnects)
             this.socket.emit('join', { user_id: this.userId });
+            this.flushPendingRegister();
 
             // Start heartbeat
             this.startHeartbeat();
@@ -57,6 +58,7 @@ class SocketService {
                 this.socket.emit('user:register', { user_id: this.userId });
                 this.socket.emit('join', { user_id: this.userId });
             }
+            this.flushPendingRegister();
             if (window.notificationService && window.notificationService.checkMissedNotices) {
                 window.notificationService.checkMissedNotices();
             }
@@ -280,6 +282,27 @@ class SocketService {
     joinRoom(roomId) {
         if (this.socket && this.isConnected) {
             this.socket.emit('join', { room: roomId });
+        }
+    }
+
+    // Register presence + join your personal room. Required for guests too:
+    // app-startup registration only covers the logged-in account, so link
+    // joiners would otherwise never receive approval/DM/call events.
+    registerUser(userId) {
+        if (!userId) return;
+        if (this.socket && this.isConnected) {
+            this.socket.emit('user:register', { user_id: userId });
+            this.socket.emit('join', { user_id: userId });
+        } else {
+            this._pendingRegister = userId;
+        }
+    }
+
+    flushPendingRegister() {
+        if (this._pendingRegister && this.socket && this.isConnected) {
+            const uid = this._pendingRegister;
+            this._pendingRegister = null;
+            this.registerUser(uid);
         }
     }
 }
