@@ -280,6 +280,8 @@ router.afterEach((to) => {
       title: 'Bugema University - Digital Notice Board',
       desc: 'Official Bugema University Digital Notice Board. View official announcements, academic notices, timetable updates, and campus news.'
     });
+    document.documentElement.classList.remove('nexrooms-theme');
+    document.body.classList.remove('nexrooms-theme');
   } else if (isNexRooms) {
     updateHead({
       iconUrl: '/nexrooms-logo.png',
@@ -288,6 +290,8 @@ router.afterEach((to) => {
       title: 'NexRooms — Instant Meetings & Scheduled Talks',
       desc: 'Create instant meetings, schedule talks, and join rooms — powered by NexFi. Black-and-white, distraction-free.'
     });
+    document.documentElement.classList.add('nexrooms-theme');
+    document.body.classList.add('nexrooms-theme');
   } else {
     updateHead({
       iconUrl: '/logo.png',
@@ -296,6 +300,8 @@ router.afterEach((to) => {
       title: 'NexFi - Connect, Share & Communicate',
       desc: 'Connect, share updates, direct message, and communicate seamlessly on NexFi.'
     });
+    document.documentElement.classList.remove('nexrooms-theme');
+    document.body.classList.remove('nexrooms-theme');
   }
 });
 
