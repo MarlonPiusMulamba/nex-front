@@ -23,7 +23,7 @@
         <section v-if="!userId" class="nr-hero">
           <div class="nr-hero-badge">NEXROOMS</div>
           <h1 class="nr-hero-title">Your meeting room.<br><span class="nr-hero-thin">Always ready.</span></h1>
-          <p class="nr-hero-sub">Instant meetings, scheduled talks and breakout rooms — distraction-free in pure black and white.</p>
+          <p class="nr-hero-sub">Instant meetings, scheduled talks and breakout rooms.</p>
           <div class="nr-hero-actions">
             <button class="nr-btn nr-btn-primary" @click="goLogin">Get started</button>
             <button class="nr-btn nr-btn-outline" @click="goLogin">Join a meeting</button>

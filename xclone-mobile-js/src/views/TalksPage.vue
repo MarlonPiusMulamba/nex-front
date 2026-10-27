@@ -12,7 +12,7 @@
           <img src="/nexrooms-logo.png" class="nexrooms-hub-logo" alt="NexRooms" />
           <div>
             <div class="nexrooms-hub-title">Open NexRooms</div>
-            <div class="nexrooms-hub-sub">Distraction-free black &amp; white meeting hub</div>
+            <div class="nexrooms-hub-sub">Dedicated instant meetings &amp; scheduled talks</div>
           </div>
         </div>
         <span class="nexrooms-hub-arrow">Launch →</span>

@@ -306,7 +306,7 @@ router.afterEach((to) => {
       manifestUrl: '/manifest-nexrooms.json',
       appName: 'NexRooms',
       title: 'NexRooms — Instant Meetings & Scheduled Talks',
-      desc: 'Create instant meetings, schedule talks, and join rooms — powered by NexFi. Black-and-white, distraction-free.'
+      desc: 'Create instant meetings, schedule talks, and join rooms — powered by NexFi.'
     });
     document.documentElement.classList.add('nexrooms-theme');
     document.body.classList.add('nexrooms-theme');
