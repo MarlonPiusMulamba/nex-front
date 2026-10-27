@@ -23,6 +23,15 @@ import NexRoomsPage from '../views/NexRoomsPage.vue';
 import NexRoomsAuthPage from '../views/NexRoomsAuthPage.vue';
 
 const standaloneOrg = (import.meta.env.VITE_STANDALONE_ORG || '').trim() || null;
+const standaloneApp = (import.meta.env.VITE_STANDALONE_APP || '').trim().toLowerCase();
+
+// Standalone NexRooms check (via Vercel env var, custom domain like rooms.nexfi.org.uk, or ?app=rooms query)
+export const isRoomsStandalone = () => {
+  if (standaloneApp === 'rooms' || import.meta.env.VITE_STANDALONE_ROOMS === 'true') return true;
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname.toLowerCase();
+  return host.startsWith('rooms.') || host.includes('nexrooms') || window.location.search.includes('app=rooms');
+};
 
 // Runtime check: launched from an installed home-screen icon (separate window, no URL bar)
 function isStandaloneMode() {
@@ -37,6 +46,7 @@ const routes = [
   {
     path: '/',
     redirect: () => {
+      if (isRoomsStandalone()) return '/rooms';
       if (standaloneOrg) return `/notices/${standaloneOrg}`;
       return '/tabs/feed';
     }
@@ -191,7 +201,15 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   console.log('🧭 Navigating to:', to.path);
 
-  if (standaloneOrg || isStandaloneMode()) {
+  if (isRoomsStandalone()) {
+    // In standalone NexRooms mode (e.g. rooms.nexfi.org.uk or nexrooms.vercel.app),
+    // strictly isolate navigation to NexRooms & meeting rooms
+    const allowed = ['/rooms', '/talk/'];
+    const isAllowed = allowed.some(p => to.path.startsWith(p));
+    if (!isAllowed) {
+      return next('/rooms');
+    }
+  } else if (standaloneOrg || isStandaloneMode()) {
     // In standalone mode, only allow the org notice board and its login/register pages
     // plus standalone meeting rooms (shared talk links must open anywhere).
     const org = noticeSlug();
@@ -219,7 +237,7 @@ router.beforeEach((to, from, next) => {
 router.afterEach((to) => {
   if (typeof document === 'undefined') return;
   const isBugemaNotice = to.path.startsWith('/notices/bugema') || standaloneOrg === 'bugema';
-  const isNexRooms = to.path.startsWith('/rooms');
+  const isNexRooms = to.path.startsWith('/rooms') || isRoomsStandalone();
 
   const setMeta = (id, nameOrProp, val) => {
     let el = document.getElementById(id) || document.querySelector(`meta[property='${nameOrProp}']`) || document.querySelector(`meta[name='${nameOrProp}']`);

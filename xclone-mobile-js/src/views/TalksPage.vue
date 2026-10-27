@@ -6,6 +6,18 @@
       </ion-toolbar>
     </ion-header>
     <ion-content :fullscreen="true">
+      <!-- NexRooms Dedicated Hub Banner -->
+      <div class="nexrooms-hub-banner" @click="$router.push('/rooms')">
+        <div class="nexrooms-hub-left">
+          <img src="/nexrooms-logo.png" class="nexrooms-hub-logo" alt="NexRooms" />
+          <div>
+            <div class="nexrooms-hub-title">Open NexRooms</div>
+            <div class="nexrooms-hub-sub">Distraction-free black &amp; white meeting hub</div>
+          </div>
+        </div>
+        <span class="nexrooms-hub-arrow">Launch →</span>
+      </div>
+
       <div class="talks-card instant-card">
         <button v-if="!showMeetingForm" class="talk-schedule-toggle" @click="showMeetingForm = true">
           + New instant meeting
@@ -189,6 +201,51 @@ export default {
   color: var(--ion-color-medium, #8b949e);
   padding: 16px 24px 32px;
 }
+.nexrooms-hub-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #000000;
+  border: 1px solid #333333;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 12px 12px 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.nexrooms-hub-banner:hover {
+  border-color: #ffffff;
+  background: #0a0a0a;
+}
+.nexrooms-hub-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.nexrooms-hub-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid #222222;
+}
+.nexrooms-hub-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+}
+.nexrooms-hub-sub {
+  font-size: 11px;
+  color: #888888;
+}
+.nexrooms-hub-arrow {
+  font-size: 12px;
+  font-weight: 700;
+  color: #000000;
+  background: #ffffff;
+  padding: 5px 12px;
+  border-radius: 6px;
+}
+
 .instant-card {
   background: #161b22;
   border: 1px solid #30363d;
