@@ -19,6 +19,8 @@ import NoticeBoardPage from '../views/NoticeBoardPage.vue';
 import OrgBoardPage from '../views/OrgBoardPage.vue';
 import OrgAuthPage from '../views/OrgAuthPage.vue';
 import TalkRoomView from '../views/TalkRoomView.vue';
+import NexRoomsPage from '../views/NexRoomsPage.vue';
+import NexRoomsAuthPage from '../views/NexRoomsAuthPage.vue';
 
 const standaloneOrg = (import.meta.env.VITE_STANDALONE_ORG || '').trim() || null;
 
@@ -68,6 +70,17 @@ const routes = [
     // Standalone meeting room: shareable link, guest-friendly, no tabs/feed
     path: '/talk/:code',
     component: TalkRoomView,
+    meta: { requiresAuth: false }
+  },
+  {
+    // NexRooms standalone — talks/meetings hub, no NexFi nav
+    path: '/rooms',
+    component: NexRoomsPage,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/rooms/login',
+    component: NexRoomsAuthPage,
     meta: { requiresAuth: false }
   },
   {
@@ -182,7 +195,7 @@ router.beforeEach((to, from, next) => {
     // In standalone mode, only allow the org notice board and its login/register pages
     // plus standalone meeting rooms (shared talk links must open anywhere).
     const org = noticeSlug();
-    const allowedPrefixes = [`/notices/${org}`, `/tabs/notices/${org}`, '/talk/'];
+    const allowedPrefixes = [`/notices/${org}`, `/tabs/notices/${org}`, '/talk/', '/rooms'];
     const isAllowed = allowedPrefixes.some(p => to.path.startsWith(p));
     if (!isAllowed) {
       return next(`/notices/${org}`);
@@ -206,6 +219,7 @@ router.beforeEach((to, from, next) => {
 router.afterEach((to) => {
   if (typeof document === 'undefined') return;
   const isBugemaNotice = to.path.startsWith('/notices/bugema') || standaloneOrg === 'bugema';
+  const isNexRooms = to.path.startsWith('/rooms');
 
   const setMeta = (id, nameOrProp, val) => {
     let el = document.getElementById(id) || document.querySelector(`meta[property='${nameOrProp}']`) || document.querySelector(`meta[name='${nameOrProp}']`);
@@ -225,26 +239,18 @@ router.afterEach((to) => {
 
     // 1. Favicon links
     let favicon = document.getElementById('app-favicon') || document.querySelector("link[rel*='icon']");
-    if (favicon) {
-      favicon.href = iconUrl;
-    }
+    if (favicon) favicon.href = iconUrl;
 
     let shortcutIcon = document.querySelector("link[rel='shortcut icon']");
-    if (shortcutIcon) {
-      shortcutIcon.href = iconUrl;
-    }
+    if (shortcutIcon) shortcutIcon.href = iconUrl;
 
-    // 2. Apple Touch Icon (Critical for iOS Home Screen Icon!)
+    // 2. Apple Touch Icon
     let appleIcon = document.getElementById('app-apple-touch-icon') || document.querySelector("link[rel='apple-touch-icon']");
-    if (appleIcon) {
-      appleIcon.href = iconUrl;
-    }
+    if (appleIcon) appleIcon.href = iconUrl;
 
-    // 3. Manifest Link (Critical for Android & Desktop PWA Name & Icon!)
+    // 3. Manifest Link
     let manifest = document.getElementById('manifest-link') || document.querySelector("link[rel='manifest']");
-    if (manifest) {
-      manifest.setAttribute('href', manifestUrl);
-    }
+    if (manifest) manifest.setAttribute('href', manifestUrl);
 
     // 4. App Name & OpenGraph Meta
     setMeta('meta-title', 'title', title);
@@ -260,6 +266,10 @@ router.afterEach((to) => {
 
     setMeta('apple-title', 'apple-mobile-web-app-title', appName);
     setMeta('app-name', 'application-name', appName);
+
+    // Theme colour
+    let themeColor = document.querySelector("meta[name='theme-color']");
+    if (themeColor) themeColor.setAttribute('content', appName === 'NexRooms' ? '#000000' : (appName === 'Bugema Notice' ? '#daa520' : '#1208a1'));
   };
 
   if (isBugemaNotice) {
@@ -269,6 +279,14 @@ router.afterEach((to) => {
       appName: 'Bugema Notice',
       title: 'Bugema University - Digital Notice Board',
       desc: 'Official Bugema University Digital Notice Board. View official announcements, academic notices, timetable updates, and campus news.'
+    });
+  } else if (isNexRooms) {
+    updateHead({
+      iconUrl: '/nexrooms-logo.png',
+      manifestUrl: '/manifest-nexrooms.json',
+      appName: 'NexRooms',
+      title: 'NexRooms — Instant Meetings & Scheduled Talks',
+      desc: 'Create instant meetings, schedule talks, and join rooms — powered by NexFi. Black-and-white, distraction-free.'
     });
   } else {
     updateHead({
