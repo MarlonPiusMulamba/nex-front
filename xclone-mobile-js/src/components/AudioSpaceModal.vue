@@ -408,7 +408,18 @@
               </div>
             </div>
             
-            <button class="ctrl-btn end-btn labeled-btn" @click="confirmEnd" v-if="isHost" title="End call for everyone">
+            <!-- Host Record Button -->
+            <button
+              v-if="isHost"
+              class="ctrl-btn labeled-btn"
+              :class="{ 'rec-active-btn': isRecording }"
+              @click="toggleRecording"
+              :title="isRecording ? 'Stop recording' : 'Record meeting'"
+            >
+              <span class="rec-dot-icon" :class="{ 'pulsing': isRecording }"></span>
+              <span class="ctrl-label">{{ isRecording ? 'Rec ON' : 'Record' }}</span>
+            </button>
+                        <button class="ctrl-btn end-btn labeled-btn" @click="confirmEnd" v-if="isHost" title="End call for everyone">
               <ion-icon :icon="powerOutline"></ion-icon>
               <span class="ctrl-label">End</span>
             </button>
@@ -505,7 +516,16 @@
       </div>
 
     </div>
-  </ion-modal>
+  
+      <!-- Saving recording indicator -->
+      <div v-if="isSavingRecording" class="saving-rec-overlay">
+        <div class="saving-rec-box">
+          <span class="rec-dot-icon pulsing"></span>
+          <span>Finalizing and saving meeting recording...</span>
+        </div>
+      </div>
+
+    </ion-modal>
 </template>
 
 <script setup>
@@ -2076,7 +2096,7 @@ const enterRoom = async () => {
     await joinRoomApi();
     await joinMesh();
     startBwWatch();
-    if (isHost.value) startRecording();
+    if (isHost.value && props.space?.is_record_enabled) startRecording();
   }
   roomActive.value = true;
   pokeControls();
@@ -2285,6 +2305,18 @@ const buildCompositeStream = () => {
     };
     draw();
 
+    // Guarantee valid audio track in destination so recorder encodes audio track
+    if (compDest.stream.getAudioTracks().length === 0 && compAudioCtx) {
+      try {
+        const osc = compAudioCtx.createOscillator();
+        const silent = compAudioCtx.createGain();
+        silent.gain.value = 0.001; // nearly silent baseline to keep track active
+        osc.connect(silent);
+        silent.connect(compDest);
+        osc.start();
+      } catch (_) {}
+    }
+
     const out = compCanvas.captureStream(30);
     compDest.stream.getAudioTracks().forEach(t => out.addTrack(t));
     return out;
@@ -2295,22 +2327,55 @@ const buildCompositeStream = () => {
   }
 };
 
+const toggleRecording = () => {
+  if (isRecording.value) {
+    if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
+      try {
+        mediaRecorder.value.stop();
+      } catch (_) {}
+    }
+    isRecording.value = false;
+    announceRecording(false);
+  } else {
+    startRecording();
+  }
+};
+
+const isSavingRecording = ref(false);
+
 const startRecording = () => {
   if (isRecording.value) return;
-  // Composite needs at least the local stream for audio; video tiles optional
   const recStream = buildCompositeStream() || localStream.value;
   if (!recStream) return;
   try {
     recordedChunks.length = 0;
-    const options = { mimeType: 'video/webm; codecs=vp9' };
-    if (!MediaRecorder.isTypeSupported(options.mimeType)) options.mimeType = 'video/webm';
-
+    let mimeType = '';
+    const candidates = [
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=h264,opus',
+      'video/webm',
+      'video/mp4'
+    ];
+    for (const cand of candidates) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(cand)) {
+        mimeType = cand;
+        break;
+      }
+    }
+    const options = mimeType ? { mimeType } : {};
     mediaRecorder.value = new MediaRecorder(recStream, options);
     mediaRecorder.value.ondataavailable = (e) => {
-      if (e.data.size > 0) recordedChunks.push(e.data);
+      if (e.data && e.data.size > 0) {
+        recordedChunks.push(e.data);
+      }
     };
-    mediaRecorder.value.onstop = () => { stopComposite(); uploadRecording(); };
-    mediaRecorder.value.start();
+    mediaRecorder.value.onstop = () => {
+      stopComposite();
+      uploadRecording();
+    };
+    // Force browser to deliver chunks every 1 second
+    mediaRecorder.value.start(1000);
     isRecording.value = true;
     announceRecording(true);
   } catch (err) {
@@ -2322,16 +2387,70 @@ const startRecording = () => {
 const uploadRecording = async () => {
     announceRecording(false);
     if (recordedChunks.length === 0) return;
-    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    isSavingRecording.value = true;
+    const mime = (mediaRecorder.value && mediaRecorder.value.mimeType) || 'video/webm';
+    const blob = new Blob(recordedChunks, { type: mime });
     const formData = new FormData();
     formData.append('file', blob, 'meeting_recording.webm');
     try {
         await axios.post(`${API_URL}/api/audio-spaces/${props.space.id}/recording`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
+        console.log('Recording uploaded successfully for space:', props.space.id);
     } catch (err) {
         console.error('Failed to upload recording:', err);
+    } finally {
+        isSavingRecording.value = false;
     }
+};
+
+const stopAndUploadRecording = () => {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (!done) {
+        done = true;
+        isRecording.value = false;
+        isSavingRecording.value = false;
+        resolve();
+      }
+    };
+
+    // 5-second safety timer so the UI NEVER hangs forever
+    const timer = setTimeout(() => {
+      console.warn('stopAndUploadRecording safety timeout triggered');
+      stopComposite();
+      finish();
+    }, 5000);
+
+    if (!mediaRecorder.value || mediaRecorder.value.state === 'inactive') {
+      clearTimeout(timer);
+      finish();
+      return;
+    }
+
+    mediaRecorder.value.onstop = async () => {
+      clearTimeout(timer);
+      stopComposite();
+      try {
+        await uploadRecording();
+      } catch (err) {
+        console.error('Upload error in onstop:', err);
+      }
+      finish();
+    };
+
+    try {
+      if (mediaRecorder.value.state === 'recording') {
+        try { mediaRecorder.value.requestData(); } catch (_) {}
+      }
+      mediaRecorder.value.stop();
+    } catch (e) {
+      console.warn('mediaRecorder stop error:', e);
+      clearTimeout(timer);
+      finish();
+    }
+  });
 };
 
 const stopTracks = () => {
@@ -2445,7 +2564,7 @@ const toggleCamera = async () => {
         if (localVideo.value) localVideo.value.srcObject = localStream.value;
         isVideoOn.value = true;
 
-        if (props.space?.host_user_id === props.currentUser?.id && !isRecording.value) {
+        if (props.space?.host_user_id === props.currentUser?.id && !isRecording.value && props.space?.is_record_enabled) {
             startRecording();
         }
       } else {
@@ -2508,14 +2627,21 @@ const toggleHand = () => {
 };
 
 const endSpace = async () => {
-    if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') mediaRecorder.value.stop();
+    if (isRecording.value) {
+        isSavingRecording.value = true;
+        await stopAndUploadRecording();
+    }
     try {
         const res = await axios.post(`${API_URL}/api/audio-spaces/${props.space.id}/end`, {
             user_id: props.currentUser.id
         });
         if (res.data.success) markLeftAndLeave();
+        else markLeftAndLeave();
     } catch (err) {
         console.error('End space error:', err);
+        markLeftAndLeave();
+    } finally {
+        isSavingRecording.value = false;
     }
 };
 
@@ -3167,5 +3293,51 @@ const confirmEnd = () => {
   .btn-label { font-size: 10px; margin-left: 2px; }
   .meeting-controls { gap: 6px; padding: 8px 10px; }
   .controls-center { gap: 8px; }
+}
+
+.rec-active-btn {
+  background: rgba(239, 68, 68, 0.2) !important;
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+}
+.rec-dot-icon {
+  width: 10px;
+  height: 10px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  display: inline-block;
+  margin-bottom: 2px;
+}
+.rec-dot-icon.pulsing {
+  animation: recPulse 1.2s infinite ease-in-out;
+}
+@keyframes recPulse {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.6; }
+}
+
+.saving-rec-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(6px);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.saving-rec-box {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 20px 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
 }
 </style>

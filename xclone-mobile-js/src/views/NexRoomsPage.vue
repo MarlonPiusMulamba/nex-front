@@ -35,6 +35,28 @@
         ════════════════════════════════════════════════════ -->
         <main v-else class="nr-main">
 
+          <!-- ── ONGOING / REJOIN ACTIVE MEETING ─────────── -->
+          <section v-if="activeMeetings.length > 0" class="nr-card nr-active-card">
+            <div class="nr-card-header nr-between">
+              <div>
+                <span class="nr-card-tag nr-tag-live">● ONGOING LIVE MEETING</span>
+                <h2 class="nr-card-title">{{ activeMeetings[0].title }}</h2>
+                <p class="nr-card-desc">You have a live meeting in progress. Rejoin now or end it.</p>
+              </div>
+              <div class="nr-active-actions">
+                <button class="nr-btn nr-btn-primary" @click="rejoinActiveSpace(activeMeetings[0])">
+                  ▶ Rejoin Meeting
+                </button>
+                <button class="nr-btn nr-btn-ghost nr-btn-sm" @click="endActiveSpace(activeMeetings[0])">
+                  End Call
+                </button>
+                <button class="nr-btn nr-btn-danger-outline nr-btn-sm" @click="deleteMeeting(activeMeetings[0])" title="Delete meeting">
+                  🗑 Delete
+                </button>
+              </div>
+            </div>
+          </section>
+
           <!-- ── JOIN BY LINK ────────────────────────────── -->
           <section class="nr-card">
             <div class="nr-card-header">
@@ -104,6 +126,11 @@
               <label class="nr-locked-row">
                 <input type="checkbox" v-model="meetingLocked" class="nr-checkbox" />
                 <span>Locked room — approve participants before they speak</span>
+              </label>
+
+              <label class="nr-locked-row nr-record-row">
+                <input type="checkbox" v-model="meetingRecord" class="nr-checkbox" />
+                <span>🔴 Record this meeting — saved to history when ended</span>
               </label>
 
               <div class="nr-form-actions">
@@ -259,11 +286,133 @@
             </div>
           </section>
 
+        
+          <!-- ── MEETING HISTORY & RECORDINGS ────────────── -->
+          <section class="nr-card">
+            <div class="nr-card-header nr-between">
+              <div>
+                <span class="nr-card-tag">ARCHIVE</span>
+                <h2 class="nr-card-title">
+                  Meeting History & Recordings
+                  <span v-if="recordedHistory.length" class="nr-count-badge">{{ recordedHistory.length }}</span>
+                </h2>
+                <p class="nr-card-desc">Recorded meetings saved in history so you can play back what transpired.</p>
+              </div>
+              <button class="nr-btn nr-btn-outline nr-btn-sm" @click="fetchMySpaces" :disabled="loadingSpaces">
+                <span v-if="loadingSpaces" class="nr-spinner"></span>
+                <span v-else>↻ Refresh</span>
+              </button>
+            </div>
+
+            <!-- Empty State -->
+            <div v-if="recordedHistory.length === 0 && !loadingSpaces" class="nr-empty">
+              <div class="nr-empty-icon">📼</div>
+              <p class="nr-empty-title">No recorded meetings yet</p>
+              <p class="nr-empty-sub">Enable "Record this meeting" when starting a meeting to keep its recording in history.</p>
+            </div>
+
+            <!-- History List -->
+            <div v-else class="nr-history-list">
+              <div v-for="m in recordedHistory" :key="m.id" class="nr-history-item">
+                <div class="nr-history-info">
+                  <div class="nr-history-title-row">
+                    <span class="nr-history-title">{{ m.title }}</span>
+                    <span v-if="m.recording_url" class="nr-rec-pill">● RECORDED</span>
+                    <span v-else class="nr-rec-pill nr-rec-none">NO RECORDING</span>
+                  </div>
+                  <div class="nr-history-meta">
+                    <span>{{ formatMeetingDate(m.ended_at || m.created_at) }}</span>
+                    <span v-if="m.join_code">• Code: {{ m.join_code }}</span>
+                  </div>
+                </div>
+
+                <div class="nr-history-actions">
+                  <button
+                    v-if="m.recording_url"
+                    class="nr-btn nr-btn-primary nr-btn-sm"
+                    @click="playRecording(m)"
+                  >
+                    ▶ Play Recording
+                  </button>
+                  <button
+                    class="nr-btn nr-btn-danger-outline nr-btn-sm"
+                    @click="deleteMeeting(m)"
+                    title="Delete this meeting"
+                  >
+                    🗑 Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
         </main>
 
         <!-- ═══════════════════════════════════════════════════
              AUDIO SPACE MODAL
         ════════════════════════════════════════════════════ -->
+        
+        <!-- ═══════════════════════════════════════════════════
+             RECORDING PLAYBACK MODAL
+        ════════════════════════════════════════════════════ -->
+        <div v-if="showPlaybackModal && playingRecording" class="nr-modal-backdrop" @click="closePlayback">
+          <div class="nr-modal-card" @click.stop>
+            <div class="nr-modal-header">
+              <div>
+                <h3 class="nr-modal-title">{{ playingRecording.title }}</h3>
+                <p class="nr-modal-sub">{{ formatMeetingDate(playingRecording.ended_at || playingRecording.created_at) }}</p>
+              </div>
+              <button class="nr-btn-close" @click="closePlayback">✕</button>
+            </div>
+
+            <div class="nr-player-wrap">
+              <iframe
+                v-if="isYouTube(playingRecording.recording_url)"
+                :src="getYouTubeEmbed(playingRecording.recording_url)"
+                class="nr-video-iframe"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+              ></iframe>
+              <div v-else class="nr-video-box">
+                <video
+                  :key="playingRecording.id"
+                  controls
+                  playsinline
+                  preload="metadata"
+                  class="nr-video-player"
+                  @error="videoLoadError = true"
+                >
+                  <source :src="getRecordingSrc(playingRecording.recording_url)" type="video/webm" />
+                  <source :src="getRecordingSrc(playingRecording.recording_url)" type="video/mp4" />
+                  Your browser does not support playing this video directly.
+                </video>
+
+                <div v-if="videoLoadError" class="nr-player-error-badge">
+                  <p>⚠️ Video stream could not be loaded directly (file may be empty or corrupted).</p>
+                  <div class="nr-err-btns">
+                    <a :href="getRecordingSrc(playingRecording.recording_url)" target="_blank" class="nr-btn nr-btn-outline nr-btn-sm">
+                      Open Direct Link
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="nr-modal-footer">
+              <a
+                v-if="playingRecording.recording_url && !isYouTube(playingRecording.recording_url)"
+                :href="getRecordingSrc(playingRecording.recording_url)"
+                download="meeting_recording.webm"
+                target="_blank"
+                class="nr-btn nr-btn-outline nr-btn-sm"
+              >
+                Download Recording
+              </a>
+              <button class="nr-btn nr-btn-ghost nr-btn-sm" @click="closePlayback">Close</button>
+            </div>
+          </div>
+        </div>
+
         <AudioSpaceModal
           v-if="showSpaceModal && currentSpace"
           :is-open="showSpaceModal"
@@ -286,7 +435,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, onBeforeRouteUpdate } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import axios from 'axios';
 import config from '@/config/index.js';
@@ -296,9 +445,31 @@ const router = useRouter();
 const API_URL = config.api.baseURL;
 
 // ── Auth ─────────────────────────────────────────────
-const userId   = ref(localStorage.getItem('userId'));
-const username = ref(localStorage.getItem('username') || '');
+const userId     = ref(localStorage.getItem('userId'));
+const username   = ref(localStorage.getItem('username') || '');
 const userAvatar = ref(localStorage.getItem('userAvatar') || '');
+
+// Re-read auth from localStorage (called after login redirect or storage change)
+const refreshAuth = () => {
+  const newId = localStorage.getItem('userId');
+  const wasLoggedIn = !!userId.value;
+  userId.value     = newId;
+  username.value   = localStorage.getItem('username') || '';
+  userAvatar.value = localStorage.getItem('userAvatar') || '';
+  if (newId) {
+    fetchTalks();
+    fetchMySpaces();
+    if (!refreshTimer) {
+      refreshTimer = setInterval(() => {
+        fetchTalks();
+        fetchMySpaces();
+      }, 30000);
+    }
+  }
+};
+
+// Trigger refreshAuth whenever this route is re-entered after a login push
+onBeforeRouteUpdate(() => { refreshAuth(); });
 
 // ── Join by code/link ─────────────────────────────────
 const joinCode  = ref('');
@@ -324,7 +495,112 @@ const showMeetingForm   = ref(false);
 const meetingTitle      = ref('');
 const meetingVisibility = ref('unlisted');
 const meetingLocked     = ref(false);
+const meetingRecord     = ref(false);
 const creating          = ref(false);
+
+// ── My Spaces & History ──────────────────────────────
+const mySpaces        = ref([]);
+const loadingSpaces   = ref(false);
+
+const activeMeetings  = computed(() => {
+  return mySpaces.value.filter(s => s.status === 'live');
+});
+
+const recordedHistory = computed(() => {
+  return mySpaces.value.filter(s => s.status === 'ended');
+});
+
+const fetchMySpaces = async () => {
+  if (!userId.value) return;
+  loadingSpaces.value = true;
+  try {
+    const res = await axios.get(`${API_URL}/api/audio-spaces/my-history`, {
+      params: { host_id: userId.value }
+    });
+    if (res.data?.success) {
+      mySpaces.value = res.data.spaces || [];
+    }
+  } catch (err) {
+    console.warn('fetchMySpaces failed', err);
+  } finally {
+    loadingSpaces.value = false;
+  }
+};
+
+const rejoinActiveSpace = async (space) => {
+  await openSpaceById(space.id);
+};
+
+const endActiveSpace = async (space) => {
+  if (!confirm(`End "${space.title}" for everyone?`)) return;
+  try {
+    await axios.post(`${API_URL}/api/audio-spaces/${space.id}/end`, { user_id: userId.value });
+    await fetchMySpaces();
+  } catch (err) {
+    console.error('endActiveSpace error', err);
+  }
+};
+
+const deleteMeeting = async (meeting) => {
+  if (!confirm(`Delete meeting "${meeting.title}"? This cannot be undone.`)) return;
+  try {
+    const res = await axios.delete(`${API_URL}/api/audio-spaces/${meeting.id}`, {
+      params: { host_id: userId.value }
+    });
+    if (res.data?.success) {
+      mySpaces.value = mySpaces.value.filter(s => s.id !== meeting.id);
+    } else {
+      alert(res.data?.message || 'Could not delete meeting');
+    }
+  } catch (err) {
+    console.error('Delete meeting error:', err);
+    alert('Failed to delete meeting');
+  }
+};
+
+// ── Playback Modal ────────────────────────────────────
+const playingRecording  = ref(null);
+const showPlaybackModal = ref(false);
+const videoLoadError    = ref(false);
+
+const playRecording = (space) => {
+  videoLoadError.value = false;
+  playingRecording.value = space;
+  showPlaybackModal.value = true;
+};
+
+const closePlayback = () => {
+  playingRecording.value = null;
+  showPlaybackModal.value = false;
+  videoLoadError.value = false;
+};
+
+const getRecordingSrc = (url) => {
+  if (!url) return '';
+  url = url.trim().replace(/\?+$/, '');
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
+const isYouTube = (url) => {
+  return /youtube\.com|youtu\.be/.test(url || '');
+};
+
+const getYouTubeEmbed = (url) => {
+  if (!url) return '';
+  const m = url.match(/(?:v=|youtu\.be\/)([\w-]+)/);
+  return m ? `https://www.youtube.com/embed/${m[1]}` : url;
+};
+
+const formatMeetingDate = (ts) => {
+  if (!ts) return '';
+  try {
+    const d = new Date(ts);
+    return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch (_) {
+    return ts;
+  }
+};
 
 // ── Room state ────────────────────────────────────────
 const showSpaceModal = ref(false);
@@ -355,7 +631,8 @@ const createInstantMeeting = async () => {
         user_id: userId.value,
         content: title,
         audio_space_title: title,
-        is_locked: meetingLocked.value
+        is_locked: meetingLocked.value,
+        is_record_enabled: meetingRecord.value ? 1 : 0
       });
       if (res.data?.success && res.data.space_id) await openSpaceById(res.data.space_id);
     } else {
@@ -363,9 +640,13 @@ const createInstantMeeting = async () => {
         host_id: userId.value,
         title,
         visibility: 'unlisted',
-        is_locked: meetingLocked.value ? 1 : 0
+        is_locked: meetingLocked.value ? 1 : 0,
+        is_record_enabled: meetingRecord.value ? 1 : 0
       });
-      if (res.data?.success && res.data.space_id) await openSpaceById(res.data.space_id);
+      if (res.data?.success && res.data.space_id) {
+        await openSpaceById(res.data.space_id);
+        fetchMySpaces();
+      }
     }
   } catch (e) {
     console.error('create meeting failed', e);
@@ -378,6 +659,7 @@ const leaveSpace = () => {
   showSpaceModal.value = false;
   currentSpace.value   = null;
   spaceHistory.value   = [];
+  fetchMySpaces();
 };
 
 const switchSpaceRoom = async (room) => {
@@ -544,12 +826,14 @@ const signOut = () => {
 };
 
 onMounted(() => {
-  if (userId.value) { fetchTalks(); refreshTimer = setInterval(fetchTalks, 60000); }
+  refreshAuth();
   window.addEventListener('talks-refresh', fetchTalks);
+  window.addEventListener('nexrooms-auth', refreshAuth);
 });
 onUnmounted(() => {
   if (refreshTimer) clearInterval(refreshTimer);
   window.removeEventListener('talks-refresh', fetchTalks);
+  window.removeEventListener('nexrooms-auth', refreshAuth);
 });
 </script>
 
@@ -1135,5 +1419,219 @@ html.nexrooms-theme .nr-ion-content {
   .nr-card-header.nr-between .nr-btn {
     align-self: flex-start;
   }
+}
+
+/* ── ACTIVE MEETING BANNER ──────────────── */
+.nr-active-card {
+  border: 1px solid #ef4444 !important;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(10, 10, 10, 0.95) 100%) !important;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+}
+.nr-tag-live {
+  color: #ef4444 !important;
+  animation: recPulse 1.5s infinite ease-in-out;
+}
+.nr-active-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── HISTORY LIST ───────────────────────── */
+.nr-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.nr-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: #121212;
+  border: 1px solid #222;
+  border-radius: 10px;
+  transition: border-color 0.15s ease;
+}
+.nr-history-item:hover {
+  border-color: #333;
+}
+.nr-history-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nr-history-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.nr-history-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+.nr-rec-pill {
+  font-size: 10px;
+  font-weight: 800;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 2px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+}
+.nr-rec-processing {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.nr-history-meta {
+  font-size: 12px;
+  color: #777;
+  display: flex;
+  gap: 6px;
+}
+.nr-saving-note {
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+}
+.nr-count-badge {
+  display: inline-block;
+  font-size: 11px;
+  background: #222;
+  color: #aaa;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-left: 6px;
+}
+
+/* ── PLAYBACK MODAL ─────────────────────── */
+.nr-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+.nr-modal-card {
+  width: 100%;
+  max-width: 800px;
+  background: #0d0d0d;
+  border: 1px solid #262626;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+}
+.nr-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #1f1f1f;
+}
+.nr-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+.nr-modal-sub {
+  font-size: 12px;
+  color: #888;
+  margin: 2px 0 0;
+}
+.nr-btn-close {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+.nr-btn-close:hover {
+  color: #fff;
+  background: #1a1a1a;
+}
+.nr-player-wrap {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nr-video-player,
+.nr-video-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #000;
+}
+.nr-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 20px;
+  border-top: 1px solid #1f1f1f;
+  background: #0a0a0a;
+}
+
+.nr-video-box {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+.nr-player-error-badge {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  text-align: center;
+  color: #ef4444;
+  font-size: 13px;
+}
+.nr-err-btns {
+  display: flex;
+  gap: 10px;
+}
+
+.nr-btn-danger-outline {
+  background: transparent !important;
+  color: #ef4444 !important;
+  border: 1px solid rgba(239, 68, 68, 0.4) !important;
+}
+.nr-btn-danger-outline:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: #ef4444 !important;
+}
+.nr-rec-none {
+  color: #888888;
+  background: #1a1a1a;
+  border: 1px solid #333333;
 }
 </style>

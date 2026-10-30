@@ -97,6 +97,8 @@ const handleLogin = async () => {
     });
     if (res.data?.success || res.data?.token || res.data?.user_id) {
       saveAuth(res.data);
+      // Notify NexRoomsPage to re-read auth before the route change
+      window.dispatchEvent(new Event('nexrooms-auth'));
       router.push('/rooms');
     } else {
       errorMessage.value = res.data?.message || 'Invalid username or password.';
@@ -121,6 +123,8 @@ const handleRegister = async () => {
     });
     if (res.data?.success || res.data?.token || res.data?.user_id) {
       saveAuth(res.data);
+      // Notify NexRoomsPage to re-read auth before the route change
+      window.dispatchEvent(new Event('nexrooms-auth'));
       router.push('/rooms');
     } else {
       errorMessage.value = res.data?.message || 'Registration failed.';
