@@ -118,7 +118,7 @@
           </div>
         </div>
 
-        <!-- 📱 Install Mobile App Section -->
+        <!-- Install Mobile App Section -->
         <div class="settings-card install-card">
           <div class="card-header">
             <ion-icon :icon="downloadOutline" class="section-icon"></ion-icon>
@@ -135,7 +135,7 @@
               :class="{ 'install-tab--active': activeInstallTab === 'android' }"
               @click="activeInstallTab = 'android'"
             >
-              <span class="tab-emoji">🤖</span>
+              <span class="tab-emoji"></span>
               <span>Android</span>
             </button>
 
@@ -144,7 +144,7 @@
               :class="{ 'install-tab--active': activeInstallTab === 'pwa' }"
               @click="activeInstallTab = 'pwa'"
             >
-              <span class="tab-emoji">⚡</span>
+              <span class="tab-emoji"></span>
               <span>PWA App</span>
             </button>
 
@@ -153,7 +153,7 @@
               :class="{ 'install-tab--active': activeInstallTab === 'ios' }"
               @click="activeInstallTab = 'ios'"
             >
-              <span class="tab-emoji">🍏</span>
+              <span class="tab-emoji"></span>
               <span>iOS (iPhone)</span>
             </button>
           </div>
@@ -187,7 +187,7 @@
               </div>
               
               <div class="manual-install-card">
-                <h4 class="install-guide-title">📲 How to Install on your Phone:</h4>
+                <h4 class="install-guide-title">How to Install on your Phone:</h4>
                 <ol class="manual-steps-list">
                   <li>Swipe down your <strong>Notification Bar</strong> or open your phone's <strong>Files / Downloads</strong> app.</li>
                   <li>Tap <strong><code>Bugema_Notice_Board.apk</code></strong>.</li>
@@ -228,7 +228,7 @@
             <!-- PWA Downloading Progress UI -->
             <div v-if="pwaDownloading" class="progress-wrap">
               <div class="progress-info-row">
-                <span class="status-pulse">⚡ Launching PWA App Installer...</span>
+                <span class="status-pulse">Launching PWA App Installer...</span>
                 <span class="progress-pct">{{ pwaProgress }}%</span>
               </div>
               <div class="progress-bar-track">

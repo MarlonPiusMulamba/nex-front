@@ -70,7 +70,7 @@
             <!-- Header -->
             <div class="poll-creator-header">
               <div class="pc-header-left">
-                <span class="pc-icon">📊</span>
+                <span class="pc-icon"></span>
                 <span class="pc-title">Create Poll</span>
               </div>
               <div class="poll-type-chips">
@@ -78,7 +78,7 @@
                   Standard
                 </button>
                 <button class="type-chip battle-chip" :class="{ active: pollType === 'battle' }" @click="setPollType('battle')">
-                  ⚔️ Battle
+                  Battle
                 </button>
               </div>
             </div>

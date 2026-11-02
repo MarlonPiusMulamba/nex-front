@@ -5,8 +5,8 @@
     <div class="poll-header">
       <div class="poll-meta-left">
         <span class="poll-type-badge" :class="isBattleMode ? 'badge-battle' : 'badge-poll'">
-          <span v-if="!isBattleMode">📊 Poll</span>
-          <span v-else>⚔️ Battle</span>
+          <span v-if="!isBattleMode">Poll</span>
+          <span v-else>Battle</span>
         </span>
         <span v-if="!poll.is_expired" class="live-chip">
           <span class="live-dot"></span>
